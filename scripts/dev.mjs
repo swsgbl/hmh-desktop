@@ -27,9 +27,9 @@ for (let i = 0; i < 60; i++) {
   }
 }
 
-// 4) electron
-const electronBin = join(root, '..', 'node_modules', 'electron', 'index.js');
-const child = spawn(process.execPath, [electronBin, 'apps/desktop'], {
+// 4) electron(直接用二进制;node 跑 electron/index.js 只是包入口)
+const electronExe = join(root, '..', 'node_modules', 'electron', 'dist', 'electron.exe');
+const child = spawn(electronExe, ['apps/desktop'], {
   cwd: join(root, '..'),
   stdio: 'inherit',
   env: {

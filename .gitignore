@@ -1,7 +1,10 @@
 node_modules/
 dist/
+dist-electron/
+dist-renderer/
 out/
 *.log
 .vite/
 *.tsbuildinfo
 .DS_Store
+test-out.log

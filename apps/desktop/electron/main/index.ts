@@ -15,11 +15,11 @@ import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, type HostState } from '@hmh-desktop/host-adapter';
 import type { EventEnvelope, EventKind } from '@hmh-desktop/contracts';
 
-// cjs bundle(esbuild)输出;__dirname 指向 dist-electron/main
-const here = __dirname;
+// esm bundle(esbuild)输出;Electron 44 内置 Node 22,import.meta.dirname 可用
+const here = import.meta.dirname ?? '.';
 const isDev = process.env.HMH_DESKTOP_DEV === '1';
 const rendererDevUrl = process.env.HMH_DESKTOP_RENDERER_URL ?? '';
-const preloadPath = join(here, '../preload/index.js');
+const preloadPath = join(here, '../preload/index.cjs');
 
 /* ---- 日志脱敏:token/authorization 永不进控制台(崩溃报告同理见 main 的日志包装) ---- */
 const secrets: string[] = [];
@@ -92,7 +92,9 @@ if (!app.requestSingleInstanceLock()) {
     };
   }
 
-  /** dev 默认 fake host;HMH_DESKTOP_REAL=1 时尝试真实 hmharness desktop-host。 */
+  /** dev 默认 fake host;HMH_DESKTOP_REAL=1 时尝试真实 hmharness desktop-host。
+   *  注意:Electron 主进程的 process.execPath 是 electron.exe——host 子进程
+   *  必须带 ELECTRON_RUN_AS_NODE=1 才会以纯 node 语义跑 --import tsx。 */
   async function startHost(): Promise<void> {
     const useReal = process.env.HMH_DESKTOP_REAL === '1';
     const repoRoot = join(here, '..', '..', '..', '..'); // apps/desktop/dist-electron/main → repo root
@@ -100,12 +102,14 @@ if (!app.requestSingleInstanceLock()) {
       ? {
           command: process.execPath,
           args: ['--import', 'tsx', join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts')],
-          env: {},
+          env: { ELECTRON_RUN_AS_NODE: '1' },
         }
       : {
           command: process.execPath,
-          args: ['--import', 'tsx', join(repoRoot, 'node_modules', '@hmh-desktop', 'host-adapter', 'src', 'fake-host.ts')],
-          env: {},
+          // 直接走包真实路径(node_modules 里的 workspace junction 会被 ESM
+          // realpath 化,导致 fake-host 的 argv[1]/import.meta.url 匹配失效)
+          args: ['--import', 'tsx', join(repoRoot, 'packages', 'host-adapter', 'src', 'fake-host.ts')],
+          env: { ELECTRON_RUN_AS_NODE: '1' },
         };
     supervisor = new DesktopRuntimeSupervisor(spec, {
       onStateChange: (s, info) => {
@@ -121,8 +125,9 @@ if (!app.requestSingleInstanceLock()) {
       bridge = { ...bridge, hostState: 'ready', hostPort: ep.port, hostVersion: ep.version, lastError: null };
       logInfo('host', `ready on 127.0.0.1:${ep.port} (runtime ${ep.version})`);
     } catch (err) {
-      bridge = { ...bridge, hostState: 'failed', lastError: String(err).slice(0, 200) };
-      logInfo('host', `start failed: ${String(err).slice(0, 200)}`);
+      const detail = (() => { try { return JSON.stringify(err); } catch { return String(err); } })().slice(0, 400);
+      bridge = { ...bridge, hostState: 'failed', lastError: detail };
+      logInfo('host', `start failed: ${detail}`);
     }
   }
 

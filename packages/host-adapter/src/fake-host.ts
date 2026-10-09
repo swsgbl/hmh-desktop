@@ -12,6 +12,7 @@
 import { createServer, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
 import { EVENT_SCHEMA_VERSION, desktopError, type EventEnvelope, type EventKind } from '@hmh-desktop/contracts';
 
 export interface FakeHostHandle {
@@ -139,11 +140,12 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
   return { port, emit, close };
 }
 
-// 直接运行(supervisor spawn 的子进程形态)
+// 直接运行(supervisor spawn 的子进程形态)。realpath 比较:npm workspace
+// junction / 大小写差异都不能让这个检测失手(失手=静默退出 code 0,难查)。
 const invokedAsScript = (() => {
   if (process.argv[1] === undefined) return false;
   try {
-    return import.meta.url === pathToFileURL(process.argv[1]).href;
+    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
   } catch {
     return false;
   }

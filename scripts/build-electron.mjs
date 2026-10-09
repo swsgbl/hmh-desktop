@@ -20,6 +20,7 @@ const shared = {
 
 await build({
   ...shared,
+  format: 'esm',
   entryPoints: [join(appDir, 'electron', 'main', 'index.ts')],
   outfile: join(appDir, 'dist-electron', 'main', 'index.js'),
 });
@@ -27,7 +28,7 @@ await build({
 await build({
   ...shared,
   entryPoints: [join(appDir, 'electron', 'preload', 'index.ts')],
-  outfile: join(appDir, 'dist-electron', 'preload', 'index.js'),
+  outfile: join(appDir, 'dist-electron', 'preload', 'index.cjs'),
 });
 
 console.log('electron bundles → apps/desktop/dist-electron/');
