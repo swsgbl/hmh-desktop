@@ -30,7 +30,7 @@ setTimeout(() => {
     console.log(out.slice(-3000));
     console.log('=== stderr(tail) ===');
     console.log(err.slice(-1500));
-    const ready = /ready on 127\.0\.0\.1:\d+/.test(out);
+    const ready = /bridge ready on 127\.0\.0\.1:\d+/.test(out);
     const noCrash = !/uncaught|Unhandled/gi.test(err);
     console.log(`SMOKE: host-ready=${ready} no-crash=${noCrash}`);
     process.exit(ready && noCrash ? 0 : 1);

@@ -38,6 +38,9 @@ export interface SupervisorOptions {
   startTimeoutMs?: number;
   gracefulShutdownMs?: number;
   onStateChange?(state: HostState, info: { restartCount: number; lastError?: string }): void;
+  /** 每次 host 就绪(含 crash 自愈后的重启)都会触发,携带端点(含 token,
+   *  仅供同信任域的宿主进程重建桥客户端;不要跨进 renderer)。 */
+  onReady?(endpoint: HostEndpoint): void;
 }
 
 export interface HostEndpoint {
@@ -120,6 +123,7 @@ export class DesktopRuntimeSupervisor {
       const endpoint = await this.awaitReady(child);
       this.currentEndpoint = { port: endpoint.port, version: endpoint.version };
       this.setState('ready');
+      this.opts.onReady?.(endpoint);
       // ready 之后进程死亡 = 意外退出 → 有限重启
       child.once('exit', () => {
         this.exitWaiters.forEach((w) => w());

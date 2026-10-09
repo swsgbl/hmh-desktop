@@ -2,7 +2,7 @@
  * preload — 最小暴露的 typed bridge(ADR-004)。
  *
  * 只暴露白名单方法;不暴露 ipcRenderer 本体、Node API、electron 模块。
- * sandbox:true 下必须是 CJS(esbuild 打包为 cjs)。
+ * sandbox:true 下必须是 CJS(esbuild 打包为 .cjs)。
  */
 import { contextBridge, ipcRenderer } from 'electron';
 import type { EventEnvelope } from '@hmh-desktop/contracts';
@@ -13,16 +13,23 @@ const bridge = {
     hostPort: number | null;
     hostVersion: string | null;
     lastError: string | null;
-    sessions: Array<{ id: string; title: string; createdAt: string }>;
+    mode: 'fake' | 'real';
+    droppedFrames: number;
     error?: string;
   }> {
     return ipcRenderer.invoke('bridge:get-state');
   },
-  newSession(): Promise<{ id: string; error?: string }> {
-    return ipcRenderer.invoke('bridge:new-session');
+  sessions(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:sessions');
   },
-  sendTask(text: string, sessionId: string): Promise<{ ok: boolean; runId?: string; code?: string }> {
-    return ipcRenderer.invoke('bridge:send-task', text, sessionId);
+  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo'): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:send-task', text, sessionId, mode ?? 'ask');
+  },
+  approve(granted: boolean, sessionId: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:approve', granted, sessionId);
+  },
+  interrupt(sessionId: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:interrupt', sessionId);
   },
   stopHost(): Promise<{ ok: boolean }> {
     return ipcRenderer.invoke('bridge:stop-host');
@@ -41,4 +48,3 @@ const bridge = {
 };
 
 contextBridge.exposeInMainWorld('hmh', bridge);
-export type HmhBridge = typeof bridge;

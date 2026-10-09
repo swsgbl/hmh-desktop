@@ -74,8 +74,41 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .btn.primary { background: var(--hmh-accent); color: #fff; }
 .btn.primary:hover:not(:disabled) { background: var(--hmh-accent-hover); }
 .btn.ghost { border: 1px solid var(--hmh-border); color: var(--hmh-text-dim); }
+.btn.danger { background: var(--hmh-danger); color: #fff; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .send { align-self: flex-end; }
+
+/* 工具折叠卡(过程默认折叠) */
+.tool-card {
+  max-width: 760px; align-self: flex-start;
+  border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm);
+  background: var(--hmh-bg-panel); color: var(--hmh-text-dim);
+  font-size: 13px;
+}
+.tool-card summary {
+  cursor: pointer; padding: 6px 12px; list-style: none;
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--hmh-font-mono);
+}
+.tool-card summary::-webkit-details-marker { display: none; }
+.tool-badge { color: var(--hmh-status-running); }
+.tool-badge.err { color: var(--hmh-danger); }
+.tool-running { color: var(--hmh-text-dim); }
+.tool-io {
+  margin: 0; padding: 8px 12px; border-top: 1px solid var(--hmh-border);
+  font: 12px/1.5 var(--hmh-font-mono); white-space: pre-wrap; word-break: break-word;
+  max-height: 220px; overflow: auto; color: var(--hmh-text-dim);
+}
+.tool-io.out { color: var(--hmh-text); }
+
+/* 审批卡(权威在 runtime;UI 只转述) */
+.approval-card { border-color: var(--hmh-warn); align-self: stretch; max-width: 760px; }
+.approval-head { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; color: var(--hmh-warn); }
+.approval-risk { margin: 8px 0 0; font-size: 13px; color: var(--hmh-text-dim); }
+.approval-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+.turn.system { border-color: var(--hmh-danger); align-self: stretch; max-width: 760px; }
+.composer-side { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
 
 /* Context Dock */
 .dock {
