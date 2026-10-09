@@ -1,0 +1,12 @@
+{
+  "name": "@hmh-desktop/contracts",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "HMH Desktop 与 hmharness runtime 之间的版本化 DTO/事件契约。UI 不依赖 runtime 内部 JSONL 结构,一切跨进程数据经过这里。",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

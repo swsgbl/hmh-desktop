@@ -1,0 +1,15 @@
+{
+  "name": "@hmh-desktop/host-adapter",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "HMH Desktop Host Adapter — hmharness 运行时生命周期管理(loopback/临时端口/token)与 SSE 事件客户端。不实现任何 agent 语义。",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@hmh-desktop/contracts": "0.1.0-alpha.0"
+  }
+}

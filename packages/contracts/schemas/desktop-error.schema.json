@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hmh.dev/schemas/desktop-error.schema.json",
+  "title": "DesktopError",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message", "retryable"],
+  "properties": {
+    "code": {
+      "enum": ["HOST_NOT_READY", "AUTH_FAILED", "RUNTIME_CRASHED", "PORT_BIND_FAILED", "STALE_VERSION", "SCHEMA_MISMATCH"]
+    },
+    "message": { "type": "string" },
+    "retryable": { "type": "boolean" },
+    "sessionId": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "recoveryAction": { "enum": ["RECONNECT", "RESUME", "EXPORT", "OPEN_LOGS"] }
+  }
+}

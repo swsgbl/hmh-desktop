@@ -1,0 +1,28 @@
+/* HMH Desktop 设计 token — 暗色为默认(与 web 一致的深色工作台气质) */
+:root {
+  --hmh-bg: #141416;
+  --hmh-bg-raised: #1b1d21;
+  --hmh-bg-panel: #1e2024;
+  --hmh-border: #2b2e33;
+  --hmh-text: #f5f5f6;
+  --hmh-text-dim: #95979d;
+  --hmh-accent: #2f81f7;
+  --hmh-accent-hover: #4a90f9;
+  --hmh-danger: #f85149;
+  --hmh-warn: #d29922;
+
+  --hmh-status-planning: #a371f7;
+  --hmh-status-running: #2f81f7;
+  --hmh-status-waiting: #d29922;
+  --hmh-status-verifying: #2f81f7;
+  --hmh-status-recovering: #db6d28;
+  --hmh-status-completed: #3fb950;
+  --hmh-status-failed: #f85149;
+  --hmh-status-cancelled: #95979d;
+
+  --hmh-radius-sm: 6px;
+  --hmh-radius-md: 10px;
+  --hmh-radius-lg: 14px;
+  --hmh-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --hmh-font-mono: 'Cascadia Code', Consolas, 'JetBrains Mono', monospace;
+}

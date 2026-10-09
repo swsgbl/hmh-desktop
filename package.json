@@ -1,0 +1,25 @@
+{
+  "name": "hmh-desktop",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "HMH Desktop — 本地优先的 HMH Cognitive Workbench。Windows 优先桌面壳;hmharness 是唯一 Agent/Cognitive Runtime,本仓库不实现第二份 agent loop / 工具权限判定 / 认知模型。",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test --test-force-exit packages/contracts/src/__tests__/*.test.ts packages/host-adapter/src/__tests__/*.test.ts",
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

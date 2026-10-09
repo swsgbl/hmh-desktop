@@ -1,0 +1,13 @@
+{
+  "name": "@hmh-desktop/ui-tokens",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "设计 token:间距/颜色/字体/语义状态。单一来源,renderer 与未来主题共用。",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css"
+  }
+}

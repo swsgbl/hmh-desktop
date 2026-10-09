@@ -1,0 +1,22 @@
+{
+  "name": "@hmh-desktop/app",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "HMH Desktop 桌面应用(Electron 壳)。renderer 无 Node;IPC 白名单;host token 只存在于主进程。",
+  "type": "module",
+  "main": "dist-electron/main/index.js",
+  "dependencies": {
+    "@hmh-desktop/contracts": "0.1.0-alpha.0",
+    "@hmh-desktop/host-adapter": "0.1.0-alpha.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.7.0",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "vite": "^8.3.4"
+  }
+}
