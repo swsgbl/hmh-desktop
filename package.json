@@ -15,6 +15,7 @@
     "build": "node scripts/build.mjs",
     "security-test": "node scripts/build-electron.mjs && node scripts/security-test.mjs",
     "package": "node scripts/package.mjs",
+    "install-verify": "node scripts/install-verify.mjs",
     "sbom": "node scripts/gen-sbom.mjs"
   },
   "devDependencies": {
