@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventEnvelope, RunStatus } from '@hmh-desktop/contracts';
-import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type SessionPreviewDto } from './bridge.ts';
+import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type ProviderDetailDto, type SessionPreviewDto, type WorkspaceDto } from './bridge.ts';
 
 const STATUS_LABEL: Record<string, string> = {
   planning: '规划中',
@@ -71,6 +71,15 @@ export function App(): React.ReactElement {
     try { return window.localStorage.getItem('hmh.enterSends') !== 'newline'; } catch { return true; }
   });
   const [approvalMode, setApprovalMode] = useState<'ask' | 'auto'>('ask');
+  // Provider 设置(03 §七)
+  const [providers, setProviders] = useState<ProviderDetailDto[]>([]);
+  const [providerForm, setProviderForm] = useState({ name: '', baseUrl: '', model: '', apiKey: '' });
+  const [providerHint, setProviderHint] = useState('');
+  // 会话搜索(03 §六)
+  const [search, setSearch] = useState('');
+  // 工作区(03 §六)
+  const [workspaces, setWorkspaces] = useState<{ current: string; items: WorkspaceDto[] } | null>(null);
+  const [wsAddPath, setWsAddPath] = useState('');
   const streamRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef('');
   activeRef.current = activeSession;
@@ -225,6 +234,72 @@ export function App(): React.ReactElement {
     try { window.localStorage.setItem('hmh.enterSends', sends ? 'send' : 'newline'); } catch { /* 私有模式 */ }
   }, []);
 
+  /** Provider 设置(03 §七:key 只显示 hasKey/末四位;保存直写 runtime,不回显)。 */
+  const refreshProviders = useCallback(async () => {
+    if (bridge === undefined) return;
+    const r = await bridge.providers();
+    if ('providersDetail' in r && Array.isArray(r.providersDetail)) setProviders(r.providersDetail);
+  }, []);
+
+  const saveProvider = useCallback(async () => {
+    if (bridge === undefined) return;
+    const { name, baseUrl, model, apiKey } = providerForm;
+    if (name === '' || baseUrl === '' || model === '') {
+      setProviderHint('名称、Base URL、模型必填');
+      return;
+    }
+    const r = await bridge.providerSave(apiKey === '' ? { name, baseUrl, model } : { name, baseUrl, model, apiKey });
+    if ('ok' in r && r.ok === true) {
+      setProviderHint(`已保存 ${name}(密钥已写入 runtime,不回显)`);
+      setProviderForm({ name: '', baseUrl: '', model: '', apiKey: '' });
+      void refreshProviders();
+    } else {
+      setProviderHint('保存失败:' + ('error' in r ? r.error : '未知'));
+    }
+  }, [providerForm, refreshProviders]);
+
+  /** 会话归档/删除(runtime:archive/trash,可恢复)。 */
+  const sessionOp = useCallback(async (id: string, op: 'archive' | 'delete') => {
+    if (bridge === undefined) return;
+    const r = await bridge.sessionOp(id, op);
+    if ('ok' in r && r.ok === true) {
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      if (activeSession === id) { setActiveSession(''); setItems([]); }
+      setExportHint(op === 'archive' ? `已归档 ${id}` : `已移入回收站 ${id}(可从 sessions/trash 恢复)`);
+      setTimeout(() => setExportHint(''), 4_000);
+    }
+  }, [activeSession]);
+
+  /** 工作区(03 §六:runtime 单选 cwd;Files 面板顶部选择器)。 */
+  const refreshWorkspaces = useCallback(async () => {
+    if (bridge === undefined) return;
+    const r = await bridge.workspaces();
+    if ('items' in r) setWorkspaces({ current: r.current, items: r.items });
+  }, []);
+
+  const useWorkspace = useCallback(async (id: string) => {
+    if (bridge === undefined) return;
+    const r = await bridge.workspaceUse(id);
+    if ('ok' in r && r.ok === true) {
+      void refreshWorkspaces();
+      setFsData(null); // 置空触发 Files 面板的 useEffect 自动重载新工作区根
+    }
+  }, [refreshWorkspaces]);
+
+  const addWorkspace = useCallback(async () => {
+    if (bridge === undefined || wsAddPath.trim() === '') return;
+    const path = wsAddPath.trim();
+    const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+    const r = await bridge.workspaceAdd(name, path);
+    if ('ok' in r && r.ok === true) {
+      setWsAddPath('');
+      void refreshWorkspaces();
+    } else if ('error' in r) {
+      setExportHint(`添加工作区失败:${r.error}`);
+      setTimeout(() => setExportHint(''), 4_000);
+    }
+  }, [wsAddPath, refreshWorkspaces]);
+
   /** 历史会话:加载 runtime 的 transcript 预览(最后 80 条)。 */
   const openSession = useCallback(async (id: string) => {
     setActiveSession(id);
@@ -333,9 +408,14 @@ export function App(): React.ReactElement {
 
   useEffect(() => {
     if (dockTab === 'files' && fsData === null && hostState === 'ready') void loadFs('');
+    if (dockTab === 'files' && workspaces === null && hostState === 'ready') void refreshWorkspaces();
     if (dockTab === 'evidence' && cog === null && hostState === 'ready') void loadCog();
     if (dockTab === 'diff' && hostState === 'ready') void loadDiff();
-  }, [dockTab, hostState, fsData, cog, loadFs, loadCog, loadDiff]);
+  }, [dockTab, hostState, fsData, cog, workspaces, loadFs, loadCog, loadDiff, refreshWorkspaces]);
+
+  useEffect(() => {
+    if (settingsOpen && hostState === 'ready') void refreshProviders();
+  }, [settingsOpen, hostState, refreshProviders]);
 
   const runCommand = useCallback((cmd: string): void => {
     setCmdOpen(false);
@@ -400,15 +480,48 @@ export function App(): React.ReactElement {
               </div>
             </div>
             <div className="settings-note">auto 即时生效并持久;破坏性操作仍受 runtime 审批门约束。</div>
+            <div className="settings-section">Provider(runtime config.json;密钥只显示末四位)</div>
+            <div className="provider-list">
+              {providers.map((p) => (
+                <div key={p.name} className="provider-row">
+                  <span className="provider-name">{p.name}</span>
+                  <span className="provider-model">{p.model}</span>
+                  <span className="provider-key" title="密钥状态">{p.hasKey ? `密钥 ····${p.keyTail ?? '????'}` : '未配置密钥'}</span>
+                </div>
+              ))}
+              {providers.length === 0 && <div className="empty-hint">暂无 provider</div>}
+            </div>
+            <div className="provider-form">
+              <input placeholder="名称(如 deepseek)" value={providerForm.name} onChange={(e) => setProviderForm({ ...providerForm, name: e.target.value })} aria-label="Provider 名称" />
+              <input placeholder="Base URL(如 https://api.deepseek.com/v1)" value={providerForm.baseUrl} onChange={(e) => setProviderForm({ ...providerForm, baseUrl: e.target.value })} aria-label="Base URL" />
+              <input placeholder="模型(如 deepseek-chat)" value={providerForm.model} onChange={(e) => setProviderForm({ ...providerForm, model: e.target.value })} aria-label="模型" />
+              <input type="password" placeholder="API Key(留空=保留已存密钥)" value={providerForm.apiKey} onChange={(e) => setProviderForm({ ...providerForm, apiKey: e.target.value })} aria-label="API Key" />
+              <button className="btn primary sm" onClick={() => void saveProvider()}>保存 Provider</button>
+            </div>
+            {providerHint !== '' && <div className="settings-note" role="status">{providerHint}</div>}
           </div>
         </div>
       )}
       <aside className="sidebar" aria-label="会话导航">
         <div className="sidebar-head">
           <button className="btn primary" onClick={newSession}>+ 新建会话</button>
+          <input
+            className="session-search"
+            type="search"
+            placeholder="搜索会话…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="搜索会话"
+          />
         </div>
         <div className="session-list" role="list">
-          {sessions.map((s) => (
+          {sessions
+            .filter((s) => {
+              if (search.trim() === '') return true;
+              const q = search.trim().toLowerCase();
+              return s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.task.toLowerCase().includes(q);
+            })
+            .map((s) => (
             <div key={s.id} role="listitem" className={`session-row${s.id === activeSession ? ' active' : ''}`}>
               <button
                 className="session-item"
@@ -419,6 +532,8 @@ export function App(): React.ReactElement {
                 <span className="session-time">{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
               </button>
               <button className="session-export" aria-label={`导出会话 ${s.id} 为 Markdown`} title="导出 Markdown" onClick={() => void exportSession(s.id)}>⤓</button>
+              <button className="session-export" aria-label={`归档会话 ${s.id}`} title="归档(可恢复)" onClick={() => void sessionOp(s.id, 'archive')}>🗄</button>
+              <button className="session-export danger" aria-label={`删除会话 ${s.id}(移入回收站)`} title="删除(移入回收站,可恢复)" onClick={() => void sessionOp(s.id, 'delete')}>🗑</button>
             </div>
           ))}
           {sessions.length === 0 && <div className="empty-hint">点"新建会话"开始</div>}
@@ -587,6 +702,28 @@ export function App(): React.ReactElement {
             )}
             {dockTab === 'files' && (
               <div className="files-pane">
+                {workspaces !== null && (
+                  <div className="ws-picker">
+                    <span className="ws-label">工作区</span>
+                    <select
+                      value={workspaces.current}
+                      onChange={(e) => void useWorkspace(e.target.value)}
+                      aria-label="切换工作区(runtime 权威)"
+                    >
+                      {workspaces.items.map((w) => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                    <input
+                      className="ws-add"
+                      placeholder="添加工作区(绝对路径)…"
+                      value={wsAddPath}
+                      onChange={(e) => setWsAddPath(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addWorkspace(); } }}
+                      aria-label="添加工作区路径"
+                    />
+                  </div>
+                )}
                 <div className="fs-crumbs">
                   <button className="btn ghost sm" onClick={() => void loadFs(fsData?.parent ?? '')} disabled={fsData === null || fsData.parent === ''}>↑ 上级</button>
                   <span className="fs-path">{fsPath === '' ? '(选择工作区根)' : fsPath}</span>

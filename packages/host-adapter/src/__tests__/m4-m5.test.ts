@@ -78,3 +78,74 @@ test('会话预览:任务后可回读历史消息(404 亦有结构化错误)', a
     await sup.stop();
   }
 });
+
+test('Provider 面板:key 只出 hasKey/末四位,永不明文(03 §七)', async () => {
+  const sup = new DesktopRuntimeSupervisor(
+    { command: process.execPath, args: ['--import', 'tsx', fakeHostPath], env: {} },
+    { token: 'pv-tok' },
+  );
+  const ep = await sup.start();
+  const c = new DesktopHostClient(`http://127.0.0.1:${ep.port}`, 'pv-tok');
+  try {
+    const st = await c.getJson<{ providersDetail: Array<{ name: string; hasKey: boolean; keyTail?: string; apiKey?: string }> }>('/api/state');
+    const demo = st.providersDetail.find((p) => p.name === 'demo');
+    assert.ok(demo !== undefined, '预置 provider 可见');
+    assert.equal(demo.hasKey, true);
+    assert.equal(demo.keyTail, '1234');
+    assert.equal((demo as { apiKey?: string }).apiKey, undefined, '明文 key 永不出现');
+
+    const save = await c.postJson<{ ok: boolean }>('/api/providers', { name: 'newp', baseUrl: 'http://x/v1', model: 'm2', apiKey: 'sk-new-9999' });
+    assert.equal(save.ok, true);
+    const st2 = await c.getJson<{ providersDetail: Array<{ name: string; keyTail?: string }> }>('/api/state');
+    const added = st2.providersDetail.find((p) => p.name === 'newp');
+    assert.equal(added?.keyTail, '9999', '保存后末四位可见');
+  } finally {
+    await sup.stop();
+  }
+});
+
+test('工作区:列表/添加/切换(runtime 单选 cwd 语义)', async () => {
+  const sup = new DesktopRuntimeSupervisor(
+    { command: process.execPath, args: ['--import', 'tsx', fakeHostPath], env: {} },
+    { token: 'ws-tok' },
+  );
+  const ep = await sup.start();
+  const c = new DesktopHostClient(`http://127.0.0.1:${ep.port}`, 'ws-tok');
+  try {
+    const list0 = await c.getJson<{ current: string; items: Array<{ id: string }> }>('/api/workspaces');
+    assert.ok(list0.items.length > 0);
+
+    const add = await c.postJson<{ ok: boolean; items: Array<{ id: string; name: string }> }>('/api/workspaces', { name: 'proj', path: 'C:\\proj' });
+    assert.equal(add.ok, true);
+    const added = add.items.find((w) => w.name === 'proj');
+    assert.ok(added !== undefined);
+
+    const use = await c.postJson<{ ok: boolean; current: string }>('/api/workspaces/use', { id: added!.id });
+    assert.equal(use.ok, true);
+    assert.equal(use.current, added!.id, '切换后 current 指向新工作区');
+  } finally {
+    await sup.stop();
+  }
+});
+
+test('会话归档/删除:可恢复语义(从列表移除,不硬删)', async () => {
+  const sup = new DesktopRuntimeSupervisor(
+    { command: process.execPath, args: ['--import', 'tsx', fakeHostPath], env: {} },
+    { token: 'op-tok' },
+  );
+  const ep = await sup.start();
+  const c = new DesktopHostClient(`http://127.0.0.1:${ep.port}`, 'op-tok');
+  try {
+    await c.postJson('/api/task', { text: 'to archive', sessionId: 'op-1', mode: 'auto' });
+    const arch = await c.postJson<{ ok: boolean }>('/api/sessions/op-1/archive', {});
+    assert.equal(arch.ok, true);
+    const gone = await c.getJson('/api/sessions/op-1').catch(() => null);
+    assert.equal(gone, null, '归档后不在常规列表');
+
+    await c.postJson('/api/task', { text: 'to delete', sessionId: 'op-2', mode: 'auto' });
+    const del = await c.postJson<{ ok: boolean }>('/api/sessions/op-2/delete', {});
+    assert.equal(del.ok, true);
+  } finally {
+    await sup.stop();
+  }
+});

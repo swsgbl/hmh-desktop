@@ -61,6 +61,16 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
   const sessions = new Map<string, FakeSession>();
   let pending: PendingApproval | null = null;
   const runTimers = new Map<string, NodeJS.Timeout>();
+  // 工作区/Provider 状态(与 hmharness 同形的最小模拟)
+  const fakeWorkspaces = {
+    current: 'ws-demo',
+    items: [
+      { id: 'ws-demo', name: 'demo-workspace', path: 'C:\\demo' },
+    ],
+  };
+  const fakeProviders = new Map<string, { baseUrl: string; model: string; apiKey: string }>([
+    ['demo', { baseUrl: 'http://127.0.0.1:9/v1', model: 'fake-m', apiKey: 'sk-demo-1234' }],
+  ]);
 
   const emit = (sessionId: string, runId: string, kind: EventKind, payload: Record<string, unknown>): number => {
     const key = `${sessionId}\0${runId}`;
@@ -199,11 +209,20 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
     if (!authorized) { deny(); return; }
 
     if (req.method === 'GET' && url.pathname === '/api/state') {
+      // providersDetail:与 hmharness 同形——key 只出 hasKey/末四位,永不明文
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         daemonVersion: 'fake-0.0.0', desktop: true, model: 'fake-model', locale: 'zh',
         busySessions: [...sessions.keys()].slice(0, 2),
         approvalPending: pending !== null,
+        settings: { approval: 'ask' },
+        workspace: fakeWorkspaces.items.find((w) => w.id === fakeWorkspaces.current) ?? null,
+        providersDetail: [...fakeProviders.entries()].map(([name, p]) => ({
+          name, model: p.model, baseUrl: p.baseUrl,
+          hasKey: p.apiKey !== '',
+          keyTail: p.apiKey.length >= 4 ? p.apiKey.slice(-4) : undefined,
+          purposes: ['chat'],
+        })),
       }));
       return;
     }
@@ -257,6 +276,28 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
         p.resolve(body.granted === true);
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, granted: body.granted === true }));
+      })();
+      return;
+    }
+    if (req.method === 'POST' && url.pathname.startsWith('/api/sessions/') && (url.pathname.endsWith('/archive') || url.pathname.endsWith('/delete'))) {
+      // 会话归档/删除(hmharness 同形:移入 archive/trash,可恢复,不硬删)
+      void (async () => {
+        const parts = url.pathname.slice('/api/sessions/'.length).split('/');
+        const op = parts[1] ?? '';
+        const oid = decodeURIComponent(parts[0] ?? '').replace(/[^a-zA-Z0-9_:.@-]/g, '');
+        if (oid === '' || (op !== 'archive' && op !== 'delete')) {
+          res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'bad op', { retryable: false })));
+          return;
+        }
+        if (!sessions.has(oid)) {
+          res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'session not found', { retryable: false })));
+          return;
+        }
+        sessions.delete(oid);
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true }));
       })();
       return;
     }
@@ -367,6 +408,69 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
         ],
         stat: ' src/app.ts      | 12 +++++++---\n docs/notes.md   |  4 ++++\n 2 files changed, 16 insertions(+), 3 deletions(-)',
       }));
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/workspaces') {
+      // 工作区(与 hmharness 同形:current + items)
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        current: fakeWorkspaces.current,
+        items: fakeWorkspaces.items,
+      }));
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/workspaces') {
+      void (async () => {
+        const body = JSON.parse((await readBody()) || '{}') as { name?: unknown; path?: unknown };
+        const path = typeof body.path === 'string' ? body.path : '';
+        const name = typeof body.name === 'string' && body.name !== '' ? body.name : (path.split(/[\\/]/).filter(Boolean).pop() ?? '');
+        if (path === '' || name === '') {
+          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'absolute path and name required', { retryable: false })));
+          return;
+        }
+        if (fakeWorkspaces.items.some((w) => w.path.toLowerCase() === path.toLowerCase())) {
+          res.writeHead(409, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'workspace already registered', { retryable: false })));
+          return;
+        }
+        const item = { id: `ws-${Math.random().toString(36).slice(2, 8)}`, name, path };
+        fakeWorkspaces.items.push(item);
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, current: fakeWorkspaces.current, items: fakeWorkspaces.items }));
+      })();
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/workspaces/use') {
+      void (async () => {
+        const body = JSON.parse((await readBody()) || '{}') as { id?: unknown };
+        const hit = fakeWorkspaces.items.find((w) => w.id === body.id);
+        if (hit === undefined) {
+          res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'workspace not found', { retryable: false })));
+          return;
+        }
+        fakeWorkspaces.current = hit.id;
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, current: fakeWorkspaces.current, items: fakeWorkspaces.items }));
+      })();
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/providers') {
+      void (async () => {
+        const body = JSON.parse((await readBody()) || '{}') as { name?: unknown; baseUrl?: unknown; model?: unknown; apiKey?: unknown };
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        const baseUrl = typeof body.baseUrl === 'string' ? body.baseUrl.trim() : '';
+        const model = typeof body.model === 'string' ? body.model.trim() : '';
+        if (name === '' || baseUrl === '' || model === '') {
+          res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'name, baseUrl and model are required', { retryable: false })));
+          return;
+        }
+        fakeProviders.set(name, { baseUrl, model, apiKey: typeof body.apiKey === 'string' ? body.apiKey : '' });
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, name }));
+      })();
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/cognitive') {

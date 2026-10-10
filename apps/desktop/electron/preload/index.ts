@@ -43,6 +43,24 @@ const bridge = {
   approvalSet(mode: 'ask' | 'auto'): Promise<unknown> {
     return ipcRenderer.invoke('bridge:approval-set', mode);
   },
+  providers(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:providers');
+  },
+  providerSave(provider: { name: string; baseUrl: string; model: string; apiKey?: string }): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:provider-save', provider);
+  },
+  workspaces(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:workspaces');
+  },
+  workspaceUse(id: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:workspace-use', id);
+  },
+  workspaceAdd(name: string, path: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:workspace-add', name, path);
+  },
+  sessionOp(id: string, op: 'archive' | 'delete'): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:session-op', id, op);
+  },
   fsList(path: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:fs-list', path);
   },

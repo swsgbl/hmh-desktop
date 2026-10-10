@@ -192,6 +192,42 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .settings-note { padding: 6px 14px 12px; font-size: 12px; color: var(--hmh-text-dim); }
 .approval-mode.auto { color: var(--hmh-warn); }
 
+/* 会话搜索 */
+.session-search {
+  width: 100%; margin-top: 8px; padding: 7px 10px; font: 13px var(--hmh-font-ui);
+  background: var(--hmh-bg-panel); color: var(--hmh-text);
+  border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm); outline: none;
+}
+.session-search:focus { border-color: var(--hmh-accent); }
+.session-export.danger:hover { color: var(--hmh-danger); }
+
+/* Provider 设置 */
+.provider-list { padding: 0 14px; display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; }
+.provider-row { display: flex; gap: 10px; font-size: 13px; align-items: baseline; }
+.provider-name { font-weight: 600; min-width: 70px; }
+.provider-model { color: var(--hmh-text-dim); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.provider-key { font: 12px var(--hmh-font-mono); color: var(--hmh-status-completed); }
+.provider-form { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px 4px; }
+.provider-form input {
+  flex: 1 1 45%; padding: 7px 10px; font: 13px var(--hmh-font-ui);
+  background: var(--hmh-bg-panel); color: var(--hmh-text);
+  border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm); outline: none;
+}
+.provider-form input:focus { border-color: var(--hmh-accent); }
+
+/* 工作区选择器 */
+.ws-picker { display: flex; flex-direction: column; gap: 6px; }
+.ws-picker select {
+  padding: 6px 8px; font: 13px var(--hmh-font-ui); background: var(--hmh-bg-panel);
+  color: var(--hmh-text); border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm);
+}
+.ws-label { font-size: 11px; color: var(--hmh-text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.ws-add {
+  padding: 6px 8px; font: 12px var(--hmh-font-mono); background: var(--hmh-bg-panel);
+  color: var(--hmh-text); border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm); outline: none;
+}
+.ws-add:focus { border-color: var(--hmh-accent); }
+
 /* Context Dock */
 .dock {
   width: 360px; min-width: 320px; max-width: 420px;

@@ -303,6 +303,47 @@ if (!app.requestSingleInstanceLock()) {
       return hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/config', { approval: m }));
     });
 
+    // ---- Provider 设置(03 §七:key 只出 hasKey/末四位;保存直写 runtime) ----
+    ipcMain.handle('bridge:providers', (event) =>
+      hostCall(event, (c) => c.getJson<{ providersDetail?: Array<{ name: string; model: string; baseUrl: string; hasKey: boolean; keyTail?: string }>; model?: string }>('/api/state')));
+
+    ipcMain.handle('bridge:provider-save', (event, provider: unknown) => {
+      const p = provider as { name?: unknown; baseUrl?: unknown; model?: unknown; apiKey?: unknown };
+      const name = typeof p?.name === 'string' ? p.name.slice(0, 80) : '';
+      const baseUrl = typeof p?.baseUrl === 'string' ? p.baseUrl.slice(0, 300) : '';
+      const model = typeof p?.model === 'string' ? p.model.slice(0, 120) : '';
+      if (name === '' || baseUrl === '' || model === '') return Promise.resolve({ error: 'name/baseUrl/model required', code: 'BAD_REQUEST' });
+      const body: Record<string, unknown> = { name, baseUrl, model };
+      // apiKey 只在显式输入时上传,绝不回显(renderer 表单提交后即清空)
+      if (typeof p?.apiKey === 'string' && p.apiKey !== '') body.apiKey = p.apiKey.slice(0, 300);
+      return hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/providers', body));
+    });
+
+    // ---- 工作区(03 §六;切换语义与 web 相同:runtime 单选 cwd) ----
+    ipcMain.handle('bridge:workspaces', (event) =>
+      hostCall(event, (c) => c.getJson<{ current: string; items: Array<{ id: string; name: string; path: string }> }>('/api/workspaces')));
+
+    ipcMain.handle('bridge:workspace-use', (event, id: unknown) => {
+      const wid = typeof id === 'string' ? id.slice(0, 60) : '';
+      if (wid === '') return Promise.resolve({ error: 'id required', code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/workspaces/use', { id: wid }));
+    });
+
+    ipcMain.handle('bridge:workspace-add', (event, name: unknown, path: unknown) => {
+      const n = typeof name === 'string' ? name.slice(0, 120) : '';
+      const p = typeof path === 'string' ? path.slice(0, 1000) : '';
+      if (p === '') return Promise.resolve({ error: 'path required', code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/workspaces', { name: n === '' ? undefined : n, path: p }));
+    });
+
+    // ---- 会话归档/删除(移入 archive/trash,可恢复;runtime 权威) ----
+    ipcMain.handle('bridge:session-op', (event, id: unknown, op: unknown) => {
+      const sid = typeof id === 'string' ? id.replace(/[^a-zA-Z0-9_:.@-]/g, '').slice(0, 80) : '';
+      const o = op === 'archive' || op === 'delete' ? op : '';
+      if (sid === '' || o === '') return Promise.resolve({ error: 'id and op(archive|delete) required', code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.postJson<{ ok: boolean }>(`/api/sessions/${encodeURIComponent(sid)}/${o}`, {}));
+    });
+
     // ---- M4:Diff 面板(只读 git 变更;授权在 runtime) ----
     ipcMain.handle('bridge:diff', (event, sessionId: unknown) => {
       const sid = typeof sessionId === 'string' ? sessionId.slice(0, 80) : '';
@@ -440,7 +481,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'sendTask', 'sessionPreview', 'sessions', 'stopHost'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'providerSave', 'providers', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

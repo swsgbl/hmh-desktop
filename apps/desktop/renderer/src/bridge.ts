@@ -54,6 +54,20 @@ export interface SessionPreviewDto {
   messages: Array<{ role: string; text: string; tools: string[] }>;
 }
 
+export interface ProviderDetailDto {
+  name: string;
+  model: string;
+  baseUrl: string;
+  hasKey: boolean;
+  keyTail?: string;
+}
+
+export interface WorkspaceDto {
+  id: string;
+  name: string;
+  path: string;
+}
+
 export interface DiffRowDto {
   state: string;
   path: string;
@@ -76,6 +90,12 @@ export interface HmhBridge {
   exportSession(id: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
   approvalGet(): Promise<{ settings?: { approval?: string } } | { error: string; code: string }>;
   approvalSet(mode: 'ask' | 'auto'): Promise<{ ok: boolean } | { error: string; code: string }>;
+  providers(): Promise<{ providersDetail?: ProviderDetailDto[]; model?: string } | { error: string; code: string }>;
+  providerSave(provider: { name: string; baseUrl: string; model: string; apiKey?: string }): Promise<{ ok: boolean } | { error: string; code: string }>;
+  workspaces(): Promise<{ current: string; items: WorkspaceDto[] } | { error: string; code: string }>;
+  workspaceUse(id: string): Promise<{ ok: boolean } | { error: string; code: string }>;
+  workspaceAdd(name: string, path: string): Promise<{ ok: boolean } | { error: string; code: string }>;
+  sessionOp(id: string, op: 'archive' | 'delete'): Promise<{ ok: boolean } | { error: string; code: string }>;
   fsList(path: string): Promise<FsListDto | { error: string; code: string }>;
   fsRead(path: string): Promise<FsReadDto | { error: string; code: string }>;
   cognitive(): Promise<Record<string, unknown> | { error: string; code: string }>;
