@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventEnvelope, RunStatus } from '@hmh-desktop/contracts';
-import { bridge, type BridgeState, type FsListDto, type FsReadDto, type SessionPreviewDto } from './bridge.ts';
+import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type SessionPreviewDto } from './bridge.ts';
 
 const STATUS_LABEL: Record<string, string> = {
   planning: '规划中',
@@ -58,6 +58,12 @@ export function App(): React.ReactElement {
   const [fsPreview, setFsPreview] = useState<{ name: string; text: string; binary: boolean } | null>(null);
   // Evidence 面板(M5)
   const [cog, setCog] = useState<Record<string, unknown> | null>(null);
+  // Diff 面板(M4)
+  const [diff, setDiff] = useState<DiffDto | null>(null);
+  // Logs 面板:runtime 的 line 流(运行日志,最近 200 条)
+  const [logs, setLogs] = useState<Array<{ sessionId: string; text: string }>>([]);
+  // Ctrl+K 命令面板
+  const [cmdOpen, setCmdOpen] = useState(false);
   const streamRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef('');
   activeRef.current = activeSession;
@@ -126,14 +132,30 @@ export function App(): React.ReactElement {
     const offEvents = bridge.onEventBatches((batch) => {
       for (const env of batch) applyEnvelope(env);
     });
-    // 高频流块:只拼接当前会话的 text delta(光标感来自持续渲染)
+    // 高频流块:当前会话的 text delta 拼接;line 帧进 Logs 面板
     const offChunks = bridge.onStreamChunks((c) => {
-      if (c.sessionId === activeRef.current && c.kind === 'text' && c.chunk !== '') {
+      if (c.kind === 'text' && c.sessionId === activeRef.current && c.chunk !== '') {
         setStreaming((prev) => (prev + c.chunk).slice(-40_000));
+      } else if (c.kind === 'line' && c.chunk !== '') {
+        setLogs((prev) => [...prev.slice(-199), { sessionId: c.sessionId, text: c.chunk }]);
       }
     });
     return () => { offState(); offEvents(); offChunks(); };
   }, [applyEnvelope]);
+
+  // Ctrl+K 命令面板(键盘优先;输入框聚焦时不抢占)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCmdOpen((v) => !v);
+      } else if (e.key === 'Escape') {
+        setCmdOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight });
@@ -232,10 +254,26 @@ export function App(): React.ReactElement {
     if (!('error' in r)) setCog(r);
   }, []);
 
+  /** Diff 面板(M4):只读 git 变更(会话 cwd)。 */
+  const loadDiff = useCallback(async () => {
+    if (bridge === undefined) return;
+    const r = await bridge.diff(activeSession);
+    if (!('error' in r)) setDiff(r);
+  }, [activeSession]);
+
   useEffect(() => {
     if (dockTab === 'files' && fsData === null && hostState === 'ready') void loadFs('');
     if (dockTab === 'evidence' && cog === null && hostState === 'ready') void loadCog();
-  }, [dockTab, hostState, fsData, cog, loadFs, loadCog]);
+    if (dockTab === 'diff' && hostState === 'ready') void loadDiff();
+  }, [dockTab, hostState, fsData, cog, loadFs, loadCog, loadDiff]);
+
+  const runCommand = useCallback((cmd: string): void => {
+    setCmdOpen(false);
+    if (cmd === 'new-session') newSession();
+    else if (cmd === 'stop') void interrupt();
+    else if (cmd.startsWith('tab:')) setDockTab(cmd.slice(4) as DockTab);
+    else if (cmd === 'dock') setDockOpen((v) => !v);
+  }, [newSession, interrupt]);
 
   const hostBadge = useMemo(() => {
     const label = state !== null && hostState === 'ready' ? '已连接' : STATUS_LABEL[hostState] ?? hostState;
@@ -252,6 +290,25 @@ export function App(): React.ReactElement {
 
   return (
     <div className="app-shell">
+      {cmdOpen && (
+        <div className="cmdk-overlay" role="dialog" aria-label="命令面板" onClick={() => setCmdOpen(false)}>
+          <div className="cmdk" onClick={(e) => e.stopPropagation()}>
+            <div className="cmdk-head">命令面板(Ctrl+K)</div>
+            {[
+              { cmd: 'new-session', label: '新建会话' },
+              { cmd: 'tab:overview', label: '上下文:Overview' },
+              { cmd: 'tab:files', label: '上下文:Files' },
+              { cmd: 'tab:diff', label: '上下文:Diff' },
+              { cmd: 'tab:evidence', label: '上下文:Evidence' },
+              { cmd: 'tab:logs', label: '上下文:Logs' },
+              { cmd: 'dock', label: '切换右栏显示' },
+              { cmd: 'stop', label: '停止当前任务' },
+            ].map((c) => (
+              <button key={c.cmd} className="cmdk-item" onClick={() => runCommand(c.cmd)}>{c.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
       <aside className="sidebar" aria-label="会话导航">
         <div className="sidebar-head">
           <button className="btn primary" onClick={newSession}>+ 新建会话</button>
@@ -426,7 +483,27 @@ export function App(): React.ReactElement {
                 )}
               </div>
             )}
-            {dockTab === 'diff' && <div className="empty-hint">Diff 视图(下一迭代:artifact 事件 + git diff)</div>}
+            {dockTab === 'diff' && (
+              <div className="diff-pane">
+                {diff === null && <div className="empty-hint">{hostState === 'ready' ? '加载中…' : 'host 未连接'}</div>}
+                {diff !== null && !diff.git && <div className="empty-hint">非 git 工作区({diff.cwd})</div>}
+                {diff !== null && diff.git && (
+                  <>
+                    <div className="fs-preview-head">{diff.cwd}(git 变更 {diff.changed.length} 项,只读)</div>
+                    <div className="fs-list">
+                      {diff.changed.map((c) => (
+                        <div key={c.path} className="diff-row">
+                          <span className={`diff-state ${c.state.includes('D') ? 'del' : c.state.includes('A') || c.state.includes('?') ? 'add' : 'mod'}`}>{c.state || 'M'}</span>
+                          <span className="diff-path">{c.path}</span>
+                        </div>
+                      ))}
+                      {diff.changed.length === 0 && <div className="empty-hint">(无变更)</div>}
+                    </div>
+                    {diff.stat !== '' && <pre className="tool-io out">{diff.stat}</pre>}
+                  </>
+                )}
+              </div>
+            )}
             {dockTab === 'evidence' && (
               <div className="evidence-pane">
                 <div className="dock-row"><span className="dock-k">记忆层</span><span className="dock-v">{cog === null ? '加载中…' : num((cog.memory as { layers?: unknown } | undefined)?.layers)}</span></div>
@@ -440,7 +517,20 @@ export function App(): React.ReactElement {
                 <div className="dock-note">只显示结构化事实;Brier 是预测校准指标,不代表任务成功率(审核报告 P0-D 口径)。</div>
               </div>
             )}
-            {dockTab === 'logs' && <div className="empty-hint">运行日志(下一迭代:分离运行日志流)</div>}
+            {dockTab === 'logs' && (
+              <div className="logs-pane">
+                <div className="fs-preview-head">运行日志(runtime line 流,最近 200 条)</div>
+                <div className="logs-list">
+                  {logs.map((l, i) => (
+                    <div key={`${i}-${l.text.slice(0, 20)}`} className="log-row">
+                      <span className="log-sid">{l.sessionId.slice(0, 10)}</span>
+                      <span className="log-text">{l.text}</span>
+                    </div>
+                  ))}
+                  {logs.length === 0 && <div className="empty-hint">(暂无日志——跑一个任务后实时累积)</div>}
+                </div>
+              </div>
+            )}
           </div>
         </aside>
       )}

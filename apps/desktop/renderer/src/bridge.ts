@@ -54,6 +54,18 @@ export interface SessionPreviewDto {
   messages: Array<{ role: string; text: string; tools: string[] }>;
 }
 
+export interface DiffRowDto {
+  state: string;
+  path: string;
+}
+
+export interface DiffDto {
+  git: boolean;
+  cwd: string;
+  changed: DiffRowDto[];
+  stat: string;
+}
+
 export interface HmhBridge {
   getState(): Promise<BridgeState>;
   sessions(): Promise<{ sessions: SessionRowDto[]; nextCursor: string | null } | { error: string; code: string }>;
@@ -63,6 +75,7 @@ export interface HmhBridge {
   fsList(path: string): Promise<FsListDto | { error: string; code: string }>;
   fsRead(path: string): Promise<FsReadDto | { error: string; code: string }>;
   cognitive(): Promise<Record<string, unknown> | { error: string; code: string }>;
+  diff(sessionId: string): Promise<DiffDto | { error: string; code: string }>;
   sessionPreview(id: string): Promise<SessionPreviewDto | { error: string; code: string }>;
   stopHost(): Promise<{ ok: boolean }>;
   onEventBatches(cb: (batch: EventEnvelope[]) => void): () => void;

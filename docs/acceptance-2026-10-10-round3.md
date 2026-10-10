@@ -13,10 +13,12 @@
 | v0.23.35 Desktop Bridge 契约(02 P0) | ✅ 前两轮完成 | port0/loopback/token 轮换/优雅关闭/不误杀;本轮继续验证 |
 | P0-C 桌面端口设计(01) | ✅ 前两轮完成 | — |
 | P0-D 校准≠任务能力(01) | ✅ 口径落实 | Desktop Evidence 面板明示"Brier 是预测校准指标,不代表任务成功率";报告全部分开陈述 |
-| Desktop M4 工作区成果(04) | ✅ Files 面板 | 文件树浏览(/api/fs?files=1)+ 文件预览(/api/fs/read,64KB 上限);路径授权在 runtime(insideWs);Diff 面板留占位(需 artifact/git diff 后端,NOT RUN) |
+| Desktop M4 工作区成果(04) | ✅ Files + Diff 面板 | 文件树浏览(/api/fs?files=1)+ 文件预览(/api/fs/read,64KB 上限);路径授权在 runtime(insideWs);**Diff 面板**:hmharness 新增只读 `/api/diff`(会话 cwd 的 git status --porcelain + diff --stat;非 git 仓返回 git:false),renderer 按状态着色(增/改/删),真实 git 仓 e2e 验证 |
 | Desktop M5 认知上下文(04) | ✅ Evidence 面板 | 认知状态(记忆层/轨迹/审计/WM 版本/Brier/校准)接 /api/cognitive;缺数据显示"无数据";Logs 占位 |
 | 会话恢复(04 M2 收尾) | ✅ | 点击历史会话加载 runtime transcript 预览(最后 80 条×500 字) |
 | delta 流式渲染 | ✅ | client.rawEvents() 全帧流;main 转发 delta/line → renderer 流式拼接(光标动画) |
+| Logs 面板(04 M5) | ✅ | runtime line 流实时累积(最近 200 条,带 sessionId 标签) |
+| Ctrl+K 命令面板(03 §六) | ✅ | 新建会话/切 Dock 五页签/切右栏/停止;Esc 关闭;键盘优先 |
 | G1 门禁(02 §五) | ✅ 持续 | 两仓 typecheck/test/build 全绿记录于下 |
 
 ## 变更文件
@@ -25,6 +27,8 @@
 - M packages/web/src/page.ts(9 处 esc)
 - M packages/kernel/src/loop.ts(sanitizeToolCalls + runLoop 执行侧:非对象 JSON → {} / skip)
 - M packages/kernel/src/__tests__/loop-badargs.test.ts(4 新测试,共 8)
+- M packages/web/src/server.ts(新增只读 /api/diff)
+- M packages/web/src/__tests__/desktop-host.test.ts(新增 /api/diff 真实 git 仓测试,共 4)
 - + packages/web/src/__tests__/page-xss.test.ts(4 测试)
 
 **hmh-desktop**:
@@ -40,7 +44,7 @@
 | `cd G:\hmharness && node --import tsx --test packages/kernel/src/__tests__/loop-badargs.test.ts` | 8/8 pass |
 | `cd G:\hmharness && node --import tsx --test packages/web/src/__tests__/page-xss.test.ts` | 4/4 pass |
 | `cd G:\hmharness && node --import tsx --test packages/kernel/src/__tests__/*.test.ts` | 116/116 pass(sanitize 改动无回归) |
-| `cd G:\hmharness && npm test`(全量) | **897/899 pass;2 fail = extension real-browser Firefox 断言(2026-10-10 已用干净基线 stash 复现同样失败 → 环境性,与本改动无关且零 import 依赖)**;新增 8 测试(loop-badargs 4 + page-xss 4)全过 |
+| `cd G:\hmharness && npm test`(全量) | **898/900 pass;2 fail = extension real-browser Firefox 断言(2026-10-10 已用干净基线 stash 复现同样失败 → 环境性,与本改动无关且零 import 依赖)**;新增 9 测试(loop-badargs 4 + page-xss 4 + desktop-host diff 1)全过 |
 | `cd G:\hmh-desktop && npm run typecheck` | 0 errors |
 | `cd G:\hmh-desktop && npm test` | **33/33 pass**(0 fail 0 skip) |
 | `cd G:\hmh-desktop && npm run build` + smoke(fake) | `SMOKE: host-ready=true no-crash=true` |
@@ -55,10 +59,9 @@
 
 ## NOT RUN(原因)
 
-1. GUI 真人操作流(Files 点选/Evidence 切换/流式观感)——自主环境无人工;建议用户 `npm run dev` 验收。
-2. Diff 面板与 artifact 事件(后端无 git diff API,属下一迭代设计项)。
-3. Logs 面板(分离运行日志流是阶段 H 范畴)。
-4. 真实模型任务(用户额度;桥层已验证)。
+1. GUI 真人操作流(Files 点选/Evidence 切换/Diff 着色/Ctrl+K/流式观感)——自主环境无人工;建议用户 `npm run dev` 验收。
+2. 真实模型任务(用户额度;桥层已验证)。
+3. artifact 事件流(交付物链接;需 runtime 在 run 中产出 artifact 清单,属下一迭代设计项)。
 
 ## NEEDS-DATA
 

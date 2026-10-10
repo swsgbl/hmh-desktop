@@ -40,6 +40,9 @@ const bridge = {
   cognitive(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:cognitive');
   },
+  diff(sessionId: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:diff', sessionId);
+  },
   sessionPreview(id: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:session-preview', id);
   },

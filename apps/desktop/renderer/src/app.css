@@ -127,6 +127,35 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .fs-preview .tool-io { max-height: 320px; overflow: auto; }
 .btn.sm { padding: 4px 8px; font-size: 12px; }
 
+/* Diff 面板 */
+.diff-pane { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.diff-row { display: flex; gap: 8px; font: 12px/1.6 var(--hmh-font-mono); padding: 2px 4px; }
+.diff-state { width: 20px; text-align: center; border-radius: 3px; font-weight: 600; }
+.diff-state.add { color: var(--hmh-status-completed); }
+.diff-state.mod { color: var(--hmh-warn); }
+.diff-state.del { color: var(--hmh-danger); }
+.diff-path { color: var(--hmh-text-dim); word-break: break-all; }
+
+/* Logs 面板 */
+.logs-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.logs-list { flex: 1; overflow-y: auto; font: 12px/1.6 var(--hmh-font-mono); }
+.log-row { display: flex; gap: 8px; padding: 2px 4px; border-bottom: 1px solid var(--hmh-bg-panel); }
+.log-sid { color: var(--hmh-text-dim); flex-shrink: 0; }
+.log-text { color: var(--hmh-text-dim); word-break: break-all; white-space: pre-wrap; }
+
+/* Ctrl+K 命令面板 */
+.cmdk-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: grid; place-items: start center; padding-top: 120px; z-index: 100;
+}
+.cmdk {
+  width: 420px; background: var(--hmh-bg-raised); border: 1px solid var(--hmh-border);
+  border-radius: var(--hmh-radius-lg); box-shadow: 0 16px 48px rgba(0,0,0,0.5); overflow: hidden;
+}
+.cmdk-head { padding: 10px 14px; font-size: 12px; color: var(--hmh-text-dim); border-bottom: 1px solid var(--hmh-border); }
+.cmdk-item { display: block; width: 100%; text-align: left; padding: 10px 14px; font-size: 14px; }
+.cmdk-item:hover, .cmdk-item:focus-visible { background: var(--hmh-bg-panel); outline: none; }
+
 /* Context Dock */
 .dock {
   width: 360px; min-width: 320px; max-width: 420px;

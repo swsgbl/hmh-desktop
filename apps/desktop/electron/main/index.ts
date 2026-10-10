@@ -241,6 +241,12 @@ if (!app.requestSingleInstanceLock()) {
       return hostCall(event, (c) => c.getJson<Record<string, unknown>>(`/api/fs/read?path=${encodeURIComponent(p)}`));
     });
 
+    // ---- M4:Diff 面板(只读 git 变更;授权在 runtime) ----
+    ipcMain.handle('bridge:diff', (event, sessionId: unknown) => {
+      const sid = typeof sessionId === 'string' ? sessionId.slice(0, 80) : '';
+      return hostCall(event, (c) => c.getJson<Record<string, unknown>>(`/api/diff${sid !== '' ? `?sessionId=${encodeURIComponent(sid)}` : ''}`));
+    });
+
     // ---- M5:认知状态(结构化事实;缺数据字段由 UI 显示"无数据") ----
     ipcMain.handle('bridge:cognitive', (event) =>
       hostCall(event, (c) => c.getJson<Record<string, unknown>>('/api/cognitive')));

@@ -330,6 +330,19 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
       }));
       return;
     }
+    if (req.method === 'GET' && url.pathname === '/api/diff') {
+      // Diff 面板(与 hmharness /api/diff 同形;fake 返回固定小变更集)
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        git: true, cwd: 'C:\\demo',
+        changed: [
+          { state: 'M', path: 'src/app.ts' },
+          { state: 'A', path: 'docs/notes.md' },
+        ],
+        stat: ' src/app.ts      | 12 +++++++---\n docs/notes.md   |  4 ++++\n 2 files changed, 16 insertions(+), 3 deletions(-)',
+      }));
+      return;
+    }
     if (req.method === 'GET' && url.pathname === '/api/cognitive') {
       // 认知状态(与 hmharness cognitiveStatus 同形子集;缺数据显式 null)
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
