@@ -31,6 +31,24 @@ const bridge = {
   interrupt(sessionId: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:interrupt', sessionId);
   },
+  fsList(path: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:fs-list', path);
+  },
+  fsRead(path: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:fs-read', path);
+  },
+  cognitive(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:cognitive');
+  },
+  sessionPreview(id: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:session-preview', id);
+  },
+  /** 订阅高频流块(delta/line 原帧;renderer 拼接当前 assistant 占位)。 */
+  onStreamChunks(cb: (chunk: { sessionId: string; kind: string; chunk: string }) => void): () => void {
+    const listener = (_e: Electron.IpcRendererEvent, payload: { sessionId: string; kind: string; chunk: string }): void => cb(payload);
+    ipcRenderer.on('bridge:stream-chunk', listener);
+    return () => ipcRenderer.removeListener('bridge:stream-chunk', listener);
+  },
   stopHost(): Promise<{ ok: boolean }> {
     return ipcRenderer.invoke('bridge:stop-host');
   },

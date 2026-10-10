@@ -105,6 +105,40 @@ export class DesktopHostClient {
   }
 
   /**
+   * 订阅全部 SSE 帧(含非信封事件:delta/line 等高频流)。信封由调用方
+   * 用 envelopeFromFrame 自行分流;断线重连语义同 events()。
+   */
+  async *rawEvents(lastEventId?: string, signal?: AbortSignal): AsyncGenerator<SseFrame> {
+    const res = await fetch(`${this.baseUrl}/api/events`, {
+      headers: this.headers({
+        accept: 'text/event-stream',
+        ...(lastEventId !== undefined ? { 'last-event-id': lastEventId } : {}),
+      }),
+      ...(signal !== undefined ? { signal } : {}),
+    });
+    if (res.status === 401 || res.status === 403) {
+      throw new DesktopHttpError(desktopError('AUTH_FAILED', `host rejected the session token (HTTP ${res.status})`, { retryable: false, recoveryAction: 'RECONNECT' }));
+    }
+    if (!res.ok || res.body === null) {
+      throw new DesktopHttpError(desktopError('HOST_NOT_READY', `SSE HTTP ${res.status}`, { retryable: true, recoveryAction: 'RECONNECT' }));
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const block = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        for (const frame of parseSseChunk(block)) yield frame;
+      }
+    }
+  }
+
+  /**
    * 订阅 SSE 事件流(async iterator)。断线由调用方重连;重连时把最后
    * 收到的 eventId 传入 lastEventId,host 端从重放环补发。
    */

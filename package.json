@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test --test-force-exit packages/contracts/src/__tests__/*.test.ts packages/host-adapter/src/__tests__/*.test.ts packages/host-adapter/src/__tests__/e2e.test.ts",
+    "test": "node --import tsx --test --test-force-exit packages/contracts/src/__tests__/*.test.ts packages/host-adapter/src/__tests__/*.test.ts",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs"
   },

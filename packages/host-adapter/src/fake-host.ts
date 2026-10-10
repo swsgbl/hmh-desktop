@@ -272,6 +272,76 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
       res.end(JSON.stringify({ sessions: list, nextCursor: null }));
       return;
     }
+    if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {
+      // 会话预览(与 hmharness GET /api/sessions/:id 同形:最后 80 条,每条 500 字)
+      const id = decodeURIComponent(url.pathname.slice('/api/sessions/'.length)).replace(/[^a-zA-Z0-9_:.@-]/g, '');
+      const s = sessions.get(id);
+      if (s === undefined) {
+        res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'session not found', { retryable: false })));
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        id, model: 'fake-model', cwd: 'C:\\demo',
+        messages: [
+          { role: 'user', text: '之前的任务(fake 预览)', tools: [] },
+          { role: 'assistant', text: '这是历史会话的回复预览(fake)。', tools: ['read_file'] },
+        ],
+      }));
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/fs') {
+      // 目录浏览(与 hmharness 同形:path 省略=根;files=1 附带文件列表)
+      const q = url.searchParams.get('path') ?? '';
+      const withFiles = url.searchParams.get('files') === '1';
+      if (q === '') {
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          path: '', segments: [], parent: '',
+          dirs: [{ name: 'demo-workspace', path: 'C:\\demo' }],
+          ...(withFiles ? { files: [] } : {}),
+        }));
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        path: q, segments: [{ name: q.split(/[\\/]/).filter(Boolean).pop() ?? q, path: q }], parent: '',
+        dirs: [{ name: 'src', path: `${q.replace(/[\\/]$/, '')}\\src` }],
+        ...(withFiles ? { files: [
+          { name: 'README.md', path: `${q.replace(/[\\/]$/, '')}\\README.md`, rel: 'README.md' },
+          { name: 'package.json', path: `${q.replace(/[\\/]$/, '')}\\package.json`, rel: 'package.json' },
+        ] } : {}),
+      }));
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/fs/read') {
+      // 文件预览(64KB 上限语义;fake 返回固定文本)
+      const p = url.searchParams.get('path') ?? '';
+      if (p === '') {
+        res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'path required', { retryable: false })));
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        path: p, rel: p.split(/[\\/]/).pop() ?? p, size: 42,
+        text: '# demo workspace\n\n这是 fake host 的文件预览内容。\n',
+      }));
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/cognitive') {
+      // 认知状态(与 hmharness cognitiveStatus 同形子集;缺数据显式 null)
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        memory: { layers: 3, entries: 12, contradictions: 0 },
+        trajectories: 7,
+        auditEvents: 21,
+        worldModel: { version: 4, beliefs: 9, trusted: 5, brier: 0.31 },
+        calibration: { predictions: 46, reliability: 0.72 },
+      }));
+      return;
+    }
     if (req.method === 'POST' && url.pathname === '/api/fake/emit') {
       void (async () => {
         try {

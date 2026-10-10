@@ -110,6 +110,23 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .turn.system { border-color: var(--hmh-danger); align-self: stretch; max-width: 760px; }
 .composer-side { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
 
+/* 流式输出 */
+.turn.streaming { border-style: dashed; }
+.cursor { animation: hmh-blink 1s steps(1) infinite; color: var(--hmh-accent); }
+@keyframes hmh-blink { 50% { opacity: 0; } }
+
+/* Dock 面板通用 */
+.files-pane, .evidence-pane { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.fs-crumbs { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.fs-path { color: var(--hmh-text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fs-list { display: flex; flex-direction: column; overflow-y: auto; max-height: 40%; }
+.fs-row { text-align: left; padding: 5px 8px; border-radius: var(--hmh-radius-sm); font-size: 13px; color: var(--hmh-text-dim); font-family: var(--hmh-font-mono); }
+.fs-row:hover { background: var(--hmh-bg-panel); color: var(--hmh-text); }
+.fs-preview { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.fs-preview-head { font-size: 12px; color: var(--hmh-text-dim); padding: 4px 0; }
+.fs-preview .tool-io { max-height: 320px; overflow: auto; }
+.btn.sm { padding: 4px 8px; font-size: 12px; }
+
 /* Context Dock */
 .dock {
   width: 360px; min-width: 320px; max-width: 420px;

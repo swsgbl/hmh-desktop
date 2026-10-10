@@ -16,7 +16,7 @@ import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { DesktopRuntimeSupervisor, DesktopHostClient, type HostState } from '@hmh-desktop/host-adapter';
+import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
 import { isEventEnvelope, type EventEnvelope } from '@hmh-desktop/contracts';
 
 const here = import.meta.dirname ?? '.';
@@ -91,20 +91,34 @@ if (!app.requestSingleInstanceLock()) {
     }
   }
 
-  /** SSE 信封流订阅:断线自动重连(带 Last-Event-ID);host 重启后重建。 */
+  /** SSE 流订阅:信封(event: hmh)批量推 renderer;高频 delta/line 原帧
+   *  作为流块转发(renderer 拼接当前 assistant 占位)。断线自动重连。 */
   async function pumpEvents(): Promise<void> {
     if (client === null) return;
     for (;;) {
       const c = client;
       if (c === null) return;
       try {
-        for await (const env of c.events(lastEventId === '' ? undefined : lastEventId, sseAbort?.signal)) {
-          if (!isEventEnvelope(env)) {
-            droppedFrames += 1;
-            continue;
+        for await (const frame of c.rawEvents(lastEventId === '' ? undefined : lastEventId, sseAbort?.signal)) {
+          if (frame.event === 'hmh') {
+            const env = envelopeFromFrame(frame);
+            if (env === null) {
+              droppedFrames += 1;
+              continue;
+            }
+            lastEventId = env.eventId;
+            pushEvent(env);
+          } else if (frame.event === 'delta' || frame.event === 'line') {
+            try {
+              const d = JSON.parse(frame.data) as { sessionId?: string; k?: string; chunk?: string; text?: string };
+              const payload = frame.event === 'delta'
+                ? { sessionId: d.sessionId ?? '', kind: d.k ?? 'text', chunk: String(d.chunk ?? '') }
+                : { sessionId: d.sessionId ?? '', kind: 'line', chunk: String(d.text ?? '') };
+              for (const w of BrowserWindow.getAllWindows()) {
+                if (!w.isDestroyed()) w.webContents.send('bridge:stream-chunk', payload);
+              }
+            } catch { /* malformed stream frame: skip */ }
           }
-          lastEventId = env.eventId;
-          pushEvent(env);
         }
         return; // 流正常结束(host 关闭)
       } catch {
@@ -214,6 +228,29 @@ if (!app.requestSingleInstanceLock()) {
       hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/interrupt', {
         sessionId: typeof sessionId === 'string' ? sessionId.slice(0, 80) : '',
       })));
+
+    // ---- M4:工作区文件面(路径授权在 runtime:insideWs 校验) ----
+    ipcMain.handle('bridge:fs-list', (event, path: unknown) => {
+      const p = typeof path === 'string' ? path.slice(0, 1000) : '';
+      return hostCall(event, (c) => c.getJson<Record<string, unknown>>(`/api/fs?files=1${p !== '' ? `&path=${encodeURIComponent(p)}` : ''}`));
+    });
+
+    ipcMain.handle('bridge:fs-read', (event, path: unknown) => {
+      const p = typeof path === 'string' ? path.slice(0, 1000) : '';
+      if (p === '') return Promise.resolve({ error: 'path required', code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.getJson<Record<string, unknown>>(`/api/fs/read?path=${encodeURIComponent(p)}`));
+    });
+
+    // ---- M5:认知状态(结构化事实;缺数据字段由 UI 显示"无数据") ----
+    ipcMain.handle('bridge:cognitive', (event) =>
+      hostCall(event, (c) => c.getJson<Record<string, unknown>>('/api/cognitive')));
+
+    // ---- 历史会话预览(最后 80 条,每条 500 字;runtime 权威数据) ----
+    ipcMain.handle('bridge:session-preview', (event, id: unknown) => {
+      const sid = typeof id === 'string' ? id.replace(/[^a-zA-Z0-9_:.@-]/g, '').slice(0, 80) : '';
+      if (sid === '') return Promise.resolve({ error: 'id required', code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.getJson<Record<string, unknown>>(`/api/sessions/${encodeURIComponent(sid)}`));
+    });
 
     ipcMain.handle('bridge:stop-host', (event) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender' };
