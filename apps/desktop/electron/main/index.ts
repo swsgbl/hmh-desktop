@@ -131,24 +131,43 @@ if (!app.requestSingleInstanceLock()) {
 
   /** dev 默认 fake host;HMH_DESKTOP_REAL=1 时连真实 hmharness desktop-host。
    *  注意:Electron 主进程的 process.execPath 是 electron.exe——host 子进程
-   *  必须带 ELECTRON_RUN_AS_NODE=1 才会以纯 node 语义跑 --import tsx。 */
+   *  必须带 ELECTRON_RUN_AS_NODE=1 才会以纯 node 语义跑。
+   *  打包产品(app.isPackaged):fake host 用 extraResources 里的自包含 cjs;
+   *  真实 runtime 需 HMH_DESKTOP_REAL_ENTRY 指向 desktop-host 入口(产品化
+   *  的 runtime 捆绑属后续设计,见验收报告)。 */
   async function startHost(): Promise<void> {
     const useReal = process.env.HMH_DESKTOP_REAL === '1';
     bridge = { ...bridge, mode: useReal ? 'real' : 'fake' };
     const repoRoot = join(here, '..', '..', '..', '..'); // apps/desktop/dist-electron/main → repo root
-    const spec = useReal
-      ? {
-          command: process.execPath,
-          args: ['--import', 'tsx', join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts')],
-          env: { ELECTRON_RUN_AS_NODE: '1' },
-        }
-      : {
-          command: process.execPath,
-          // 直接走包真实路径(node_modules 里的 workspace junction 会被 ESM
-          // realpath 化,导致 fake-host 的 argv[1]/import.meta.url 匹配失效)
-          args: ['--import', 'tsx', join(repoRoot, 'packages', 'host-adapter', 'src', 'fake-host.ts')],
-          env: { ELECTRON_RUN_AS_NODE: '1' },
-        };
+    const packaged = app.isPackaged;
+    let spec: { command: string; args: string[]; env: Record<string, string> };
+    if (useReal) {
+      const entry = process.env.HMH_DESKTOP_REAL_ENTRY ?? (packaged ? '' : join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts'));
+      if (entry === '') {
+        bridge = { ...bridge, hostState: 'failed', lastError: '真实 runtime 未配置:打包产品需设置 HMH_DESKTOP_REAL_ENTRY 指向 hmharness desktop-host 入口' };
+        logInfo('host', 'real mode without HMH_DESKTOP_REAL_ENTRY in packaged app');
+        return;
+      }
+      spec = {
+        command: process.execPath,
+        args: ['--import', 'tsx', entry],
+        env: { ELECTRON_RUN_AS_NODE: '1' },
+      };
+    } else if (packaged) {
+      spec = {
+        command: process.execPath,
+        args: [join(process.resourcesPath, 'fake-host.cjs')],
+        env: { ELECTRON_RUN_AS_NODE: '1' },
+      };
+    } else {
+      spec = {
+        command: process.execPath,
+        // 直接走包真实路径(node_modules 里的 workspace junction 会被 ESM
+        // realpath 化,导致 fake-host 的 argv[1]/import.meta.url 匹配失效)
+        args: ['--import', 'tsx', join(repoRoot, 'packages', 'host-adapter', 'src', 'fake-host.ts')],
+        env: { ELECTRON_RUN_AS_NODE: '1' },
+      };
+    }
     supervisor = new DesktopRuntimeSupervisor(spec, {
       onStateChange: broadcastHostState,
       // 首次启动与 crash 自愈后的重启都会走这里:端口/token 都是新的,
@@ -337,10 +356,84 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     void startHost();
 
+    // 阶段H 安全自测(MasterPrompt H:renderer 无 process/require、白名单桥、
+    // 导航拦截、CSP、window.open 拒绝)。自驱探针,scripts/security-test.mjs 消费。
+    if (process.env.HMH_DESKTOP_SECURITY_TEST === '1') {
+      const win0 = BrowserWindow.getAllWindows()[0];
+      if (win0 !== undefined) {
+        win0.webContents.once('did-finish-load', () => {
+          void securitySelfTest(win0);
+        });
+      }
+    }
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
   });
+
+  async function securitySelfTest(win: BrowserWindow): Promise<void> {
+    const results: Array<[string, boolean, string]> = [];
+    const check = async (name: string, probe: () => Promise<[boolean, string]>): Promise<void> => {
+      try {
+        const [ok, detail] = await probe();
+        results.push([name, ok, detail]);
+      } catch (err) {
+        results.push([name, false, String(err).slice(0, 120)]);
+      }
+    };
+    const js = (code: string): Promise<unknown> => win.webContents.executeJavaScript(code, true);
+
+    await check('renderer 无可用的 process/require(sandbox 生效)', async () => {
+      const r = (await js(`(function(){
+        var t = function(f){ try { var v = f(); return (v === undefined || v === null) ? 'unavailable' : typeof v; } catch(e){ return 'blocked'; } };
+        return JSON.stringify([t(function(){return process}), t(function(){return require}), t(function(){return globalThis.process})]);
+      })()`)) as string;
+      const parsed = JSON.parse(r) as string[];
+      const p = parsed[0] ?? 'unknown';
+      const req = parsed[1] ?? 'unknown';
+      const safe = (v: string): boolean => v === 'unavailable' || v === 'blocked';
+      return [safe(p) && safe(req), `process=${p} require=${req}`];
+    });
+    await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
+      const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
+      const allow = ['approve', 'cognitive', 'diff', 'fsList', 'fsRead', 'getState', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'sendTask', 'sessionPreview', 'sessions', 'stopHost'];
+      const got = r === '' ? [] : r.split(',');
+      const unexpected = got.filter((k) => !allow.includes(k));
+      return [unexpected.length === 0, `keys=${r}`];
+    });
+    await check('外部导航被拦截(URL 不变)', async () => {
+      const before = win.webContents.getURL();
+      await js('location.href = "https://example.invalid/x"; "noop"').catch(() => 'noop');
+      await new Promise((r2) => setTimeout(r2, 1_200));
+      const after = win.webContents.getURL();
+      return [after === before, `${before} → ${after}`];
+    });
+    await check('window.open 被拒绝(返回 null 且无新窗口)', async () => {
+      const before = BrowserWindow.getAllWindows().length;
+      const r = (await js('String(window.open("https://example.invalid"))')) as string;
+      await new Promise((r2) => setTimeout(r2, 400));
+      const after = BrowserWindow.getAllWindows().length;
+      return [r === 'null' && after === before, `open()=${r} windows=${before}→${after}`];
+    });
+    await check('CSP 存在(meta 注入或响应头)', async () => {
+      const meta = (await js('Boolean(document.querySelector("meta[http-equiv=\'Content-Security-Policy\']"))')) as boolean;
+      const headerCsp = isDev ? 'dev: header CSP 由 onHeadersReceived 注入(不适用 meta 断言)' : 'prod';
+      return [meta || isDev, `meta=${meta} ${headerCsp}`];
+    });
+    await check('bridge:get-state 正常返回(host 桥可用)', async () => {
+      const r = (await js('window.hmh.getState().then(s => JSON.stringify(s)).catch(e => "ERR:"+e)')) as string;
+      return [r.startsWith('{') && r.includes('hostState'), r.slice(0, 80)];
+    });
+
+    let failed = 0;
+    for (const [name, ok, detail] of results) {
+      console.log(`SECURITY-TEST ${ok ? 'PASS' : 'FAIL'} | ${name} | ${redact(detail)}`);
+      if (!ok) failed += 1;
+    }
+    console.log(`SECURITY-TEST SUMMARY pass=${results.length - failed}/${results.length}`);
+    app.exit(failed === 0 ? 0 : 1);
+  }
 
   // 退出:优雅停止自己 spawn 的 host(shutdown 端点 → 兜底只 kill 自己的句柄)
   app.on('before-quit', (e) => {

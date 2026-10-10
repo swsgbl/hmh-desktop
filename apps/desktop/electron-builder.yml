@@ -1,0 +1,33 @@
+appId: dev.hmh.desktop
+productName: HMH Desktop
+copyright: Copyright © 2026 HMH
+# 锁定版本(03 号文档:发布前锁定 Electron 版本;builder 需要精确值)
+electronVersion: 44.7.0
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist-electron/**/*
+  - dist-renderer/**/*
+  - package.json
+# fake-host.cjs 走 extraResources(asar 外:子进程以 electron-as-node 直跑,
+# 不依赖 asar 的 fs patch);@hmh-desktop/* 已被 esbuild 打平进 main bundle。
+extraResources:
+  - from: resources
+    to: .
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # 代码签名证书未配置:NOT RUN 项(发布前需证书与验签)
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  artifactName: HMH-Desktop-Setup-${version}.${ext}
+electronDownload:
+  mirror: https://cdn.npmmirror.com/binaries/electron/

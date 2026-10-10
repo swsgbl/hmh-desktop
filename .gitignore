@@ -2,7 +2,10 @@ node_modules/
 dist/
 dist-electron/
 dist-renderer/
+resources/
 out/
+release/
+build/
 *.log
 .vite/
 *.tsbuildinfo

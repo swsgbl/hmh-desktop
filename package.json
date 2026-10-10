@@ -12,10 +12,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test --test-force-exit packages/contracts/src/__tests__/*.test.ts packages/host-adapter/src/__tests__/*.test.ts",
     "dev": "node scripts/dev.mjs",
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs",
+    "security-test": "node scripts/build-electron.mjs && node scripts/security-test.mjs",
+    "package": "node scripts/package.mjs",
+    "sbom": "node scripts/gen-sbom.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "electron-builder": "^26.15.3",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   },

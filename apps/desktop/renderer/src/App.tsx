@@ -35,6 +35,7 @@ type Item =
   | { kind: 'assistant'; id: string; text: string }
   | { kind: 'tool'; id: string; name: string; argsPreview: string; outputPreview?: string; isError?: boolean }
   | { kind: 'approval'; id: string; approvalId: string; tool: string; argsPreview: string; risk: string }
+  | { kind: 'artifact'; id: string; relPath: string; title: string }
   | { kind: 'error'; id: string; code: string; message: string };
 
 type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs';
@@ -102,6 +103,11 @@ export function App(): React.ReactElement {
         argsPreview: String(p.argsPreview ?? ''),
         risk: String(p.risk ?? ''),
       }]);
+    } else if (env.kind === 'artifact.created') {
+      const a = (env.payload as { artifact?: { relPath?: string; title?: string; kind?: string } }).artifact;
+      if (a !== undefined) {
+        setItems((prev) => [...prev, { kind: 'artifact', id: env.eventId, relPath: String(a.relPath ?? ''), title: String(a.title ?? a.relPath ?? '') }]);
+      }
     } else if (env.kind === 'run.completed') {
       setRunStatus('completed');
       setStreaming('');
@@ -394,6 +400,15 @@ export function App(): React.ReactElement {
                     <button className="btn danger" disabled={approvalBusy} onClick={() => void approve(false)}>拒绝</button>
                   </div>
                 </article>
+              );
+            }
+            if (it.kind === 'artifact') {
+              return (
+                <div key={it.id} className="artifact-card" aria-label="交付物">
+                  <span className="artifact-icon" aria-hidden="true">📦</span>
+                  <span className="artifact-title">{it.title}</span>
+                  <span className="artifact-hint">交付物(工作区相对路径;可在 Files 面板预览)</span>
+                </div>
               );
             }
             return (

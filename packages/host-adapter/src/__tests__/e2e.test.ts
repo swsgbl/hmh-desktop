@@ -70,6 +70,12 @@ test('纵切片:发送 → run.started → 工具 → run.completed(auto 模式)
     assert.ok(v.events.some((e) => e.kind === 'tool.started'));
     assert.ok(v.events.some((e) => e.kind === 'tool.completed'));
     assert.equal(v.needsCatchUp, false, '顺序到达无缺口');
+    // 交付物先于终态(artifact.created 在 run.completed 之前)
+    const artIdx = v.events.findIndex((e) => e.kind === 'artifact.created');
+    const doneIdx = v.events.findIndex((e) => e.kind === 'run.completed');
+    assert.ok(artIdx >= 0 && artIdx < doneIdx, 'artifact.created 先于 run.completed');
+    const art = (v.events[artIdx]!.payload as { artifact?: { relPath?: string } }).artifact;
+    assert.ok(typeof art?.relPath === 'string' && art.relPath.length > 0, '交付物带工作区相对路径');
   } finally {
     await rig.stop();
   }

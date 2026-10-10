@@ -123,6 +123,10 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
 
     const finishRun = (answer: string, toolUses: number): void => {
       runTimers.delete(`${sessionId}\0${runId}`);
+      // 交付物先于终态(与 hmharness desktop 桥同序:artifact.created → run.completed)
+      emit(sessionId, runId, 'artifact.created', {
+        artifact: { relPath: 'out.txt', kind: 'file', title: 'out.txt' },
+      });
       emit(sessionId, runId, 'run.completed', { text: answer, turns: 1, toolUses });
     };
 
@@ -408,10 +412,14 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
 
 // 直接运行(supervisor spawn 的子进程形态)。realpath 比较:npm workspace
 // junction / 大小写差异都不能让这个检测失手(失手=静默退出 code 0,难查)。
+// cjs bundle(esbuild,打包产品)下 __filename 存在;ESM(tsx/源码)用 import.meta。
+const selfUrl: string = typeof __filename === 'string'
+  ? pathToFileURL(realpathSync(__filename)).href
+  : import.meta.url;
 const invokedAsScript = (() => {
   if (process.argv[1] === undefined) return false;
   try {
-    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+    return selfUrl === pathToFileURL(realpathSync(process.argv[1])).href;
   } catch {
     return false;
   }
