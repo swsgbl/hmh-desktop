@@ -14,10 +14,20 @@ const bridge = {
     hostVersion: string | null;
     lastError: string | null;
     mode: 'fake' | 'real';
+    runtimeEntry: string | null;
     droppedFrames: number;
     error?: string;
   }> {
     return ipcRenderer.invoke('bridge:get-state');
+  },
+  runtimeInfo(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:runtime-info');
+  },
+  browseRuntime(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:browse-runtime');
+  },
+  setRuntime(entry: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:set-runtime', entry);
   },
   sessions(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:sessions');

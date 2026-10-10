@@ -227,6 +227,29 @@ export function App(): React.ReactElement {
   }, []);
 
   const [exportHint, setExportHint] = useState('');
+  // runtime 连接(fake 时引导/徽章;真实入口信息)
+  const [runtimeDismissed, setRuntimeDismissed] = useState(false);
+  const [runtimeBusy, setRuntimeBusy] = useState(false);
+
+  const pickRuntime = useCallback(async (): Promise<void> => {
+    if (bridge === undefined) return;
+    setRuntimeBusy(true);
+    const r = await bridge.browseRuntime();
+    if ('ok' in r && r.ok === true && r.entry !== undefined) {
+      await bridge.setRuntime(r.entry); // 热切换:main 停旧 host 按新入口拉起
+      setRuntimeDismissed(true);
+      void bridge.getState().then(setState);
+    }
+    setRuntimeBusy(false);
+  }, []);
+
+  const resetRuntimeAuto = useCallback(async (): Promise<void> => {
+    if (bridge === undefined) return;
+    setRuntimeBusy(true);
+    await bridge.setRuntime(''); // 清除覆盖 → 回到自动发现
+    void bridge.getState().then(setState);
+    setRuntimeBusy(false);
+  }, []);
 
   /** 审批模式(权威在 runtime;切换显式且即时生效)。 */
   useEffect(() => {
@@ -476,6 +499,21 @@ export function App(): React.ReactElement {
 
   return (
     <div className="app-shell">
+      {state !== null && state.mode === 'fake' && hostState === 'ready' && !runtimeDismissed && (
+        <div className="runtime-guide" role="dialog" aria-label="连接 hmharness 运行时">
+          <div className="runtime-guide-card">
+            <div className="runtime-guide-title">当前是演示模式(假数据)</div>
+            <p className="runtime-guide-text">
+              未自动找到 hmharness 运行时。安装过 hmharness(CLI)的机器通常会被自动识别;若未识别,请选择 hmharness 仓库里的
+              <code>packages/web/src/desktop-host.ts</code>。连接后与 CLI / TUI / 网页版共享全部配置、Provider 与会话历史。
+            </p>
+            <div className="runtime-guide-actions">
+              <button className="btn primary" disabled={runtimeBusy} onClick={() => void pickRuntime()}>选择 hmharness 运行时…</button>
+              <button className="btn ghost" disabled={runtimeBusy} onClick={() => setRuntimeDismissed(true)}>先用演示模式</button>
+            </div>
+          </div>
+        </div>
+      )}
       {cmdOpen && (
         <div className="cmdk-overlay" role="dialog" aria-label="命令面板" onClick={() => setCmdOpen(false)}>
           <div className="cmdk" onClick={(e) => e.stopPropagation()}>
@@ -499,6 +537,25 @@ export function App(): React.ReactElement {
         <div className="cmdk-overlay" role="dialog" aria-label="设置" onClick={() => setSettingsOpen(false)}>
           <div className="cmdk settings" onClick={(e) => e.stopPropagation()}>
             <div className="cmdk-head">设置</div>
+            <div className="settings-section">运行时(hmharness 连接)</div>
+            <div className="settings-row">
+              <span>模式</span>
+              <span className="runtime-mode">{state?.mode === 'real' ? '真实 hmharness' : '演示(假数据)'}</span>
+            </div>
+            {state?.runtimeEntry !== null && (
+              <div className="settings-row">
+                <span>入口</span>
+                <code className="runtime-entry" title={state?.runtimeEntry ?? ''}>{state?.runtimeEntry}</code>
+              </div>
+            )}
+            <div className="settings-row">
+              <span>切换运行时</span>
+              <div className="seg">
+                <button disabled={runtimeBusy} onClick={() => void pickRuntime()}>选择入口…</button>
+                <button disabled={runtimeBusy} onClick={() => void resetRuntimeAuto()}>恢复自动发现</button>
+              </div>
+            </div>
+            <div className="settings-note">与 CLI / TUI / 网页版 7788 共享同一 HMH_HOME(配置、Provider、会话历史)。</div>
             <div className="settings-section">应用偏好(本地存储)</div>
             <div className="settings-row">
               <span>Enter 键行为</span>
@@ -591,7 +648,10 @@ export function App(): React.ReactElement {
           )}
           {currentModel !== '' && <span className="topbar-model" title="当前 chat 模型">{currentModel}</span>}
           <span className="spacer" />
-          {providers.length === 0 && hostState === 'ready' && (
+          {state?.mode === 'fake' && (
+            <button className="guide-pill" title="点击连接真实 hmharness" onClick={() => setRuntimeDismissed(false)}>演示模式</button>
+          )}
+          {providers.length === 0 && hostState === 'ready' && state?.mode === 'real' && (
             <button className="guide-pill" onClick={() => setSettingsOpen(true)}>未配置模型 Provider — 点此添加</button>
           )}
           {busy && runStatus !== null && (

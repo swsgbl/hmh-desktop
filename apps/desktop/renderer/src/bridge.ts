@@ -7,8 +7,16 @@ export interface BridgeState {
   hostVersion: string | null;
   lastError: string | null;
   mode: 'fake' | 'real';
+  runtimeEntry: string | null;
   droppedFrames: number;
   error?: string;
+}
+
+export interface RuntimeInfoDto {
+  mode: 'fake' | 'real';
+  runtimeEntry: string | null;
+  override: string;
+  detected: string;
 }
 
 export interface SessionRowDto {
@@ -82,6 +90,9 @@ export interface DiffDto {
 
 export interface HmhBridge {
   getState(): Promise<BridgeState>;
+  runtimeInfo(): Promise<RuntimeInfoDto | { error: string; code: string }>;
+  browseRuntime(): Promise<{ ok: boolean; entry?: string; canceled?: boolean } | { error: string; code: string }>;
+  setRuntime(entry: string): Promise<{ ok: boolean; mode?: string } | { error: string; code: string }>;
   sessions(): Promise<{ sessions: SessionRowDto[]; nextCursor: string | null } | { error: string; code: string }>;
   sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[]): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
   fsSearch(q: string): Promise<{ results: Array<{ rel: string; path: string }> } | { error: string; code: string }>;

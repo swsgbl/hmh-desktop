@@ -12,7 +12,7 @@ const electronExe = join(root, 'node_modules', 'electron', 'dist', 'electron.exe
 const child = spawn(electronExe, [join(root, 'apps', 'desktop')], {
   cwd: root,
   stdio: ['ignore', 'pipe', 'pipe'],
-  env: { ...process.env, HMH_DESKTOP_SECURITY_TEST: '1' },
+  env: { ...process.env, HMH_DESKTOP_SECURITY_TEST: '1', HMH_DESKTOP_FAKE: '1' },
 });
 let out = '';
 child.stdout.on('data', (d) => { out += d.toString(); });

@@ -259,6 +259,20 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .sidebar { display: none; }
 }
 
+/* runtime 连接引导 */
+.runtime-guide { position: fixed; inset: 0; background: rgba(0,0,0,0.72); display: grid; place-items: center; z-index: 90; }
+.runtime-guide-card {
+  width: 520px; max-width: 92vw; background: var(--hmh-bg-raised);
+  border: 1px solid var(--hmh-warn); border-radius: var(--hmh-radius-lg);
+  padding: 22px 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.runtime-guide-title { font-weight: 700; color: var(--hmh-warn); margin-bottom: 8px; }
+.runtime-guide-text { font-size: 13px; color: var(--hmh-text-dim); line-height: 1.7; margin: 0 0 14px; }
+.runtime-guide-text code { font-family: var(--hmh-font-mono); color: var(--hmh-text); }
+.runtime-guide-actions { display: flex; gap: 8px; }
+.runtime-mode { font-size: 13px; color: var(--hmh-text); }
+.runtime-entry { font: 11px var(--hmh-font-mono); color: var(--hmh-text-dim); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+
 /* Context Dock */
 .dock {
   width: 360px; min-width: 320px; max-width: 420px;

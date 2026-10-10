@@ -13,8 +13,11 @@
  * 给 host —— fake 与真实 hmharness desktop-host 走同一条代码路径。
  */
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
-import { join } from 'node:path';
+import { join, dirname, isAbsolute, resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
@@ -57,10 +60,11 @@ if (!app.requestSingleInstanceLock()) {
     hostVersion: string | null;
     lastError: string | null;
     mode: 'fake' | 'real';
+    runtimeEntry: string | null;
   }
   let supervisor: DesktopRuntimeSupervisor | null = null;
   let client: DesktopHostClient | null = null;
-  let bridge: BridgeSnapshot = { hostState: 'stopped', hostPort: null, hostVersion: null, lastError: null, mode: 'fake' };
+  let bridge: BridgeSnapshot = { hostState: 'stopped', hostPort: null, hostVersion: null, lastError: null, mode: 'fake', runtimeEntry: null };
   /** 事件批量缓冲:高频 SSE 不逐条过 IPC,50ms 批量 flush(渲染不卡)。 */
   let eventBuffer: EventEnvelope[] = [];
   let flushTimer: NodeJS.Timeout | null = null;
@@ -130,28 +134,98 @@ if (!app.requestSingleInstanceLock()) {
     }
   }
 
-  /** dev 默认 fake host;HMH_DESKTOP_REAL=1 时连真实 hmharness desktop-host。
-   *  注意:Electron 主进程的 process.execPath 是 electron.exe——host 子进程
-   *  必须带 ELECTRON_RUN_AS_NODE=1 才会以纯 node 语义跑。
-   *  打包产品(app.isPackaged):fake host 用 extraResources 里的自包含 cjs;
-   *  真实 runtime 需 HMH_DESKTOP_REAL_ENTRY 指向 desktop-host 入口(产品化
-   *  的 runtime 捆绑属后续设计,见验收报告)。 */
+  /* ---- hmharness runtime 自动发现(2026-10-10 用户定调:装过 hmharness 的
+     机器零配置直连,复用 CLI/TUI/web 7788 的同一 HMH_HOME——config/providers/
+     会话历史天然共享)。发现顺序:显式配置 > where hmh > npm 全局 > 常见源码位置。 */
+  const runtimeConfigFile = (): string => join(app.getPath('userData'), 'runtime.json');
+  async function loadRuntimeEntryOverride(): Promise<string> {
+    try {
+      const v = JSON.parse(await readFile(runtimeConfigFile(), 'utf8')) as { entry?: unknown };
+      return typeof v.entry === 'string' && v.entry !== '' && isAbsolute(v.entry) ? v.entry : '';
+    } catch { return ''; }
+  }
+  async function saveRuntimeEntryOverride(entry: string): Promise<void> {
+    await writeFile(runtimeConfigFile(), JSON.stringify({ entry }, null, 2), 'utf8').catch(() => undefined);
+  }
+
+  function detectRealEntry(): string {
+    // 1) 环境变量显式覆盖(高级用户)
+    const envEntry = process.env.HMH_DESKTOP_REAL_ENTRY;
+    if (envEntry !== undefined && envEntry !== '' && isAbsolute(envEntry)) return envEntry;
+
+    const repos = new Set<string>();
+    // 2) where hmh:npm link/全局安装的 bin → node_modules/hmharness → 真 repo(npm link 是 symlink)
+    try {
+      const out = execFileSync('where', ['hmh'], { encoding: 'utf8', timeout: 4_000, windowsHide: true });
+      for (const line of out.split(/\r?\n/)) {
+        const bin = line.trim();
+        if (bin === '') continue;
+        try {
+          const linked = join(dirname(bin), 'node_modules', 'hmharness');
+          if (existsSync(linked)) repos.add(realpathSync(linked));
+        } catch { /* bin 布局不符,跳过 */ }
+      }
+    } catch { /* hmh 不在 PATH */ }
+    // 3) npm 全局根
+    try {
+      const out = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', timeout: 6_000, windowsHide: true });
+      const p = join(out.trim(), 'hmharness');
+      if (existsSync(p)) repos.add(realpathSync(p));
+    } catch { /* npm 不可用 */ }
+    // 4) 常见源码位置(本机开发布局)
+    const bases = ['C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\', homedir(), join(homedir(), 'Developer')];
+    for (const base of bases) {
+      try {
+        const p = resolve(base, 'hmharness');
+        if (existsSync(p)) repos.add(p);
+      } catch { /* 盘不存在 */ }
+    }
+    // 命中的 repo 必须有 desktop-host 入口与依赖布局
+    for (const repo of repos) {
+      const entry = join(repo, 'packages', 'web', 'src', 'desktop-host.ts');
+      if (existsSync(entry) && existsSync(join(repo, 'node_modules'))) return entry;
+    }
+    return '';
+  }
+
+  /** 解析 runtime 入口所属的 hmharness 仓库根(packages/web/src|dist 上溯)。 */
+  function repoRootOf(entry: string): string {
+    let dir = dirname(entry);
+    for (let i = 0; i < 6; i++) {
+      if (existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'packages', 'web'))) return dir;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return dirname(entry);
+  }
+
+  let runtimeEntry = ''; // 当前实际使用的真实 runtime 入口(''=未接)
+
+  /** dev 连仓库内 hmharness;打包产品自动发现(发现不到→演示模式+引导)。 */
   async function startHost(): Promise<void> {
-    const useReal = process.env.HMH_DESKTOP_REAL === '1';
-    bridge = { ...bridge, mode: useReal ? 'real' : 'fake' };
     const repoRoot = join(here, '..', '..', '..', '..'); // apps/desktop/dist-electron/main → repo root
     const packaged = app.isPackaged;
-    let spec: { command: string; args: string[]; env: Record<string, string> };
+    // 真实入口解析:配置覆盖 > 自动发现(dev 直接用相邻仓库);
+    // HMH_DESKTOP_FAKE=1 强制演示模式(快速/确定性测试与冒烟)
+    const forceFake = process.env.HMH_DESKTOP_FAKE === '1';
+    const override = await loadRuntimeEntryOverride();
+    runtimeEntry = forceFake
+      ? ''
+      : override !== ''
+        ? override
+        : packaged
+          ? detectRealEntry()
+          : join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts');
+    const useReal = runtimeEntry !== '' && existsSync(runtimeEntry);
+    bridge = { ...bridge, mode: useReal ? 'real' : 'fake', runtimeEntry: useReal ? runtimeEntry : null };
+    let spec: { command: string; args: string[]; env: Record<string, string>; cwd?: string };
     if (useReal) {
-      const entry = process.env.HMH_DESKTOP_REAL_ENTRY ?? (packaged ? '' : join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts'));
-      if (entry === '') {
-        bridge = { ...bridge, hostState: 'failed', lastError: '真实 runtime 未配置:打包产品需设置 HMH_DESKTOP_REAL_ENTRY 指向 hmharness desktop-host 入口' };
-        logInfo('host', 'real mode without HMH_DESKTOP_REAL_ENTRY in packaged app');
-        return;
-      }
+      const repo = repoRootOf(runtimeEntry);
       spec = {
         command: process.execPath,
-        args: ['--import', 'tsx', entry],
+        args: ['--import', 'tsx', runtimeEntry],
+        cwd: repo, // bare 'tsx' 与 workspace 依赖都从 repo 的 node_modules 解析
         env: { ELECTRON_RUN_AS_NODE: '1' },
       };
     } else if (packaged) {
@@ -179,7 +253,7 @@ if (!app.requestSingleInstanceLock()) {
         sseAbort = new AbortController();
         lastEventId = '';
         void pumpEvents();
-        logInfo('host', `bridge ready on 127.0.0.1:${ep.port} (runtime ${ep.version}, mode ${bridge.mode})`);
+        logInfo('host', `bridge ready on 127.0.0.1:${ep.port} (runtime ${ep.version}, mode ${bridge.mode}${useReal ? `, entry=${runtimeEntry}` : ''})`);
       },
     });
     try {
@@ -310,6 +384,45 @@ if (!app.requestSingleInstanceLock()) {
       const m = mode === 'auto' ? 'auto' : mode === 'ask' ? 'ask' : '';
       if (m === '') return Promise.resolve({ error: 'mode must be ask|auto', code: 'BAD_REQUEST' });
       return hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/config', { approval: m }));
+    });
+
+    // ---- hmharness runtime 连接(自动发现 + 手动覆盖 + 热切换) ----
+    ipcMain.handle('bridge:runtime-info', (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      return {
+        mode: bridge.mode,
+        runtimeEntry: bridge.runtimeEntry,
+        override: loadRuntimeEntryOverride(),
+        detected: detectRealEntry(),
+      };
+    });
+
+    ipcMain.handle('bridge:browse-runtime', async (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+      if (win === undefined) return { error: 'no window', code: 'BRIDGE_ERROR' };
+      const r = await dialog.showOpenDialog(win, {
+        title: '选择 hmharness 的 desktop-host 入口',
+        properties: ['openFile'],
+        filters: [{ name: 'desktop-host', extensions: ['ts', 'js'] }],
+      });
+      if (r.canceled || r.filePaths[0] === undefined) return { ok: false, canceled: true };
+      return { ok: true, entry: r.filePaths[0] };
+    });
+
+    /** 设置/清除手动入口后热重启 host(空串=回到自动发现)。 */
+    ipcMain.handle('bridge:set-runtime', async (event, entry: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const e = typeof entry === 'string' ? entry.trim() : '';
+      if (e !== '' && (!isAbsolute(e) || !existsSync(e))) {
+        return { error: '入口必须是存在的绝对路径(desktop-host.ts)', code: 'BAD_REQUEST' };
+      }
+      await saveRuntimeEntryOverride(e);
+      // 热切换:先优雅停掉当前 host,再按新配置拉起
+      sseAbort?.abort();
+      if (supervisor !== null) await supervisor.stop();
+      await startHost();
+      return { ok: true, mode: bridge.mode };
     });
 
     // ---- Provider 设置(03 §七:key 只出 hasKey/末四位;保存直写 runtime) ----
@@ -461,11 +574,33 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     registerIpc();
-    // createWindow 是 async(bounds 恢复);安全自测在窗口就绪后从内部挂载
+    // createWindow 是 async(bounds 恢复);安全自测/渲染自检在窗口就绪后挂载
     void createWindow().then((win) => {
-      if (win !== null && process.env.HMH_DESKTOP_SECURITY_TEST === '1') {
+      if (win === null) return;
+      if (process.env.HMH_DESKTOP_SECURITY_TEST === '1') {
         win.webContents.once('did-finish-load', () => {
           void securitySelfTest(win);
+        });
+      }
+      // 渲染自检(2026-10-10 装机黑屏教训:bridge ready ≠ 界面渲染了)。
+      // #root 在 React 挂载后必有子节点;空 = 资源路径/CSP/脚本加载坏了。
+      if (process.env.HMH_DESKTOP_RENDER_TEST === '1') {
+        win.webContents.once('did-finish-load', () => {
+          setTimeout(() => {
+            void (async () => {
+              try {
+                const n = (await win.webContents.executeJavaScript(
+                  'document.getElementById("root") ? document.getElementById("root").children.length : -1', true,
+                )) as number;
+                const ok = n > 0;
+                console.log(`RENDER-TEST ${ok ? 'ok' : 'EMPTY'} rootChildren=${n}`);
+                app.exit(ok ? 0 : 1);
+              } catch (err) {
+                console.log(`RENDER-TEST ERROR ${String(err).slice(0, 120)}`);
+                app.exit(1);
+              }
+            })();
+          }, 2_500);
         });
       }
     });
@@ -501,7 +636,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'providerSave', 'providers', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'providerSave', 'providers', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];
