@@ -164,11 +164,23 @@ export function App(): React.ReactElement {
 
   useEffect(() => {
     if (bridge === undefined) return;
-    void bridge.getState().then(setState);
-    const offState = bridge.onHostState((s, info) => {
+    const b = bridge; // 闭包内的判空收窄(TS 不跨 async 回调)
+    // mount 快照兜底:host-state 的 ready 广播可能早于本页订阅(打包版 cjs
+    // host 冷启动快于 React mount,广播即丢,hostState 永远停在 'stopped' ——
+    // 引导层/Files/Diff/Evidence 全部空转)。get-state 快照带权威 hostState。
+    void b.getState().then((s) => {
+      setState(s);
+      setHostState(s.hostState);
+    });
+    const offState = b.onHostState((s, info) => {
       setHostState(s);
       setHostInfo(info);
-      if (s === 'ready') void refreshSessions();
+      // 每次就绪都重拉快照:mount 时拉的那份 hostVersion/hostPort 还是 null
+      // (host 尚未起),不重拉就永远显示 "runtime ? · 127.0.0.1:?"。
+      if (s === 'ready') {
+        void b.getState().then(setState);
+        void refreshSessions();
+      }
     });
     const offEvents = bridge.onEventBatches((batch) => {
       for (const env of batch) applyEnvelope(env);

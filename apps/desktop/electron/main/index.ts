@@ -22,6 +22,7 @@ import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
 import { isEventEnvelope, type EventEnvelope } from '@hmh-desktop/contracts';
+import { attachUiVerify } from './uiverify.ts';
 
 const here = import.meta.dirname ?? '.';
 const isDev = process.env.HMH_DESKTOP_DEV === '1';
@@ -549,10 +550,21 @@ if (!app.requestSingleInstanceLock()) {
     } else {
       void win.loadFile(join(here, '..', '..', 'dist-renderer', 'index.html'));
     }
+    // 页面加载完重播当前 host 状态:ready 广播若早于 renderer 订阅即丢失,
+    // renderer 的 get-state 快照 + 这里的重播双保险(多窗口/重载场景也覆盖)。
+    win.webContents.once('did-finish-load', () => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('bridge:host-state', bridge.hostState, { restartCount: 0 });
+      }
+    });
     return win;
   }
 
   app.whenReady().then(() => {
+    // UIVERIFY:fake 模式验收须在 startHost 读 env 之前强制 fake
+    if (process.env.HMH_DESKTOP_UIVERIFY === '1' && process.env.HMH_DESKTOP_UIVERIFY_MODE !== 'real') {
+      process.env.HMH_DESKTOP_FAKE = '1';
+    }
     // CSP(dev 与 prod 不同;prod 不允许任何远程源)
     const csp = isDev
       ? [
@@ -577,9 +589,73 @@ if (!app.requestSingleInstanceLock()) {
     // createWindow 是 async(bounds 恢复);安全自测/渲染自检在窗口就绪后挂载
     void createWindow().then((win) => {
       if (win === null) return;
+      if (process.env.HMH_DESKTOP_UIVERIFY === '1') attachUiVerify(win);
       if (process.env.HMH_DESKTOP_SECURITY_TEST === '1') {
         win.webContents.once('did-finish-load', () => {
           void securitySelfTest(win);
+        });
+      }
+      // UI 截图钩子:HMH_DESKTOP_SNAPSHOT=<file.png> 在界面就绪后截图退出
+      // (装机诊断用:亲眼看渲染结果,而不是只数 root 子节点)。
+      const snap = process.env.HMH_DESKTOP_SNAPSHOT;
+      if (snap !== undefined && snap !== '') {
+        win.webContents.once('did-finish-load', () => {
+          setTimeout(() => {
+            void (async () => {
+              try {
+                const img = await win.webContents.capturePage();
+                const { writeFile: wf } = await import('node:fs/promises');
+                await wf(snap, img.toPNG());
+                console.log(`SNAPSHOT ok ${snap} ${img.getSize().width}x${img.getSize().height}`);
+              } catch (err) {
+                console.log(`SNAPSHOT error ${String(err).slice(0, 120)}`);
+              }
+              const app2 = app;
+              setTimeout(() => app2.exit(0), 500);
+            })();
+          }, Number(process.env.HMH_DESKTOP_SNAPSHOT_DELAY_MS ?? 12_000));
+        });
+      }
+      // DOM 结构探针:HMH_DESKTOP_DOMPROBE=1 输出关键元素的 box/display/children,
+      // 再退出(诊断"React 挂载了但某块 UI 不可见"这类问题;截图之外的硬证据)。
+      if (process.env.HMH_DESKTOP_DOMPROBE === '1') {
+        win.webContents.once('did-finish-load', () => {
+          setTimeout(() => {
+            void (async () => {
+              try {
+                const r = (await win.webContents.executeJavaScript(`(function(){
+                  var pick = function(sel){
+                    var els = document.querySelectorAll(sel);
+                    return Array.prototype.slice.call(els, 0, 4).map(function(el){
+                      var cs = getComputedStyle(el);
+                      var b = el.getBoundingClientRect();
+                      return { cls: (el.className||'').toString().slice(0,80), tag: el.tagName,
+                        display: cs.display, vis: cs.visibility, opacity: cs.opacity,
+                        pos: cs.position, z: cs.zIndex, overflow: cs.overflow,
+                        x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height),
+                        text: (el.innerText||'').replace(/\\s+/g,' ').slice(0,60) };
+                    });
+                  };
+                  var sels = ['html','body','#root','.app-shell','.sidebar','.workspace','.topbar','.stream','.empty-hint','.composer','.composer-row','.composer textarea','.composer-side','.att-picker','.att-chips','.sidepanel','.runtime-guide','.overlay','.turn','.card'];
+                  var out = {};
+                  sels.forEach(function(s){ try { out[s] = pick(s); } catch(e){ out[s] = [{err: String(e).slice(0,80)}]; } });
+                  out.__meta = {
+                    styleSheets: document.styleSheets.length,
+                    sheet0rules: (document.styleSheets[0] && document.styleSheets[0].cssRules) ? document.styleSheets[0].cssRules.length : -1,
+                    rootChildren: document.getElementById('root') ? document.getElementById('root').children.length : -1,
+                    bodyChildren: document.body.children.length,
+                    innerHTMLLen: document.body.innerHTML.length,
+                    viewport: window.innerWidth + 'x' + window.innerHeight
+                  };
+                  return JSON.stringify(out);
+                })()`, true)) as string;
+                console.log(`DOMPROBE ${r}`);
+              } catch (err) {
+                console.log(`DOMPROBE error ${String(err).slice(0, 200)}`);
+              }
+              app.exit(0);
+            })();
+          }, Number(process.env.HMH_DESKTOP_DOMPROBE_DELAY_MS ?? 9_000));
         });
       }
       // 渲染自检(2026-10-10 装机黑屏教训:bridge ready ≠ 界面渲染了)。
