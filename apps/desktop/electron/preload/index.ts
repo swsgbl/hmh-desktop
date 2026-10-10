@@ -31,6 +31,18 @@ const bridge = {
   interrupt(sessionId: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:interrupt', sessionId);
   },
+  inject(text: string, sessionId: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:inject', text, sessionId);
+  },
+  exportSession(id: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:export-session', id);
+  },
+  approvalGet(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:approval-get');
+  },
+  approvalSet(mode: 'ask' | 'auto'): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:approval-set', mode);
+  },
   fsList(path: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:fs-list', path);
   },

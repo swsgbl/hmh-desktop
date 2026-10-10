@@ -36,7 +36,7 @@ type Item =
   | { kind: 'tool'; id: string; name: string; argsPreview: string; outputPreview?: string; isError?: boolean }
   | { kind: 'approval'; id: string; approvalId: string; tool: string; argsPreview: string; risk: string }
   | { kind: 'artifact'; id: string; relPath: string; title: string }
-  | { kind: 'error'; id: string; code: string; message: string };
+  | { kind: 'error'; id: string; code: string; message: string; sessionId: string; runId: string };
 
 type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs';
 
@@ -63,8 +63,14 @@ export function App(): React.ReactElement {
   const [diff, setDiff] = useState<DiffDto | null>(null);
   // Logs 面板:runtime 的 line 流(运行日志,最近 200 条)
   const [logs, setLogs] = useState<Array<{ sessionId: string; text: string }>>([]);
-  // Ctrl+K 命令面板
+  // Ctrl+K 命令面板 / 设置弹层 / 分页游标 / 本地偏好
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [enterSends, setEnterSends] = useState<boolean>(() => {
+    try { return window.localStorage.getItem('hmh.enterSends') !== 'newline'; } catch { return true; }
+  });
+  const [approvalMode, setApprovalMode] = useState<'ask' | 'auto'>('ask');
   const streamRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef('');
   activeRef.current = activeSession;
@@ -120,9 +126,15 @@ export function App(): React.ReactElement {
       setRunStatus('failed');
       setStreaming('');
       const p = (env.payload as { error?: { code?: string; message?: string } }).error;
+      // DoD:错误 UI 中 sessionId/runId 可追踪(恢复/导出不静默分叉)
       setItems((prev) => [
         ...prev,
-        { kind: 'error', id: env.eventId, code: String(p?.code ?? 'UNKNOWN'), message: String(p?.message ?? '任务失败') },
+        {
+          kind: 'error', id: env.eventId,
+          code: String(p?.code ?? 'UNKNOWN'),
+          message: String(p?.message ?? '任务失败'),
+          sessionId: env.sessionId, runId: env.runId,
+        },
       ]);
     }
   }, []);
@@ -149,35 +161,69 @@ export function App(): React.ReactElement {
     return () => { offState(); offEvents(); offChunks(); };
   }, [applyEnvelope]);
 
-  // Ctrl+K 命令面板(键盘优先;输入框聚焦时不抢占)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setCmdOpen((v) => !v);
-      } else if (e.key === 'Escape') {
-        setCmdOpen(false);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-
   useEffect(() => {
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight });
   }, [items, streaming]);
 
-  const refreshSessions = useCallback(async () => {
+  const refreshSessions = useCallback(async (cur: string | null = null) => {
     if (bridge === undefined) return;
     const r = await bridge.sessions();
     if ('sessions' in r && Array.isArray(r.sessions)) {
-      setSessions(r.sessions.map((s) => ({ id: s.id, title: s.title, task: s.task, turns: s.turns, toolUses: s.toolUses, updatedAt: s.updatedAt })));
+      const mapped = r.sessions.map((s) => ({ id: s.id, title: s.title, task: s.task, turns: s.turns, toolUses: s.toolUses, updatedAt: s.updatedAt }));
+      setSessions((prev) => (cur === null ? mapped : [...prev, ...mapped.filter((m) => !prev.some((p) => p.id === m.id))]));
+      setCursor('nextCursor' in r && typeof r.nextCursor === 'string' ? r.nextCursor : null);
     }
   }, []);
 
   useEffect(() => {
-    if (hostState === 'ready') void refreshSessions();
+    if (hostState === 'ready') void refreshSessions(null);
   }, [hostState, refreshSessions]);
+
+  /** 运行中注入(03 §六:输入在长任务时仍可用;非幂等动作由用户显式触发)。 */
+  const inject = useCallback(async () => {
+    if (bridge === undefined || draft.trim() === '' || activeSession === '') return;
+    const text = draft;
+    setDraft('');
+    await bridge.inject(text, activeSession);
+    setItems((prev) => [...prev, { kind: 'user', id: `inj-${Date.now()}`, text: `${text}(已注入运行中任务)` }]);
+  }, [draft, activeSession]);
+
+  /** 会话导出(runtime 同源 builder;文件写入只在 main 的保存对话框后)。 */
+  const exportSession = useCallback(async (id: string) => {
+    if (bridge === undefined) return;
+    const r = await bridge.exportSession(id);
+    if ('ok' in r && r.ok === true && r.path !== undefined) {
+      setExportHint(`已导出:${r.path}`);
+      setTimeout(() => setExportHint(''), 4_000);
+    } else if ('canceled' in r && r.canceled === true) {
+      /* 用户取消 */
+    } else if ('error' in r) {
+      setExportHint(`导出失败:${r.error}`);
+      setTimeout(() => setExportHint(''), 4_000);
+    }
+  }, []);
+
+  const [exportHint, setExportHint] = useState('');
+
+  /** 审批模式(权威在 runtime;切换显式且即时生效)。 */
+  useEffect(() => {
+    if (bridge === undefined || hostState !== 'ready') return;
+    void bridge.approvalGet().then((r) => {
+      if ('settings' in r && r.settings?.approval === 'auto') setApprovalMode('auto');
+      else setApprovalMode('ask');
+    });
+  }, [hostState]);
+
+  const switchApproval = useCallback(async (mode: 'ask' | 'auto') => {
+    if (bridge === undefined) return;
+    await bridge.approvalSet(mode);
+    setApprovalMode(mode);
+  }, []);
+
+  const setEnterBehavior = useCallback((sends: boolean): void => {
+    setEnterSends(sends);
+    try { window.localStorage.setItem('hmh.enterSends', sends ? 'send' : 'newline'); } catch { /* 私有模式 */ }
+  }, []);
 
   /** 历史会话:加载 runtime 的 transcript 预览(最后 80 条)。 */
   const openSession = useCallback(async (id: string) => {
@@ -206,6 +252,24 @@ export function App(): React.ReactElement {
     setRunStatus(null);
   }, []);
 
+  // Ctrl+K 命令面板 / Ctrl+N 新会话(03 §六;键盘优先)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCmdOpen((v) => !v);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        newSession();
+      } else if (e.key === 'Escape') {
+        setCmdOpen(false);
+        setSettingsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [newSession]);
+
   const send = useCallback(async () => {
     if (bridge === undefined || draft.trim() === '' || activeSession === '') return;
     const text = draft;
@@ -214,7 +278,7 @@ export function App(): React.ReactElement {
     setItems((prev) => [...prev, { kind: 'user', id: `local-${Date.now()}`, text }]);
     const r = await bridge.sendTask(text, activeSession, 'ask');
     if ('ok' in r && r.ok !== true) {
-      setItems((prev) => [...prev, { kind: 'error', id: `send-${Date.now()}`, code: 'code' in r ? String(r.code) : 'SEND_FAILED', message: '发送失败(host 未就绪或拒绝)' }]);
+      setItems((prev) => [...prev, { kind: 'error', id: `send-${Date.now()}`, code: 'code' in r ? String(r.code) : 'SEND_FAILED', message: '发送失败(host 未就绪或拒绝)', sessionId: activeSession, runId: '(未建立运行)' }]);
       setRunStatus(null);
     }
   }, [draft, activeSession]);
@@ -299,7 +363,7 @@ export function App(): React.ReactElement {
       {cmdOpen && (
         <div className="cmdk-overlay" role="dialog" aria-label="命令面板" onClick={() => setCmdOpen(false)}>
           <div className="cmdk" onClick={(e) => e.stopPropagation()}>
-            <div className="cmdk-head">命令面板(Ctrl+K)</div>
+            <div className="cmdk-head">命令面板(Ctrl+K · Ctrl+N 新会话)</div>
             {[
               { cmd: 'new-session', label: '新建会话' },
               { cmd: 'tab:overview', label: '上下文:Overview' },
@@ -315,23 +379,53 @@ export function App(): React.ReactElement {
           </div>
         </div>
       )}
+      {settingsOpen && (
+        <div className="cmdk-overlay" role="dialog" aria-label="设置" onClick={() => setSettingsOpen(false)}>
+          <div className="cmdk settings" onClick={(e) => e.stopPropagation()}>
+            <div className="cmdk-head">设置</div>
+            <div className="settings-section">应用偏好(本地存储)</div>
+            <div className="settings-row">
+              <span>Enter 键行为</span>
+              <div className="seg">
+                <button className={enterSends ? 'on' : ''} onClick={() => setEnterBehavior(true)}>发送</button>
+                <button className={!enterSends ? 'on' : ''} onClick={() => setEnterBehavior(false)}>换行(Ctrl+Enter 发送)</button>
+              </div>
+            </div>
+            <div className="settings-section">运行时(写入 hmharness config)</div>
+            <div className="settings-row">
+              <span>审批模式</span>
+              <div className="seg">
+                <button className={approvalMode === 'ask' ? 'on' : ''} onClick={() => void switchApproval('ask')}>ask(默认,安全)</button>
+                <button className={approvalMode === 'auto' ? 'on' : ''} onClick={() => void switchApproval('auto')}>auto(自动批准)</button>
+              </div>
+            </div>
+            <div className="settings-note">auto 即时生效并持久;破坏性操作仍受 runtime 审批门约束。</div>
+          </div>
+        </div>
+      )}
       <aside className="sidebar" aria-label="会话导航">
         <div className="sidebar-head">
           <button className="btn primary" onClick={newSession}>+ 新建会话</button>
         </div>
         <div className="session-list" role="list">
           {sessions.map((s) => (
-            <button
-              key={s.id}
-              role="listitem"
-              className={`session-item${s.id === activeSession ? ' active' : ''}`}
-              onClick={() => void openSession(s.id)}
-            >
-              <span className="session-title">{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
-              <span className="session-time">{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
-            </button>
+            <div key={s.id} role="listitem" className={`session-row${s.id === activeSession ? ' active' : ''}`}>
+              <button
+                className="session-item"
+                onClick={() => void openSession(s.id)}
+                aria-label={`打开会话 ${s.title !== '' ? s.title : s.id}`}
+              >
+                <span className="session-title">{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
+                <span className="session-time">{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
+              </button>
+              <button className="session-export" aria-label={`导出会话 ${s.id} 为 Markdown`} title="导出 Markdown" onClick={() => void exportSession(s.id)}>⤓</button>
+            </div>
           ))}
           {sessions.length === 0 && <div className="empty-hint">点"新建会话"开始</div>}
+          {cursor !== null && (
+            <button className="btn ghost sm more" onClick={() => void refreshSessions(cursor)}>加载更多</button>
+          )}
+          {exportHint !== '' && <div className="export-hint" role="status">{exportHint}</div>}
         </div>
       </aside>
 
@@ -347,7 +441,8 @@ export function App(): React.ReactElement {
             </span>
           )}
           {busy && <button className="btn danger" onClick={() => void interrupt()}>停止</button>}
-          <span className="approval-mode">审批:ask</span>
+          <span className={`approval-mode${approvalMode === 'auto' ? ' auto' : ''}`} title="点击设置切换">审批:{approvalMode === 'ask' ? 'ask(默认)' : 'auto'}</span>
+          <button className="btn ghost" aria-label="设置" onClick={() => setSettingsOpen(true)}>⚙</button>
           <button className="btn ghost" onClick={() => setDockOpen((v) => !v)} aria-expanded={dockOpen}>
             {dockOpen ? '收起上下文' : '展开上下文'}
           </button>
@@ -415,6 +510,7 @@ export function App(): React.ReactElement {
               <article key={it.id} className="turn system">
                 <div className="status-chip status-failed"><span className="dot" aria-hidden="true" />{it.code}</div>
                 <p className="turn-text">{it.message}</p>
+                <div className="err-meta">会话 {it.sessionId} · 运行 {it.runId}(恢复/导出跟随原会话)</div>
               </article>
             );
           })}
@@ -428,20 +524,35 @@ export function App(): React.ReactElement {
         <footer className="composer">
           <textarea
             value={draft}
-            placeholder={activeSession === '' ? '先新建会话…' : '描述目标(Enter 发送,Shift+Enter 换行)'}
+            placeholder={activeSession === ''
+              ? '先新建会话(Ctrl+N)…'
+              : busy
+                ? '任务运行中——输入将注入当前任务(Enter 注入)'
+                : enterSends
+                  ? '描述目标(Enter 发送,Shift+Enter 换行)'
+                  : '描述目标(Enter 换行,Ctrl+Enter 发送)'}
             disabled={activeSession === ''}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              if (e.key !== 'Enter') return;
+              const plain = !e.shiftKey && !e.ctrlKey && !e.metaKey;
+              const withCtrl = e.ctrlKey || e.metaKey;
+              const shouldAct = busy ? plain || withCtrl : (enterSends ? plain : withCtrl);
+              if (shouldAct) {
                 e.preventDefault();
-                void send();
+                if (busy) void inject();
+                else void send();
               }
             }}
             aria-label="任务输入"
           />
           <div className="composer-side">
-            <button className="btn primary send" onClick={() => void send()} disabled={draft.trim() === '' || activeSession === '' || busy}>
-              {busy ? '运行中…' : '发送'}
+            <button
+              className={`btn send ${busy ? 'ghost' : 'primary'}`}
+              onClick={() => (busy ? void inject() : void send())}
+              disabled={draft.trim() === '' || activeSession === ''}
+            >
+              {busy ? '注入运行中任务' : '发送'}
             </button>
           </div>
         </footer>

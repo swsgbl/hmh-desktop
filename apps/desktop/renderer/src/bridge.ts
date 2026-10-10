@@ -72,6 +72,10 @@ export interface HmhBridge {
   sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo'): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
   approve(granted: boolean, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   interrupt(sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
+  inject(text: string, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
+  exportSession(id: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
+  approvalGet(): Promise<{ settings?: { approval?: string } } | { error: string; code: string }>;
+  approvalSet(mode: 'ask' | 'auto'): Promise<{ ok: boolean } | { error: string; code: string }>;
   fsList(path: string): Promise<FsListDto | { error: string; code: string }>;
   fsRead(path: string): Promise<FsReadDto | { error: string; code: string }>;
   cognitive(): Promise<Record<string, unknown> | { error: string; code: string }>;

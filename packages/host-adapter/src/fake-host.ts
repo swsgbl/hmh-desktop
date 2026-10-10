@@ -260,6 +260,13 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
       })();
       return;
     }
+    if (req.method === 'POST' && url.pathname === '/api/inject') {
+      // 运行中注入(与 hmharness /api/inject 同形;fake 只回执)
+      void readBody();
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
     if (req.method === 'POST' && url.pathname === '/api/interrupt') {
       const body = JSON.parse('') as Record<string, unknown>; // interrupt 无 body 语义
       void body;
@@ -277,8 +284,23 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
       return;
     }
     if (req.method === 'GET' && url.pathname.startsWith('/api/sessions/')) {
+      const seg = decodeURIComponent(url.pathname.slice('/api/sessions/'.length));
+      // 导出(与 hmharness /api/sessions/:id/export.md 同形:text/markdown 下载)
+      const exportMatch = /^(.*)\/export\.md$/.exec(seg) ?? /^(.*)\.export\.md$/.exec(seg);
+      if (exportMatch !== null && exportMatch[1] !== undefined && exportMatch[1] !== '') {
+        const eid = exportMatch[1].replace(/[^a-zA-Z0-9_:.@-]/g, '');
+        const es = sessions.get(eid);
+        if (es === undefined) {
+          res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'session not found', { retryable: false })));
+          return;
+        }
+        res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' });
+        res.end(`# hmharness 会话导出(fake)\n\n- 会话:${eid}\n\n## 用户\n\n之前的任务(fake 预览)\n\n## 助手\n\n这是导出的回复预览(fake)。\n`);
+        return;
+      }
       // 会话预览(与 hmharness GET /api/sessions/:id 同形:最后 80 条,每条 500 字)
-      const id = decodeURIComponent(url.pathname.slice('/api/sessions/'.length)).replace(/[^a-zA-Z0-9_:.@-]/g, '');
+      const id = seg.replace(/[^a-zA-Z0-9_:.@-]/g, '');
       const s = sessions.get(id);
       if (s === undefined) {
         res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });

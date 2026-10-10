@@ -71,6 +71,23 @@ export class DesktopHostClient {
     return this.parseResponse<T>(res);
   }
 
+  /** 拉取纯文本端点(如 /api/sessions/:id/export.md)。 */
+  async getText(path: string, timeoutMs = 10_000): Promise<string> {
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, { headers: this.headers(), signal: AbortSignal.timeout(timeoutMs) });
+    } catch (err) {
+      throw new DesktopHttpError(desktopError('HOST_NOT_READY', `request failed: ${String(err).slice(0, 160)}`, { retryable: true, recoveryAction: 'RECONNECT' }));
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new DesktopHttpError(desktopError('AUTH_FAILED', `host rejected the session token (HTTP ${res.status})`, { retryable: false, recoveryAction: 'RECONNECT' }));
+    }
+    if (!res.ok) {
+      throw new DesktopHttpError(desktopError('HOST_NOT_READY', `HTTP ${res.status}`, { retryable: res.status >= 500 }));
+    }
+    return res.text();
+  }
+
   async postJson<T>(path: string, body: unknown, timeoutMs = 10_000): Promise<T> {
     let res: Response;
     try {

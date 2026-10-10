@@ -9,10 +9,15 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const exe = join(root, 'apps', 'desktop', 'release', 'win-unpacked', 'HMH Desktop.exe');
+const t0 = Date.now();
 const child = spawn(exe, [], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let out = '';
 let err = '';
-child.stdout.on('data', (d) => { out += d.toString(); });
+let coldStartMs = null;
+child.stdout.on('data', (d) => {
+  out += d.toString();
+  if (coldStartMs === null && /bridge ready on 127\.0\.0\.1:\d+/.test(out)) coldStartMs = Date.now() - t0;
+});
 child.stderr.on('data', (d) => { err += d.toString(); });
 let timedKill = false;
 setTimeout(() => {
@@ -25,7 +30,7 @@ setTimeout(() => {
     console.log(err.slice(-800));
     const ready = /bridge ready on 127\.0\.0\.1:\d+/.test(out);
     const noCrash = !/uncaught|Unhandled/gi.test(err);
-    console.log(`PACKAGED-SMOKE: bridge-ready=${ready} no-crash=${noCrash}`);
+    console.log(`PACKAGED-SMOKE: bridge-ready=${ready} no-crash=${noCrash} cold-start=${coldStartMs ?? 'n/a'}ms`);
     process.exit(ready && noCrash ? 0 : 1);
   }, 2_000);
 }, 30_000);

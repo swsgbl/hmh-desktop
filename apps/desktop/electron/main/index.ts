@@ -12,8 +12,9 @@
  * 经 50ms 批量推给 renderer;sendTask/approve/interrupt/sessions 全部转发
  * 给 host —— fake 与真实 hmharness desktop-host 走同一条代码路径。
  */
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
 import { join } from 'node:path';
+import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
@@ -260,6 +261,48 @@ if (!app.requestSingleInstanceLock()) {
       return hostCall(event, (c) => c.getJson<Record<string, unknown>>(`/api/fs/read?path=${encodeURIComponent(p)}`));
     });
 
+    ipcMain.handle('bridge:inject', (event, text: unknown, sessionId: unknown) => {
+      const t = typeof text === 'string' ? text.slice(0, 20_000) : '';
+      const sid = typeof sessionId === 'string' ? sessionId.slice(0, 80) : '';
+      if (t === '' || sid === '') return Promise.resolve({ ok: false, code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/inject', { text: t, sessionId: sid }));
+    });
+
+    // ---- 会话导出(export.md → 保存对话框;文件写入只在 main) ----
+    ipcMain.handle('bridge:export-session', async (event, id: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const sid = typeof id === 'string' ? id.replace(/[^a-zA-Z0-9_:.@-]/g, '').slice(0, 80) : '';
+      if (sid === '') return { error: 'id required', code: 'BAD_REQUEST' };
+      if (client === null || bridge.hostState !== 'ready') return { error: `host not ready (${bridge.hostState})`, code: 'HOST_NOT_READY' };
+      try {
+        const md = await client.getText(`/api/sessions/${encodeURIComponent(sid)}/export.md`);
+        const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+        if (win === undefined) return { error: 'no window', code: 'BRIDGE_ERROR' };
+        const r = await dialog.showSaveDialog(win, {
+          title: '导出会话',
+          defaultPath: `hmh-${sid}.md`,
+          filters: [{ name: 'Markdown', extensions: ['md'] }],
+        });
+        if (r.canceled || r.filePath === undefined || r.filePath === '') return { ok: false, canceled: true };
+        await writeFile(r.filePath, md, 'utf8');
+        logInfo('export', `session ${sid} → ${r.filePath}`);
+        return { ok: true, path: r.filePath };
+      } catch (err) {
+        const detail = (() => { try { return JSON.stringify(err); } catch { return String(err); } })().slice(0, 300);
+        return { error: detail, code: 'BRIDGE_ERROR' };
+      }
+    });
+
+    // ---- 审批模式读写(权威在 runtime config;切换必须显式) ----
+    ipcMain.handle('bridge:approval-get', (event) =>
+      hostCall(event, (c) => c.getJson<{ settings?: { approval?: string } }>('/api/state')));
+
+    ipcMain.handle('bridge:approval-set', (event, mode: unknown) => {
+      const m = mode === 'auto' ? 'auto' : mode === 'ask' ? 'ask' : '';
+      if (m === '') return Promise.resolve({ error: 'mode must be ask|auto', code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.postJson<{ ok: boolean }>('/api/config', { approval: m }));
+    });
+
     // ---- M4:Diff 面板(只读 git 变更;授权在 runtime) ----
     ipcMain.handle('bridge:diff', (event, sessionId: unknown) => {
       const sid = typeof sessionId === 'string' ? sessionId.slice(0, 80) : '';
@@ -397,7 +440,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'cognitive', 'diff', 'fsList', 'fsRead', 'getState', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'sendTask', 'sessionPreview', 'sessions', 'stopHost'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'sendTask', 'sessionPreview', 'sessions', 'stopHost'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];
@@ -424,6 +467,20 @@ if (!app.requestSingleInstanceLock()) {
     await check('bridge:get-state 正常返回(host 桥可用)', async () => {
       const r = (await js('window.hmh.getState().then(s => JSON.stringify(s)).catch(e => "ERR:"+e)')) as string;
       return [r.startsWith('{') && r.includes('hostState'), r.slice(0, 80)];
+    });
+    await check('XSS:恶意任务文本只以文本渲染(不执行)', async () => {
+      const payload = '<img src=x onerror="window.__xss=1"><script>window.__xss=2<\/script>"&\'';
+      const sendR = (await js(`window.hmh.sendTask(${JSON.stringify(payload)}, 'sec-xss-1', 'auto').then(r=>JSON.stringify(r)).catch(e=>'ERR:'+e)`)) as string;
+      if (!sendR.includes('"ok":true')) return [false, `sendTask 未受理: ${sendR.slice(0, 80)}`];
+      // fake host echo 回来后经 React 渲染(用户消息 + 助手 echo 双路径)
+      await new Promise((r2) => setTimeout(r2, 3_000));
+      const probe = (await js(`JSON.stringify({
+        xssFlag: typeof window.__xss,
+        imgCount: document.querySelectorAll('img[src="x"]').length,
+        scriptRan: document.body.innerText.indexOf('window.__xss=2') >= 0
+      })`)) as string;
+      const p = JSON.parse(probe) as { xssFlag: string; imgCount: number; scriptRan: boolean };
+      return [p.xssFlag === 'undefined' && p.imgCount === 0, `xssFlag=${p.xssFlag} img=${p.imgCount}`];
     });
 
     let failed = 0;

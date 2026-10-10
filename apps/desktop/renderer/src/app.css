@@ -169,6 +169,29 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 /* a11y:全局焦点可见(不只靠颜色) */
 :focus-visible { outline: 2px solid var(--hmh-accent); outline-offset: 2px; }
 
+/* 错误卡溯源 */
+.err-meta { margin-top: 6px; font: 11px/1.5 var(--hmh-font-mono); color: var(--hmh-text-dim); word-break: break-all; }
+
+/* 会话行(标题 + 导出) */
+.session-row { display: flex; align-items: stretch; gap: 2px; border-radius: var(--hmh-radius-sm); }
+.session-row .session-item { flex: 1; min-width: 0; }
+.session-export { width: 26px; flex-shrink: 0; color: var(--hmh-text-dim); opacity: 0; border-radius: var(--hmh-radius-sm); font-size: 14px; }
+.session-row:hover .session-export { opacity: 1; }
+.session-export:hover { color: var(--hmh-accent); background: var(--hmh-bg-panel); }
+.more { margin: 6px auto; display: block; }
+.export-hint { padding: 8px 10px; font-size: 12px; color: var(--hmh-status-completed); word-break: break-all; }
+
+/* 设置弹层 */
+.cmdk.settings { width: 480px; }
+.settings-section { padding: 10px 14px 4px; font-size: 11px; color: var(--hmh-text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; gap: 12px; }
+.settings-row > span { font-size: 14px; }
+.seg { display: flex; border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm); overflow: hidden; }
+.seg button { padding: 6px 12px; font-size: 13px; color: var(--hmh-text-dim); }
+.seg button.on { background: var(--hmh-accent); color: #fff; }
+.settings-note { padding: 6px 14px 12px; font-size: 12px; color: var(--hmh-text-dim); }
+.approval-mode.auto { color: var(--hmh-warn); }
+
 /* Context Dock */
 .dock {
   width: 360px; min-width: 320px; max-width: 420px;
