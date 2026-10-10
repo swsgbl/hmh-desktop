@@ -353,7 +353,7 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     // ---- 会话导出(export.md → 保存对话框;文件写入只在 main) ----
-    ipcMain.handle('bridge:export-session', async (event, id: unknown) => {
+    ipcMain.handle('bridge:export-session', async (event, id: unknown, title: unknown) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
       const sid = typeof id === 'string' ? id.replace(/[^a-zA-Z0-9_:.@-]/g, '').slice(0, 80) : '';
       if (sid === '') return { error: 'id required', code: 'BAD_REQUEST' };
@@ -363,7 +363,7 @@ if (!app.requestSingleInstanceLock()) {
         const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
         if (win === undefined) return { error: 'no window', code: 'BRIDGE_ERROR' };
         const r = await dialog.showSaveDialog(win, {
-          title: '导出会话',
+          title: typeof title === 'string' && title !== '' ? title.slice(0, 80) : '导出会话',
           defaultPath: `hmh-${sid}.md`,
           filters: [{ name: 'Markdown', extensions: ['md'] }],
         });
@@ -398,12 +398,12 @@ if (!app.requestSingleInstanceLock()) {
       };
     });
 
-    ipcMain.handle('bridge:browse-runtime', async (event) => {
+    ipcMain.handle('bridge:browse-runtime', async (event, title: unknown) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
       const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
       if (win === undefined) return { error: 'no window', code: 'BRIDGE_ERROR' };
       const r = await dialog.showOpenDialog(win, {
-        title: '选择 hmharness 的 desktop-host 入口',
+        title: typeof title === 'string' && title !== '' ? title.slice(0, 120) : '选择 hmharness 的 desktop-host 入口',
         properties: ['openFile'],
         filters: [{ name: 'desktop-host', extensions: ['ts', 'js'] }],
       });

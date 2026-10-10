@@ -222,6 +222,23 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return waitFor('settings closed', `return {ok: !document.querySelector('.cmdk-overlay'), detail: 'closed'};`, 5_000);
     });
 
+    /* ========== fake:i18n 语言切换 ========== */
+    await step('语言切换:中文 → English → 恢复中文', async () => {
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'p', ctrlKey:true, shiftKey:true, bubbles:true}))`);
+      const w = await waitFor('settings open', `var s=document.querySelector('.cmdk.settings');
+        return {ok: !!s, detail: s ? 'open' : 'not open'};`, 5_000);
+      if (!w[0]) return w;
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.cmdk.settings button')).find(function(x){return x.textContent.trim()==='English';}); if(b) b.click(); })()`);
+      const en = await waitFor('english shown', `var b=document.querySelector('.sidebar-head .btn.primary');
+        return {ok: !!b && b.textContent === '+ New Session', detail: 'btn='+(b?b.textContent:'none')};`, 5_000);
+      await shot('english');
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.cmdk.settings button')).find(function(x){return x.textContent.trim()==='中文';}); if(b) b.click(); })()`);
+      const zh = await waitFor('chinese back', `var b=document.querySelector('.sidebar-head .btn.primary');
+        return {ok: !!b && b.textContent === '+ 新建会话', detail: 'btn='+(b?b.textContent:'none')};`, 5_000);
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))`);
+      return [en[0] && zh[0], `en: ${en[1]}; zh: ${zh[1]}`];
+    });
+
     /* ========== fake:@ 附件选择器 ========== */
     await step('@ 附件:选择器出现并可选文件', async () => {
       await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.composer button')).find(function(x){return x.textContent.trim()==='@';}); if(b) b.click(); })()`);

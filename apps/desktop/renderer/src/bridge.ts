@@ -91,7 +91,7 @@ export interface DiffDto {
 export interface HmhBridge {
   getState(): Promise<BridgeState>;
   runtimeInfo(): Promise<RuntimeInfoDto | { error: string; code: string }>;
-  browseRuntime(): Promise<{ ok: boolean; entry?: string; canceled?: boolean } | { error: string; code: string }>;
+  browseRuntime(title?: string): Promise<{ ok: boolean; entry?: string; canceled?: boolean } | { error: string; code: string }>;
   setRuntime(entry: string): Promise<{ ok: boolean; mode?: string } | { error: string; code: string }>;
   sessions(): Promise<{ sessions: SessionRowDto[]; nextCursor: string | null } | { error: string; code: string }>;
   sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[]): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
@@ -99,7 +99,7 @@ export interface HmhBridge {
   approve(granted: boolean, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   interrupt(sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   inject(text: string, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
-  exportSession(id: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
+  exportSession(id: string, title?: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
   approvalGet(): Promise<{ settings?: { approval?: string } } | { error: string; code: string }>;
   approvalSet(mode: 'ask' | 'auto'): Promise<{ ok: boolean } | { error: string; code: string }>;
   providers(): Promise<{ providersDetail?: ProviderDetailDto[]; model?: string } | { error: string; code: string }>;

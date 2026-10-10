@@ -23,8 +23,8 @@ const bridge = {
   runtimeInfo(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:runtime-info');
   },
-  browseRuntime(): Promise<unknown> {
-    return ipcRenderer.invoke('bridge:browse-runtime');
+  browseRuntime(title?: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:browse-runtime', title);
   },
   setRuntime(entry: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:set-runtime', entry);
@@ -47,8 +47,8 @@ const bridge = {
   inject(text: string, sessionId: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:inject', text, sessionId);
   },
-  exportSession(id: string): Promise<unknown> {
-    return ipcRenderer.invoke('bridge:export-session', id);
+  exportSession(id: string, title?: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:export-session', id, title);
   },
   approvalGet(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:approval-get');
