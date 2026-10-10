@@ -78,6 +78,9 @@ export function App(): React.ReactElement {
   const [attQuery, setAttQuery] = useState('');
   const [attResults, setAttResults] = useState<Array<{ rel: string; path: string }>>([]);
   const [attachments, setAttachments] = useState<Array<{ rel: string; path: string }>>([]);
+  // 图片附件(runtime vision 链:base64 dataUrl,≤3 张 ≤6MB,无需落盘)
+  const [images, setImages] = useState<Array<{ name: string; dataUrl: string }>>([]);
+  const [dragOver, setDragOver] = useState(false);
   // 收藏(本地偏好)
   const [pinned, setPinned] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(window.localStorage.getItem('hmh.pinned') ?? '[]') as string[]); } catch { return new Set(); }
@@ -396,6 +399,62 @@ export function App(): React.ReactElement {
     if ('results' in r) setAttResults(r.results.slice(0, 12));
   }, []);
 
+  /** 图片附件:粘贴/拖放/上传的图片读成 dataUrl(runtime vision 协议)。
+   *  类型白名单 PNG/JPEG/WebP、单张 ≤6MB、总数 ≤3(与 runtime 合同一致)。 */
+  const addImageFiles = useCallback(async (files: File[]): Promise<string> => {
+    const errs: string[] = [];
+    for (const f of files) {
+      const okType = f.type === 'image/png' || f.type === 'image/jpeg' || f.type === 'image/webp';
+      if (!okType) { errs.push(L.composer.imgWrongType); continue; }
+      if (f.size > 6 * 1024 * 1024) { errs.push(L.composer.imgTooLarge); continue; }
+      if (images.length >= 3) { errs.push(L.composer.imgLimit); break; }
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = (): void => resolve(String(fr.result));
+        fr.onerror = (): void => reject(fr.error);
+        fr.readAsDataURL(f);
+      }).catch(() => '');
+      if (dataUrl === '' || !dataUrl.startsWith('data:image/')) { errs.push(L.composer.imgWrongType); continue; }
+      setImages((prev) => (prev.length >= 3 ? prev : [...prev, { name: f.name || `image-${prev.length + 1}.png`, dataUrl }]));
+    }
+    return errs[0] ?? '';
+  }, [images.length, L]);
+
+  /** 拖放文件:非图片(有磁盘路径)→ attachments;图片无路径 → images。 */
+  const addDroppedFiles = useCallback((files: File[]): void => {
+    const withPath = files.filter((f) => {
+      const p = (f as File & { path?: string }).path;
+      return typeof p === 'string' && p !== '';
+    });
+    if (withPath.length > 0) {
+      setAttachments((prev) => {
+        const next = [...prev];
+        for (const f of withPath) {
+          const p = (f as File & { path?: string }).path ?? '';
+          if (!next.some((a) => a.path === p)) next.push({ rel: f.name || p.split(/[\\/]/).pop() || p, path: p });
+        }
+        return next.slice(0, 10);
+      });
+    }
+    const noPath = files.filter((f) => (f as File & { path?: string }).path === undefined);
+    if (noPath.length > 0) void addImageFiles(noPath).then((err) => { if (err !== '') setExportHint(err); });
+  }, [addImageFiles]);
+
+  /** 📎 上传本地文件(原生多选对话框;runtime 要求路径在工作区内)。 */
+  const uploadFiles = useCallback(async (): Promise<void> => {
+    if (bridge === undefined) return;
+    const r = await bridge.pickFiles(L.filesDialog.title);
+    if ('ok' in r && r.ok === true && Array.isArray(r.paths)) {
+      setAttachments((prev) => {
+        const next = [...prev];
+        for (const p of r.paths ?? []) {
+          if (!next.some((a) => a.path === p)) next.push({ rel: p.split(/[\\/]/).pop() ?? p, path: p });
+        }
+        return next.slice(0, 10);
+      });
+    }
+  }, [L]);
+
   const togglePin = useCallback((id: string): void => {
     setPinned((prev) => {
       const next = new Set(prev);
@@ -409,16 +468,19 @@ export function App(): React.ReactElement {
     if (bridge === undefined || draft.trim() === '' || activeSession === '') return;
     const text = draft;
     const atts = attachments.map((a) => a.path);
+    const imgs = images;
     setDraft('');
     setAttachments([]);
+    setImages([]);
     setRunStatus('running');
-    setItems((prev) => [...prev, { kind: 'user', id: `local-${Date.now()}`, text: attachments.length > 0 ? `${attachments.map((a) => `@${a.rel}`).join(' ')}\n${text}` : text }]);
-    const r = await bridge.sendTask(text, activeSession, 'ask', atts);
+    const imgNames = imgs.map((im) => `@${im.name}`).join(' ');
+    setItems((prev) => [...prev, { kind: 'user', id: `local-${Date.now()}`, text: `${imgNames !== '' ? `${imgNames}\n` : ''}${attachments.length > 0 ? `${attachments.map((a) => `@${a.rel}`).join(' ')}\n` : ''}${text}` }]);
+    const r = await bridge.sendTask(text, activeSession, 'ask', atts, imgs);
     if ('ok' in r && r.ok !== true) {
       setItems((prev) => [...prev, { kind: 'error', id: `send-${Date.now()}`, code: 'code' in r ? String(r.code) : 'SEND_FAILED', message: L.errors.sendFailed, sessionId: activeSession, runId: L.errors.noRun }]);
       setRunStatus(null);
     }
-  }, [draft, activeSession, attachments, L]);
+  }, [draft, activeSession, attachments, images, L]);
 
   const approve = useCallback(async (granted: boolean) => {
     if (bridge === undefined || activeSession === '') return;
@@ -538,11 +600,11 @@ export function App(): React.ReactElement {
             <div className="cmdk-head">{L.cmdk.head}</div>
             {[
               { cmd: 'new-session', label: L.cmdk.newSession },
-              { cmd: 'tab:overview', label: L.cmdk.ctx('Overview') },
-              { cmd: 'tab:files', label: L.cmdk.ctx('Files') },
-              { cmd: 'tab:diff', label: L.cmdk.ctx('Diff') },
-              { cmd: 'tab:evidence', label: L.cmdk.ctx('Evidence') },
-              { cmd: 'tab:logs', label: L.cmdk.ctx('Logs') },
+              { cmd: 'tab:overview', label: L.cmdk.ctx(L.dock.tabOverview) },
+              { cmd: 'tab:files', label: L.cmdk.ctx(L.dock.tabFiles) },
+              { cmd: 'tab:diff', label: L.cmdk.ctx(L.dock.tabDiff) },
+              { cmd: 'tab:evidence', label: L.cmdk.ctx(L.dock.tabEvidence) },
+              { cmd: 'tab:logs', label: L.cmdk.ctx(L.dock.tabLogs) },
               { cmd: 'dock', label: L.cmdk.toggleDock },
               { cmd: 'stop', label: L.cmdk.stopTask },
             ].map((c) => (
@@ -688,6 +750,10 @@ export function App(): React.ReactElement {
           {busy && <button className="btn danger" onClick={() => void interrupt()}>{L.topbar.stop}</button>}
           <span className={`approval-mode${approvalMode === 'auto' ? ' auto' : ''}`} title={L.topbar.approvalTitle}>{L.topbar.approval}:{approvalMode === 'ask' ? L.topbar.approvalAsk : L.topbar.approvalAuto}</span>
           <button className="btn ghost" aria-label={L.topbar.settingsAria} onClick={() => setSettingsOpen(true)}>⚙</button>
+          <div className="seg lang-seg" role="group" aria-label={L.settings.language}>
+            <button className={locale === 'zh' ? 'on' : ''} onClick={() => setLocale('zh')} aria-pressed={locale === 'zh'} title="中文">中</button>
+            <button className={locale === 'en' ? 'on' : ''} onClick={() => setLocale('en')} aria-pressed={locale === 'en'} title="English">EN</button>
+          </div>
           <button className="btn ghost" onClick={() => setDockOpen((v) => !v)} aria-expanded={dockOpen}>
             {dockOpen ? L.topbar.collapseDock : L.topbar.expandDock}
           </button>
@@ -769,7 +835,13 @@ export function App(): React.ReactElement {
           )}
         </div>
 
-        <footer className="composer">
+        <footer
+          className={`composer${dragOver ? ' dragover' : ''}`}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false); }}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); addDroppedFiles([...e.dataTransfer.files]); }}
+        >
+          {dragOver && <div className="drop-hint" aria-live="polite">{L.composer.dropHint}</div>}
           {attOpen && (
             <div className="att-picker" role="dialog" aria-label={L.composer.attachAriaDialog}>
               <input
@@ -802,8 +874,19 @@ export function App(): React.ReactElement {
               ))}
             </div>
           )}
+          {images.length > 0 && (
+            <div className="att-chips">
+              {images.map((im, i) => (
+                <span key={im.dataUrl.slice(-64)} className="att-chip img" aria-label={L.composer.pasteImageAria(i + 1)}>
+                  <img src={im.dataUrl} alt={im.name} className="att-thumb" />
+                  <button aria-label={L.composer.removeImageAria(i + 1)} onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="composer-row">
             <button className="btn ghost" aria-label={L.composer.attachAria} title={L.composer.attachTitle} onClick={() => setAttOpen((v) => !v)} disabled={activeSession === ''}>@</button>
+            <button className="btn ghost" aria-label={L.composer.uploadAria} title={L.composer.uploadTitle} onClick={() => void uploadFiles()} disabled={activeSession === ''}>📎</button>
             <textarea
             value={draft}
             placeholder={activeSession === ''
@@ -815,6 +898,12 @@ export function App(): React.ReactElement {
                   : L.composer.phCtrlEnter}
             disabled={activeSession === ''}
             onChange={(e) => setDraft(e.target.value)}
+            onPaste={(e) => {
+              const files = [...e.clipboardData.files];
+              if (files.length === 0) return;
+              e.preventDefault();
+              void addImageFiles(files).then((err) => { if (err !== '') setExportHint(err); });
+            }}
             onKeyDown={(e) => {
               if (e.key !== 'Enter') return;
               const plain = !e.shiftKey && !e.ctrlKey && !e.metaKey;
@@ -852,7 +941,7 @@ export function App(): React.ReactElement {
                 className={`dock-tab${dockTab === t ? ' active' : ''}`}
                 onClick={() => setDockTab(t)}
               >
-                {t === 'overview' ? 'Overview' : t === 'files' ? 'Files' : t === 'diff' ? 'Diff' : t === 'evidence' ? 'Evidence' : 'Logs'}
+                {t === 'overview' ? L.dock.tabOverview : t === 'files' ? L.dock.tabFiles : t === 'diff' ? L.dock.tabDiff : t === 'evidence' ? L.dock.tabEvidence : L.dock.tabLogs}
               </button>
             ))}
           </div>
@@ -890,6 +979,16 @@ export function App(): React.ReactElement {
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void addWorkspace(); } }}
                       aria-label={L.dock.addWsAria}
                     />
+                    <button
+                      className="btn ghost sm"
+                      aria-label={L.dock.browseAria}
+                      onClick={() => {
+                        if (bridge === undefined) return;
+                        void bridge.pickDirectory(L.dirDialog.title).then((r) => {
+                          if ('ok' in r && r.ok === true && r.path !== undefined) setWsAddPath(r.path);
+                        });
+                      }}
+                    >{L.dock.browse}</button>
                   </div>
                 )}
                 <div className="fs-crumbs">

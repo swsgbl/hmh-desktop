@@ -94,7 +94,9 @@ export interface HmhBridge {
   browseRuntime(title?: string): Promise<{ ok: boolean; entry?: string; canceled?: boolean } | { error: string; code: string }>;
   setRuntime(entry: string): Promise<{ ok: boolean; mode?: string } | { error: string; code: string }>;
   sessions(): Promise<{ sessions: SessionRowDto[]; nextCursor: string | null } | { error: string; code: string }>;
-  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[]): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
+  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[], images?: Array<{ name: string; dataUrl: string }>): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
+  pickFiles(title?: string): Promise<{ ok: boolean; paths?: string[]; canceled?: boolean } | { error: string; code: string }>;
+  pickDirectory(title?: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
   fsSearch(q: string): Promise<{ results: Array<{ rel: string; path: string }> } | { error: string; code: string }>;
   approve(granted: boolean, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   interrupt(sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;

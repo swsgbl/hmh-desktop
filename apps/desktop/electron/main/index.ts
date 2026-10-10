@@ -305,14 +305,48 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('bridge:sessions', (event) =>
       hostCall(event, (c) => c.getJson<{ sessions: Array<{ id: string; title: string; task: string; outcome: string; turns: number; toolUses: number; time: string; cwd: string; createdAt: string; updatedAt: string }> }>('/api/sessions?limit=100')));
 
-    ipcMain.handle('bridge:send-task', (event, text: unknown, sessionId: unknown, mode: unknown, attachments: unknown) => {
+    ipcMain.handle('bridge:send-task', (event, text: unknown, sessionId: unknown, mode: unknown, attachments: unknown, images: unknown) => {
       const task = typeof text === 'string' ? text.slice(0, 20_000) : '';
       const sid = typeof sessionId === 'string' ? sessionId.slice(0, 80) : '';
       const m = mode === 'auto' || mode === 'yolo' ? mode : 'ask';
-      // 附件:后端授权 DTO 的绝对路径(@ 选择器只来自 /api/fs/search)
+      // 附件:后端授权 DTO 的绝对路径(@ 选择器/📎 上传只来自本地文件系统)
       const atts = Array.isArray(attachments) ? attachments.filter((a): a is string => typeof a === 'string').slice(0, 10) : [];
+      // 图片:runtime vision 链协议 {name, dataUrl} base64(≤3 张 ≤6MB,renderer 生成)
+      const imgs = Array.isArray(images)
+        ? images
+            .filter((im): im is { name: string; dataUrl: string } =>
+              typeof im === 'object' && im !== null && typeof (im as { name?: unknown }).name === 'string' && typeof (im as { dataUrl?: unknown }).dataUrl === 'string')
+            .slice(0, 3)
+            .map((im) => ({ name: im.name.slice(0, 120), dataUrl: im.dataUrl.slice(0, 8_500_000) }))
+        : [];
       if (task === '' || sid === '') return Promise.resolve({ ok: false, code: 'BAD_REQUEST' });
-      return hostCall(event, (c) => c.postJson<{ ok: boolean; runId?: string }>('/api/task', { text: task, sessionId: sid, mode: m, attachments: atts }));
+      return hostCall(event, (c) => c.postJson<{ ok: boolean; runId?: string }>('/api/task', { text: task, sessionId: sid, mode: m, attachments: atts, images: imgs }));
+    });
+
+    // ---- 📎 文件上传(本地多选;runtime 校验 insideWs,工作区外文件会被 400) ----
+    ipcMain.handle('bridge:pick-files', async (event, title: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+      if (win === undefined) return { error: 'no window', code: 'BRIDGE_ERROR' };
+      const r = await dialog.showOpenDialog(win, {
+        title: typeof title === 'string' && title !== '' ? title.slice(0, 120) : '选择要附加的文件(可多选)',
+        properties: ['openFile', 'multiSelections'],
+      });
+      if (r.canceled || r.filePaths.length === 0) return { ok: false, canceled: true };
+      return { ok: true, paths: r.filePaths.slice(0, 10) };
+    });
+
+    // ---- 📁 目录选择(工作区添加的浏览按钮;原生 chooser) ----
+    ipcMain.handle('bridge:pick-directory', async (event, title: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+      if (win === undefined) return { error: 'no window', code: 'BRIDGE_ERROR' };
+      const r = await dialog.showOpenDialog(win, {
+        title: typeof title === 'string' && title !== '' ? title.slice(0, 120) : '选择文件夹',
+        properties: ['openDirectory'],
+      });
+      if (r.canceled || r.filePaths[0] === undefined) return { ok: false, canceled: true };
+      return { ok: true, path: r.filePaths[0] };
     });
 
     // ---- @ 附件:工作区文件搜索(runtime 授权的路径来源) ----
@@ -712,7 +746,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'providerSave', 'providers', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'providerSave', 'providers', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

@@ -158,7 +158,7 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         return {ok: rows.length >= 5 && !!ver, detail: 'rows='+rows.length+(ver?' ver='+ver.textContent.replace(/\\s+/g,' ').slice(0,40):'')};`, 6_000);
     });
     await step('Dock:Files 浏览+文件预览', async () => {
-      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='Files';}); if(t) t.click(); })()`);
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='文件'||x.textContent==='Files';}); if(t) t.click(); })()`);
       const w = await waitFor('fs rows', `var rows=document.querySelectorAll('.fs-row').length;
         return {ok: rows >= 1, detail: 'rows='+rows};`, 6_000);
       if (!w[0]) return w;
@@ -172,18 +172,18 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         return {ok: !!p && p.textContent.indexOf('demo workspace') >= 0, detail: p ? p.textContent.replace(/\\s+/g,' ').slice(0,40) : 'no preview'};`, 6_000);
     });
     await step('Dock:Diff 变更行', async () => {
-      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='Diff';}); if(t) t.click(); })()`);
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='变更'||x.textContent==='Diff';}); if(t) t.click(); })()`);
       return waitFor('diff rows', `var rows=document.querySelectorAll('.diff-row').length;
         return {ok: rows >= 1, detail: 'diff rows='+rows};`, 6_000);
     });
     await step('Dock:Evidence 认知数据', async () => {
-      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='Evidence';}); if(t) t.click(); })()`);
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='证据'||x.textContent==='Evidence';}); if(t) t.click(); })()`);
       return waitFor('evidence rows', `var rows=[].slice.call(document.querySelectorAll('.dock-row'));
-        var mem = rows.find(function(r){ return r.textContent.indexOf('记忆层')>=0; });
+        var mem = rows.find(function(r){ return r.textContent.indexOf('记忆层')>=0 || r.textContent.indexOf('Memory layers')>=0; });
         return {ok: !!mem && mem.textContent.indexOf('3') >= 0, detail: mem ? mem.textContent.replace(/\\s+/g,' ') : 'no memory row'};`, 6_000);
     });
     await step('Dock:Logs 面板(空态提示)', async () => {
-      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='Logs';}); if(t) t.click(); })()`);
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='日志'||x.textContent==='Logs';}); if(t) t.click(); })()`);
       const w = await waitFor('logs pane', `var l=document.querySelector('.logs-list');
         return {ok: !!l, detail: l ? ('rows='+l.querySelectorAll('.log-row').length) : 'no logs list'};`, 5_000);
       return w;
@@ -207,9 +207,9 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       const w = await waitFor('cmdk open', `var c=document.querySelector('.cmdk');
         return {ok: !!c, detail: c ? 'open' : 'not open'};`, 5_000);
       if (!w[0]) return w;
-      await js(`(function(){ var it=[].slice.call(document.querySelectorAll('.cmdk-item')).find(function(x){return x.textContent.indexOf('Files')>=0;}); if(it) it.click(); })()`);
+      await js(`(function(){ var it=[].slice.call(document.querySelectorAll('.cmdk-item')).find(function(x){return x.textContent.indexOf('文件')>=0 || x.textContent.indexOf('Files')>=0;}); if(it) it.click(); })()`);
       return waitFor('tab switched', `var t=document.querySelector('.dock-tab.active');
-        return {ok: !!t && t.textContent==='Files', detail: 'active='+(t?t.textContent:'none')};`, 5_000);
+        return {ok: !!t && (t.textContent==='文件'||t.textContent==='Files'), detail: 'active='+(t?t.textContent:'none')};`, 5_000);
     });
 
     /* ========== fake:设置面板 ========== */
@@ -237,6 +237,62 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         return {ok: !!b && b.textContent === '+ 新建会话', detail: 'btn='+(b?b.textContent:'none')};`, 5_000);
       await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))`);
       return [en[0] && zh[0], `en: ${en[1]}; zh: ${zh[1]}`];
+    });
+
+    /* ========== fake:顶栏 中/EN 快捷切换(可发现性) ========== */
+    await step('顶栏快捷切换:中/EN 一键切换', async () => {
+      const w = await waitFor('lang seg', `var s=document.querySelector('.lang-seg');
+        return {ok: !!s && s.querySelectorAll('button').length === 2, detail: s ? 'present' : 'absent'};`, 5_000);
+      if (!w[0]) return w;
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.lang-seg button')).find(function(x){return x.textContent.trim()==='EN';}); if(b) b.click(); })()`);
+      const en = await waitFor('english', `var b=document.querySelector('.sidebar-head .btn.primary');
+        return {ok: !!b && b.textContent === '+ New Session', detail: 'btn='+(b?b.textContent:'none')};`, 5_000);
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.lang-seg button')).find(function(x){return x.textContent.trim()==='中';}); if(b) b.click(); })()`);
+      const zh = await waitFor('chinese back', `var b=document.querySelector('.sidebar-head .btn.primary');
+        return {ok: !!b && b.textContent === '+ 新建会话', detail: 'btn='+(b?b.textContent:'none')};`, 5_000);
+      return [en[0] && zh[0], `en: ${en[1]}; zh: ${zh[1]}`];
+    });
+
+    /* ========== fake:粘贴图片 → 缩略图 chip → 发送 → runtime 收到 ========== */
+    await step('粘贴图片:缩略图 chip + 发送后 runtime 收到图片', async () => {
+      // 新建会话确保 composer 可用
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'n', ctrlKey:true, bubbles:true}))`);
+      await sleep(300);
+      await js(`(function(){
+        var ta = document.querySelector('.composer textarea');
+        if (!ta) return;
+        var c = document.createElement('canvas');
+        c.width = 8; c.height = 8;
+        var ctx = c.getContext('2d');
+        ctx.fillStyle = '#3f9650'; ctx.fillRect(0, 0, 8, 8);
+        c.toBlob(function(blob){
+          var dt = new DataTransfer();
+          dt.items.add(new File([blob], 'pasted.png', {type: 'image/png'}));
+          ta.dispatchEvent(new ClipboardEvent('paste', {clipboardData: dt, bubbles: true, cancelable: true}));
+        }, 'image/png');
+      })()`);
+      const chip = await waitFor('image chip', `var n=document.querySelectorAll('.att-chip.img').length;
+        return {ok: n >= 1, detail: 'img chips='+n};`, 6_000);
+      if (!chip[0]) return chip;
+      await typeInto('.composer textarea', '看这张图');
+      await sleep(200);
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.composer button')).find(function(x){return x.textContent.trim()==='发送';}); if(b) b.click(); })()`);
+      const done = await waitFor('image sent', `var ts=[].slice.call(document.querySelectorAll('.turn'));
+        var hit = ts.filter(function(x){ return x.textContent.indexOf('[images: 1]') >= 0; });
+        return {ok: hit.length >= 1, detail: 'turns-with-image='+hit.length};`, 12_000);
+      await shot('pasted-image');
+      return done;
+    });
+
+    /* ========== fake:📎 上传/📁 浏览按钮就位 ========== */
+    await step('附件与目录入口:📎 上传 + 📁 浏览按钮存在', async () => {
+      const r = (await js(`(function(){
+        var up = document.querySelector('.composer button[aria-label*="上传"], .composer button[aria-label*="Upload"]');
+        var br = document.querySelector('.ws-picker button');
+        return JSON.stringify({up: !!up, browse: !!br});
+      })()`)) as string;
+      const p = JSON.parse(r) as { up: boolean; browse: boolean };
+      return [p.up && p.browse, `📎=${p.up} 📁=${p.browse}`];
     });
 
     /* ========== fake:@ 附件选择器 ========== */
@@ -282,16 +338,32 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         return {ok: !!ver && ver.textContent.indexOf('无数据') < 0, detail: ver ? ver.textContent.replace(/\\s+/g,' ').slice(0,50) : 'no ver row'};`, 10_000);
     });
     await step('Dock:Diff 真实 git 状态(非加载中)', async () => {
-      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='Diff';}); if(t) t.click(); })()`);
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='变更'||x.textContent==='Diff';}); if(t) t.click(); })()`);
       return waitFor('diff', `var p=document.querySelector('.diff-pane');
         var t = p ? p.textContent : '';
-        return {ok: !!p && t.indexOf('加载中') < 0, detail: t.replace(/\\s+/g,' ').slice(0,60)};`, 10_000);
+        return {ok: !!p && t.indexOf('加载中') < 0, detail: t.replace(/\\s+/g,' ').slice(0,60)};`, 15_000);
     });
     await step('Dock:Evidence 真实认知数据', async () => {
-      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='Evidence';}); if(t) t.click(); })()`);
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='证据'||x.textContent==='Evidence';}); if(t) t.click(); })()`);
       return waitFor('evidence', `var rows=[].slice.call(document.querySelectorAll('.dock-row'));
-        var mem = rows.find(function(r){ return r.textContent.indexOf('记忆层')>=0; });
-        return {ok: !!mem && mem.textContent.indexOf('…') < 0, detail: mem ? mem.textContent.replace(/\\s+/g,' ').slice(0,50) : 'no row'};`, 10_000);
+        var mem = rows.find(function(r){ return r.textContent.indexOf('记忆层')>=0 || r.textContent.indexOf('Memory layers')>=0; });
+        return {ok: !!mem && mem.textContent.indexOf('…') < 0, detail: mem ? mem.textContent.replace(/\\s+/g,' ').slice(0,50) : 'no row'};`, 15_000);
+    });
+    await step('附件与目录入口:📎 上传 + 顶栏中/EN + 📁 浏览按钮存在', async () => {
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='文件'||x.textContent==='Files';}); if(t) t.click(); })()`);
+      await waitFor('files tab', `var t=document.querySelector('.dock-tab.active');
+        return {ok: !!t && (t.textContent==='文件'||t.textContent==='Files'), detail: 'active='+(t?t.textContent:'none')};`, 5_000);
+      // real 模式 workspaces 请求走 runtime(冷启动后可能排队),放宽到 15s
+      const ws = await waitFor('ws picker', `var w=document.querySelector('.ws-picker');
+        return {ok: !!w, detail: w ? 'loaded' : 'workspaces not loaded yet'};`, mode === 'real' ? 15_000 : 6_000);
+      const r = (await js(`(function(){
+        var up = document.querySelector('.composer button[aria-label*="上传"], .composer button[aria-label*="Upload"]');
+        var lang = document.querySelector('.lang-seg');
+        var br = document.querySelector('.ws-picker button');
+        return JSON.stringify({up: !!up, lang: !!lang, browse: !!br});
+      })()`)) as string;
+      const p = JSON.parse(r) as { up: boolean; lang: boolean; browse: boolean };
+      return [p.up && p.lang && p.browse, `📎=${p.up} 中/EN=${p.lang} 📁=${p.browse}; ${ws[1]}`];
     });
     await shot('final');
   }

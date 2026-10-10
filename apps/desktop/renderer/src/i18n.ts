@@ -97,6 +97,14 @@ const zh = {
     removeAttachAria: (rel: string): string => `移除附件 ${rel}`,
     inputAria: '任务输入',
     injectedSuffix: '(已注入运行中任务)',
+    uploadAria: '上传本地文件(可多选)',
+    uploadTitle: '上传文件(可多选)',
+    dropHint: '松开以添加附件',
+    pasteImageAria: (n: number): string => `图片附件 ${n}`,
+    removeImageAria: (n: number): string => `移除图片 ${n}`,
+    imgTooLarge: '图片超过 6MB,已忽略',
+    imgWrongType: '只支持 PNG / JPEG / WebP 图片',
+    imgLimit: '最多 3 张图片',
   },
   errors: {
     sendFailed: '发送失败(host 未就绪或拒绝)',
@@ -157,6 +165,11 @@ const zh = {
     saveFailed: (e: string): string => `保存失败:${e}`,
   },
   dock: {
+    tabOverview: '总览',
+    tabFiles: '文件',
+    tabDiff: '变更',
+    tabEvidence: '证据',
+    tabLogs: '日志',
     hostState: 'host 状态',
     runtimeVersion: 'runtime 版本',
     mode: '模式',
@@ -192,9 +205,13 @@ const zh = {
     logsHead: '运行日志(runtime line 流,最近 200 条)',
     logsEmpty: '(暂无日志——跑一个任务后实时累积)',
     addWsFailed: (e: string): string => `添加工作区失败:${e}`,
+    browse: '浏览…',
+    browseAria: '浏览选择文件夹',
   },
   exportDialog: { title: '导出会话' },
   runtimeDialog: { title: '选择 hmharness 的 desktop-host 入口' },
+  filesDialog: { title: '选择要附加的文件(可多选)' },
+  dirDialog: { title: '选择文件夹' },
 };
 
 const en: typeof zh = {
@@ -285,6 +302,14 @@ const en: typeof zh = {
     removeAttachAria: (rel: string): string => `Remove attachment ${rel}`,
     inputAria: 'Task input',
     injectedSuffix: ' (injected into running task)',
+    uploadAria: 'Upload local files (multi-select)',
+    uploadTitle: 'Upload files (multi-select)',
+    dropHint: 'Drop to attach',
+    pasteImageAria: (n: number): string => `Image attachment ${n}`,
+    removeImageAria: (n: number): string => `Remove image ${n}`,
+    imgTooLarge: 'Image over 6MB was ignored',
+    imgWrongType: 'Only PNG / JPEG / WebP images are supported',
+    imgLimit: 'At most 3 images',
   },
   errors: {
     sendFailed: 'Send failed (host not ready or rejected)',
@@ -345,6 +370,11 @@ const en: typeof zh = {
     saveFailed: (e: string): string => `Save failed: ${e}`,
   },
   dock: {
+    tabOverview: 'Overview',
+    tabFiles: 'Files',
+    tabDiff: 'Diff',
+    tabEvidence: 'Evidence',
+    tabLogs: 'Logs',
     hostState: 'Host state',
     runtimeVersion: 'Runtime version',
     mode: 'Mode',
@@ -380,9 +410,13 @@ const en: typeof zh = {
     logsHead: 'Run logs (runtime line stream, last 200)',
     logsEmpty: '(no logs yet — they accumulate as tasks run)',
     addWsFailed: (e: string): string => `Failed to add workspace: ${e}`,
+    browse: 'Browse…',
+    browseAria: 'Browse for a folder',
   },
   exportDialog: { title: 'Export session' },
   runtimeDialog: { title: 'Choose the hmharness desktop-host entry' },
+  filesDialog: { title: 'Choose files to attach (multi-select)' },
+  dirDialog: { title: 'Choose a folder' },
 };
 
 export type Strings = typeof zh;

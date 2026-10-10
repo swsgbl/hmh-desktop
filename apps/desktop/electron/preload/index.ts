@@ -32,8 +32,14 @@ const bridge = {
   sessions(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:sessions');
   },
-  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[]): Promise<unknown> {
-    return ipcRenderer.invoke('bridge:send-task', text, sessionId, mode ?? 'ask', attachments ?? []);
+  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[], images?: Array<{ name: string; dataUrl: string }>): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:send-task', text, sessionId, mode ?? 'ask', attachments ?? [], images ?? []);
+  },
+  pickFiles(title?: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:pick-files', title);
+  },
+  pickDirectory(title?: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:pick-directory', title);
   },
   fsSearch(q: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:fs-search', q);

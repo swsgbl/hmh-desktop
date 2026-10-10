@@ -243,21 +243,33 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
     if (req.method === 'POST' && url.pathname === '/api/task') {
       void (async () => {
         try {
-          const body = JSON.parse((await readBody()) || '{}') as { text?: unknown; sessionId?: unknown; mode?: unknown; attachments?: unknown };
+          const body = JSON.parse((await readBody()) || '{}') as { text?: unknown; sessionId?: unknown; mode?: unknown; attachments?: unknown; images?: unknown };
           const text = typeof body.text === 'string' ? body.text : '';
           const sessionId = typeof body.sessionId === 'string' ? body.sessionId : `web-${Date.now().toString(36)}`;
           const mode = body.mode === 'ask' || body.mode === 'auto' || body.mode === 'yolo' ? body.mode : 'ask';
           const attachments = Array.isArray(body.attachments) ? body.attachments.filter((a): a is string => typeof a === 'string') : [];
+          // 图片附件:与 hmharness vision 协议同形({name,dataUrl});fake 校验形状即收
+          const images = Array.isArray(body.images)
+            ? body.images.filter((im): im is { name: string; dataUrl: string } => {
+                if (typeof im !== 'object' || im === null) return false;
+                const o = im as { name?: unknown; dataUrl?: unknown };
+                return typeof o.name === 'string' && typeof o.dataUrl === 'string' && o.dataUrl.startsWith('data:image/');
+              })
+            : [];
           if (!text) {
             res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'text required', { retryable: false })));
             return;
           }
-          // 与 hmharness 同语义:合法附件以 [referenced files] 前缀并入任务文本
-          const composed = attachments.length > 0 ? `[referenced files]\n${attachments.map((a) => `- ${a.split(/[\\/]/).pop()}`).join('\n')}\n\n${text}` : text;
-          const runId = runTask(sessionId, composed, mode);
+          // 与 hmharness 同语义:合法附件以 [referenced files] 前缀并入任务文本;
+          // 图片以 [images] 前缀标注张数(vision 描述链在真实 runtime 里发生)
+          const composed = attachments.length > 0
+            ? `[referenced files]\n${attachments.map((a) => `- ${a.split(/[\\/]/).pop()}`).join('\n')}\n\n${text}`
+            : text;
+          const withImages = images.length > 0 ? `[images: ${images.length}]\n${composed}` : composed;
+          const runId = runTask(sessionId, withImages, mode);
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-          res.end(JSON.stringify({ ok: true, runId }));
+          res.end(JSON.stringify({ ok: true, runId, images: images.length }));
         } catch (err) {
           res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', String(err).slice(0, 120), { retryable: false })));
