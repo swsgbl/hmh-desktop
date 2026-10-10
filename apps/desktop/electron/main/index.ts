@@ -14,7 +14,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
 import { join } from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
@@ -230,12 +230,21 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('bridge:sessions', (event) =>
       hostCall(event, (c) => c.getJson<{ sessions: Array<{ id: string; title: string; task: string; outcome: string; turns: number; toolUses: number; time: string; cwd: string; createdAt: string; updatedAt: string }> }>('/api/sessions?limit=100')));
 
-    ipcMain.handle('bridge:send-task', (event, text: unknown, sessionId: unknown, mode: unknown) => {
+    ipcMain.handle('bridge:send-task', (event, text: unknown, sessionId: unknown, mode: unknown, attachments: unknown) => {
       const task = typeof text === 'string' ? text.slice(0, 20_000) : '';
       const sid = typeof sessionId === 'string' ? sessionId.slice(0, 80) : '';
       const m = mode === 'auto' || mode === 'yolo' ? mode : 'ask';
+      // 附件:后端授权 DTO 的绝对路径(@ 选择器只来自 /api/fs/search)
+      const atts = Array.isArray(attachments) ? attachments.filter((a): a is string => typeof a === 'string').slice(0, 10) : [];
       if (task === '' || sid === '') return Promise.resolve({ ok: false, code: 'BAD_REQUEST' });
-      return hostCall(event, (c) => c.postJson<{ ok: boolean; runId?: string }>('/api/task', { text: task, sessionId: sid, mode: m }));
+      return hostCall(event, (c) => c.postJson<{ ok: boolean; runId?: string }>('/api/task', { text: task, sessionId: sid, mode: m, attachments: atts }));
+    });
+
+    // ---- @ 附件:工作区文件搜索(runtime 授权的路径来源) ----
+    ipcMain.handle('bridge:fs-search', (event, q: unknown) => {
+      const query = typeof q === 'string' ? q.slice(0, 200) : '';
+      if (query === '') return Promise.resolve({ results: [] });
+      return hostCall(event, (c) => c.getJson<{ results: Array<{ rel: string; path: string }> }>(`/api/fs/search?q=${encodeURIComponent(query)}`));
     });
 
     ipcMain.handle('bridge:approve', (event, granted: unknown, sessionId: unknown) =>
@@ -373,10 +382,23 @@ if (!app.requestSingleInstanceLock()) {
   }
 
   /* ---- 窗口与安全策略 ---- */
-  function createWindow(): void {
+  // 03 §七:Desktop 本地只存 UI 偏好/窗口状态(userData/window-state.json)
+  const windowStateFile = (): string => join(app.getPath('userData'), 'window-state.json');
+  async function loadBounds(): Promise<{ width: number; height: number; x?: number; y?: number } | null> {
+    try {
+      return JSON.parse(await readFile(windowStateFile(), 'utf8')) as { width: number; height: number; x?: number; y?: number };
+    } catch { return null; }
+  }
+  async function saveBounds(win: BrowserWindow): Promise<void> {
+    try { await writeFile(windowStateFile(), JSON.stringify(win.getBounds()), 'utf8'); } catch { /* best effort */ }
+  }
+
+  async function createWindow(): Promise<BrowserWindow | null> {
+    const saved = await loadBounds();
     const win = new BrowserWindow({
-      width: 1440,
-      height: 900,
+      width: saved?.width ?? 1440,
+      height: saved?.height ?? 900,
+      ...(saved?.x !== undefined && saved?.y !== undefined ? { x: saved.x, y: saved.y } : {}),
       minWidth: 960,
       minHeight: 600,
       show: false,
@@ -394,6 +416,7 @@ if (!app.requestSingleInstanceLock()) {
       },
     });
     win.once('ready-to-show', () => win.show());
+    win.on('close', () => { void saveBounds(win); });
 
     // 只允许加载我们自己的 renderer;任何导航/新窗口一律拒绝
     win.webContents.setWindowOpenHandler(({ url }) => {
@@ -413,6 +436,7 @@ if (!app.requestSingleInstanceLock()) {
     } else {
       void win.loadFile(join(here, '..', '..', 'dist-renderer', 'index.html'));
     }
+    return win;
   }
 
   app.whenReady().then(() => {
@@ -437,22 +461,18 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     registerIpc();
-    createWindow();
-    void startHost();
-
-    // 阶段H 安全自测(MasterPrompt H:renderer 无 process/require、白名单桥、
-    // 导航拦截、CSP、window.open 拒绝)。自驱探针,scripts/security-test.mjs 消费。
-    if (process.env.HMH_DESKTOP_SECURITY_TEST === '1') {
-      const win0 = BrowserWindow.getAllWindows()[0];
-      if (win0 !== undefined) {
-        win0.webContents.once('did-finish-load', () => {
-          void securitySelfTest(win0);
+    // createWindow 是 async(bounds 恢复);安全自测在窗口就绪后从内部挂载
+    void createWindow().then((win) => {
+      if (win !== null && process.env.HMH_DESKTOP_SECURITY_TEST === '1') {
+        win.webContents.once('did-finish-load', () => {
+          void securitySelfTest(win);
         });
       }
-    }
+    });
+    void startHost();
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      if (BrowserWindow.getAllWindows().length === 0) void createWindow();
     });
   });
 
@@ -481,7 +501,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'providerSave', 'providers', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'providerSave', 'providers', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

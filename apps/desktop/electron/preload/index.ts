@@ -22,8 +22,11 @@ const bridge = {
   sessions(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:sessions');
   },
-  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo'): Promise<unknown> {
-    return ipcRenderer.invoke('bridge:send-task', text, sessionId, mode ?? 'ask');
+  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[]): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:send-task', text, sessionId, mode ?? 'ask', attachments ?? []);
+  },
+  fsSearch(q: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:fs-search', q);
   },
   approve(granted: boolean, sessionId: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:approve', granted, sessionId);

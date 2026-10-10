@@ -36,6 +36,7 @@ type Item =
   | { kind: 'tool'; id: string; name: string; argsPreview: string; outputPreview?: string; isError?: boolean }
   | { kind: 'approval'; id: string; approvalId: string; tool: string; argsPreview: string; risk: string }
   | { kind: 'artifact'; id: string; relPath: string; title: string }
+  | { kind: 'turnsum'; id: string; text: string }
   | { kind: 'error'; id: string; code: string; message: string; sessionId: string; runId: string };
 
 type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs';
@@ -73,6 +74,7 @@ export function App(): React.ReactElement {
   const [approvalMode, setApprovalMode] = useState<'ask' | 'auto'>('ask');
   // Provider 设置(03 §七)
   const [providers, setProviders] = useState<ProviderDetailDto[]>([]);
+  const [currentModel, setCurrentModel] = useState<string>('');
   const [providerForm, setProviderForm] = useState({ name: '', baseUrl: '', model: '', apiKey: '' });
   const [providerHint, setProviderHint] = useState('');
   // 会话搜索(03 §六)
@@ -80,6 +82,15 @@ export function App(): React.ReactElement {
   // 工作区(03 §六)
   const [workspaces, setWorkspaces] = useState<{ current: string; items: WorkspaceDto[] } | null>(null);
   const [wsAddPath, setWsAddPath] = useState('');
+  // @ 附件(03 §六 composer 附件)
+  const [attOpen, setAttOpen] = useState(false);
+  const [attQuery, setAttQuery] = useState('');
+  const [attResults, setAttResults] = useState<Array<{ rel: string; path: string }>>([]);
+  const [attachments, setAttachments] = useState<Array<{ rel: string; path: string }>>([]);
+  // 收藏(本地偏好)
+  const [pinned, setPinned] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(window.localStorage.getItem('hmh.pinned') ?? '[]') as string[]); } catch { return new Set(); }
+  });
   const streamRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef('');
   activeRef.current = activeSession;
@@ -126,10 +137,13 @@ export function App(): React.ReactElement {
     } else if (env.kind === 'run.completed') {
       setRunStatus('completed');
       setStreaming('');
-      const p = env.payload as { text?: string };
+      const p = env.payload as { text?: string; turns?: number; toolUses?: number; usage?: { promptTokens?: number; completionTokens?: number } };
+      const tokens = p.usage !== undefined ? (p.usage.promptTokens ?? 0) + (p.usage.completionTokens ?? 0) : null;
+      const sum = `${p.turns ?? 0} 回合 · ${p.toolUses ?? 0} 次工具${tokens !== null && tokens > 0 ? ` · ${tokens} tokens` : ''}`;
       setItems((prev) => [
         ...prev,
         { kind: 'assistant', id: env.eventId, text: String(p.text ?? '') },
+        { kind: 'turnsum', id: `${env.eventId}-sum`, text: sum },
       ]);
     } else if (env.kind === 'run.failed') {
       setRunStatus('failed');
@@ -239,6 +253,7 @@ export function App(): React.ReactElement {
     if (bridge === undefined) return;
     const r = await bridge.providers();
     if ('providersDetail' in r && Array.isArray(r.providersDetail)) setProviders(r.providersDetail);
+    if ('model' in r && typeof r.model === 'string') setCurrentModel(r.model);
   }, []);
 
   const saveProvider = useCallback(async () => {
@@ -336,6 +351,9 @@ export function App(): React.ReactElement {
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         newSession();
+      } else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setSettingsOpen(true);
       } else if (e.key === 'Escape') {
         setCmdOpen(false);
         setSettingsOpen(false);
@@ -345,18 +363,36 @@ export function App(): React.ReactElement {
     return () => window.removeEventListener('keydown', onKey);
   }, [newSession]);
 
+  /** @ 附件搜索(runtime 授权路径来源)。 */
+  const searchFiles = useCallback(async (q: string) => {
+    if (bridge === undefined || q.trim() === '') { setAttResults([]); return; }
+    const r = await bridge.fsSearch(q.trim());
+    if ('results' in r) setAttResults(r.results.slice(0, 12));
+  }, []);
+
+  const togglePin = useCallback((id: string): void => {
+    setPinned((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { window.localStorage.setItem('hmh.pinned', JSON.stringify([...next])); } catch { /* 私有模式 */ }
+      return next;
+    });
+  }, []);
+
   const send = useCallback(async () => {
     if (bridge === undefined || draft.trim() === '' || activeSession === '') return;
     const text = draft;
+    const atts = attachments.map((a) => a.path);
     setDraft('');
+    setAttachments([]);
     setRunStatus('running');
-    setItems((prev) => [...prev, { kind: 'user', id: `local-${Date.now()}`, text }]);
-    const r = await bridge.sendTask(text, activeSession, 'ask');
+    setItems((prev) => [...prev, { kind: 'user', id: `local-${Date.now()}`, text: attachments.length > 0 ? `${attachments.map((a) => `@${a.rel}`).join(' ')}\n${text}` : text }]);
+    const r = await bridge.sendTask(text, activeSession, 'ask', atts);
     if ('ok' in r && r.ok !== true) {
       setItems((prev) => [...prev, { kind: 'error', id: `send-${Date.now()}`, code: 'code' in r ? String(r.code) : 'SEND_FAILED', message: '发送失败(host 未就绪或拒绝)', sessionId: activeSession, runId: '(未建立运行)' }]);
       setRunStatus(null);
     }
-  }, [draft, activeSession]);
+  }, [draft, activeSession, attachments]);
 
   const approve = useCallback(async (granted: boolean) => {
     if (bridge === undefined || activeSession === '') return;
@@ -414,8 +450,8 @@ export function App(): React.ReactElement {
   }, [dockTab, hostState, fsData, cog, workspaces, loadFs, loadCog, loadDiff, refreshWorkspaces]);
 
   useEffect(() => {
-    if (settingsOpen && hostState === 'ready') void refreshProviders();
-  }, [settingsOpen, hostState, refreshProviders]);
+    if (hostState === 'ready') void refreshProviders(); // 顶栏模型 + 首跑引导数据
+  }, [hostState, refreshProviders]);
 
   const runCommand = useCallback((cmd: string): void => {
     setCmdOpen(false);
@@ -521,6 +557,7 @@ export function App(): React.ReactElement {
               const q = search.trim().toLowerCase();
               return s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.task.toLowerCase().includes(q);
             })
+            .sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)))
             .map((s) => (
             <div key={s.id} role="listitem" className={`session-row${s.id === activeSession ? ' active' : ''}`}>
               <button
@@ -528,9 +565,10 @@ export function App(): React.ReactElement {
                 onClick={() => void openSession(s.id)}
                 aria-label={`打开会话 ${s.title !== '' ? s.title : s.id}`}
               >
-                <span className="session-title">{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
+                <span className="session-title">{pinned.has(s.id) ? '★ ' : ''}{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
                 <span className="session-time">{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
               </button>
+              <button className={`session-export${pinned.has(s.id) ? ' pinned' : ''}`} aria-label={pinned.has(s.id) ? `取消收藏 ${s.id}` : `收藏置顶 ${s.id}`} title="收藏/取消收藏" onClick={() => togglePin(s.id)}>{pinned.has(s.id) ? '★' : '☆'}</button>
               <button className="session-export" aria-label={`导出会话 ${s.id} 为 Markdown`} title="导出 Markdown" onClick={() => void exportSession(s.id)}>⤓</button>
               <button className="session-export" aria-label={`归档会话 ${s.id}`} title="归档(可恢复)" onClick={() => void sessionOp(s.id, 'archive')}>🗄</button>
               <button className="session-export danger" aria-label={`删除会话 ${s.id}(移入回收站)`} title="删除(移入回收站,可恢复)" onClick={() => void sessionOp(s.id, 'delete')}>🗑</button>
@@ -548,7 +586,14 @@ export function App(): React.ReactElement {
         <header className="topbar">
           <span className={`host-dot ${hostBadge.connected ? 'on' : 'off'}`} aria-hidden="true" />
           <span className="host-label">{hostBadge.label}{hostBadge.detail !== '' ? ` · ${hostBadge.detail}` : ''}</span>
+          {workspaces !== null && (
+            <span className="topbar-ws" title="当前工作区">{workspaces.items.find((w) => w.id === workspaces.current)?.name ?? '—'}</span>
+          )}
+          {currentModel !== '' && <span className="topbar-model" title="当前 chat 模型">{currentModel}</span>}
           <span className="spacer" />
+          {providers.length === 0 && hostState === 'ready' && (
+            <button className="guide-pill" onClick={() => setSettingsOpen(true)}>未配置模型 Provider — 点此添加</button>
+          )}
           {busy && runStatus !== null && (
             <span className={`status-chip status-${runStatus}`}>
               <span className="dot" aria-hidden="true" />
@@ -621,6 +666,9 @@ export function App(): React.ReactElement {
                 </div>
               );
             }
+            if (it.kind === 'turnsum') {
+              return <div key={it.id} className="turn-sum" aria-label="回合汇总">{it.text}</div>;
+            }
             return (
               <article key={it.id} className="turn system">
                 <div className="status-chip status-failed"><span className="dot" aria-hidden="true" />{it.code}</div>
@@ -637,7 +685,41 @@ export function App(): React.ReactElement {
         </div>
 
         <footer className="composer">
-          <textarea
+          {attOpen && (
+            <div className="att-picker" role="dialog" aria-label="附件选择">
+              <input
+                autoFocus
+                className="session-search"
+                placeholder="搜索工作区文件…(Esc 关闭)"
+                value={attQuery}
+                onChange={(e) => { setAttQuery(e.target.value); void searchFiles(e.target.value); }}
+                onKeyDown={(e) => { if (e.key === 'Escape') { setAttOpen(false); setAttResults([]); } }}
+                aria-label="搜索工作区文件"
+              />
+              <div className="att-results">
+                {attResults.map((f) => (
+                  <button key={f.path} className="fs-row" onClick={() => {
+                    setAttachments((prev) => (prev.some((a) => a.path === f.path) ? prev : [...prev, f]));
+                    setAttOpen(false); setAttQuery(''); setAttResults([]);
+                  }}>📄 {f.rel}</button>
+                ))}
+                {attQuery !== '' && attResults.length === 0 && <div className="empty-hint">无匹配(路径必须在工作区内)</div>}
+              </div>
+            </div>
+          )}
+          {attachments.length > 0 && (
+            <div className="att-chips">
+              {attachments.map((a) => (
+                <span key={a.path} className="att-chip">
+                  📄 {a.rel}
+                  <button aria-label={`移除附件 ${a.rel}`} onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}>✕</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="composer-row">
+            <button className="btn ghost" aria-label="添加工作区文件附件" title="@ 引用工作区文件" onClick={() => setAttOpen((v) => !v)} disabled={activeSession === ''}>@</button>
+            <textarea
             value={draft}
             placeholder={activeSession === ''
               ? '先新建会话(Ctrl+N)…'
@@ -661,14 +743,15 @@ export function App(): React.ReactElement {
             }}
             aria-label="任务输入"
           />
-          <div className="composer-side">
-            <button
-              className={`btn send ${busy ? 'ghost' : 'primary'}`}
-              onClick={() => (busy ? void inject() : void send())}
-              disabled={draft.trim() === '' || activeSession === ''}
-            >
-              {busy ? '注入运行中任务' : '发送'}
-            </button>
+            <div className="composer-side">
+              <button
+                className={`btn send ${busy ? 'ghost' : 'primary'}`}
+                onClick={() => (busy ? void inject() : void send())}
+                disabled={draft.trim() === '' || activeSession === ''}
+              >
+                {busy ? '注入运行中任务' : '发送'}
+              </button>
+            </div>
           </div>
         </footer>
       </main>

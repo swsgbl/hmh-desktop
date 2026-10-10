@@ -83,7 +83,8 @@ export interface DiffDto {
 export interface HmhBridge {
   getState(): Promise<BridgeState>;
   sessions(): Promise<{ sessions: SessionRowDto[]; nextCursor: string | null } | { error: string; code: string }>;
-  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo'): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
+  sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[]): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
+  fsSearch(q: string): Promise<{ results: Array<{ rel: string; path: string }> } | { error: string; code: string }>;
   approve(granted: boolean, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   interrupt(sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   inject(text: string, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;

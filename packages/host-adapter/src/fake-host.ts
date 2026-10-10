@@ -243,16 +243,19 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
     if (req.method === 'POST' && url.pathname === '/api/task') {
       void (async () => {
         try {
-          const body = JSON.parse((await readBody()) || '{}') as { text?: unknown; sessionId?: unknown; mode?: unknown };
+          const body = JSON.parse((await readBody()) || '{}') as { text?: unknown; sessionId?: unknown; mode?: unknown; attachments?: unknown };
           const text = typeof body.text === 'string' ? body.text : '';
           const sessionId = typeof body.sessionId === 'string' ? body.sessionId : `web-${Date.now().toString(36)}`;
           const mode = body.mode === 'ask' || body.mode === 'auto' || body.mode === 'yolo' ? body.mode : 'ask';
+          const attachments = Array.isArray(body.attachments) ? body.attachments.filter((a): a is string => typeof a === 'string') : [];
           if (!text) {
             res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'text required', { retryable: false })));
             return;
           }
-          const runId = runTask(sessionId, text, mode);
+          // 与 hmharness 同语义:合法附件以 [referenced files] 前缀并入任务文本
+          const composed = attachments.length > 0 ? `[referenced files]\n${attachments.map((a) => `- ${a.split(/[\\/]/).pop()}`).join('\n')}\n\n${text}` : text;
+          const runId = runTask(sessionId, composed, mode);
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
           res.end(JSON.stringify({ ok: true, runId }));
         } catch (err) {
@@ -471,6 +474,19 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
         res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true, name }));
       })();
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/fs/search') {
+      // 工作区文件搜索(与 hmharness 同形:@附件选择器的数据源)
+      const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
+      const all = [
+        { rel: 'README.md', path: 'C:\\demo\\README.md', kind: 'file' },
+        { rel: 'src/app.ts', path: 'C:\\demo\\src\\app.ts', kind: 'file' },
+        { rel: 'docs/notes.md', path: 'C:\\demo\\docs\\notes.md', kind: 'file' },
+      ];
+      const hits = q === '' ? all : all.filter((f) => f.rel.toLowerCase().includes(q));
+      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ results: hits.slice(0, 20), truncated: false, total: hits.length }));
       return;
     }
     if (req.method === 'GET' && url.pathname === '/api/cognitive') {

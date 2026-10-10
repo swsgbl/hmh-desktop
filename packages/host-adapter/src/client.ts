@@ -6,6 +6,7 @@
  * - SSE 用 fetch 流手写解析(id/event/data 帧),支持 Last-Event-ID 补拉重连。
  */
 import { desktopError, isDesktopError, isEventEnvelope, type DesktopError, type EventEnvelope } from '@hmh-desktop/contracts';
+import { randomUUID } from 'node:crypto';
 
 export interface SseFrame {
   id?: string;
@@ -88,12 +89,17 @@ export class DesktopHostClient {
     return res.text();
   }
 
+  /** 每个带副作用的 POST 自动携带幂等键(03 §四防重放:请求使用 idempotencyKey;
+   *  runtime 侧短期兼容忽略,协议先行——重试可凭键去重,不盲目重放)。 */
   async postJson<T>(path: string, body: unknown, timeoutMs = 10_000): Promise<T> {
     let res: Response;
     try {
       res = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
-        headers: this.headers({ 'content-type': 'application/json' }),
+        headers: this.headers({
+          'content-type': 'application/json',
+          'x-idempotency-key': randomUUID(),
+        }),
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs),
       });
