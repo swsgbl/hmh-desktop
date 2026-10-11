@@ -239,6 +239,28 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return [en[0] && zh[0], `en: ${en[1]}; zh: ${zh[1]}`];
     });
 
+    /* ========== fake:工作区管理(左栏栏位 + 菜单 + 新建会话选工作区) ========== */
+    await step('工作区:左栏工作区栏可见(当前工作区名)', async () => {
+      return waitFor('workspace bar', `var b=document.querySelector('.workspace-bar');
+        var n = b ? (b.querySelector('.ws-bar-name')||{}).textContent : '';
+        return {ok: !!b && !!n && n.length > 0 && n.indexOf('加载') < 0, detail: 'bar='+(b?'yes':'no')+' name='+n};`, 8_000);
+    });
+    await step('工作区:菜单弹出,列表+当前高亮+添加入口;在指定工作区新建会话', async () => {
+      await js(`(function(){ var b=document.querySelector('.workspace-bar'); if(b) b.click(); })()`);
+      const w = await waitFor('ws menu', `var m=document.querySelector('.ws-menu');
+        var items = m ? m.querySelectorAll('.ws-menu-item').length : 0;
+        var cur = m ? m.querySelectorAll('.ws-menu-item.current').length : 0;
+        var add = m ? (m.textContent.indexOf('添加工作区')>=0 || m.textContent.indexOf('Add workspace')>=0) : false;
+        return {ok: items >= 1 && cur >= 1 && add, detail: 'items='+items+' current='+cur+' add='+add};`, 6_000);
+      if (!w[0]) return w;
+      await shot('ws-menu');
+      // 点第一个工作区项 = 在该工作区新建会话(菜单关闭、composer 可用)
+      await js(`(function(){ var it=document.querySelector('.ws-menu-item'); if(it) it.click(); })()`);
+      const closed = await waitFor('menu closed + session active', `var ta=document.querySelector('.composer textarea');
+        return {ok: !document.querySelector('.ws-menu') && !!ta && ta.disabled === false, detail: 'menu='+(document.querySelector('.ws-menu')?'open':'closed')+' ta='+(ta?ta.disabled:'none')};`, 6_000);
+      return [closed[0], `${w[1]}; ${closed[1]}`];
+    });
+
     /* ========== fake:顶栏 中/EN 快捷切换(可发现性) ========== */
     await step('顶栏快捷切换:中/EN 一键切换', async () => {
       const w = await waitFor('lang seg', `var s=document.querySelector('.lang-seg');
@@ -364,6 +386,11 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       })()`)) as string;
       const p = JSON.parse(r) as { up: boolean; lang: boolean; browse: boolean };
       return [p.up && p.lang && p.browse, `📎=${p.up} 中/EN=${p.lang} 📁=${p.browse}; ${ws[1]}`];
+    });
+    await step('工作区:左栏工作区栏可见(真实工作区名)', async () => {
+      return waitFor('workspace bar', `var b=document.querySelector('.workspace-bar');
+        var n = b ? (b.querySelector('.ws-bar-name')||{}).textContent : '';
+        return {ok: !!b && !!n && n.length > 0 && n.indexOf('加载') < 0 && n.indexOf('Loading') < 0, detail: 'name='+n};`, 15_000);
     });
     await shot('final');
   }

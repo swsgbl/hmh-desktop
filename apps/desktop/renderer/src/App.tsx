@@ -18,6 +18,7 @@ interface SessionRow {
   turns: number;
   toolUses: number;
   updatedAt: string;
+  cwd: string;
 }
 
 type Item =
@@ -198,7 +199,7 @@ export function App(): React.ReactElement {
     if (bridge === undefined) return;
     const r = await bridge.sessions();
     if ('sessions' in r && Array.isArray(r.sessions)) {
-      const mapped = r.sessions.map((s) => ({ id: s.id, title: s.title, task: s.task, turns: s.turns, toolUses: s.toolUses, updatedAt: s.updatedAt }));
+      const mapped = r.sessions.map((s) => ({ id: s.id, title: s.title, task: s.task, turns: s.turns, toolUses: s.toolUses, updatedAt: s.updatedAt, cwd: s.cwd }));
       setSessions((prev) => (cur === null ? mapped : [...prev, ...mapped.filter((m) => !prev.some((p) => p.id === m.id))]));
       setCursor('nextCursor' in r && typeof r.nextCursor === 'string' ? r.nextCursor : null);
     }
@@ -364,12 +365,60 @@ export function App(): React.ReactElement {
 
   const newSession = useCallback(() => {
     const id = `web-${Date.now().toString(36)}`;
-    setSessions((prev) => [{ id, title: L.sidebar.newSessionTitle, task: '', turns: 0, toolUses: 0, updatedAt: new Date().toISOString() }, ...prev]);
+    setSessions((prev) => [{ id, title: L.sidebar.newSessionTitle, task: '', turns: 0, toolUses: 0, updatedAt: new Date().toISOString(), cwd: workspaces?.items.find((w) => w.id === workspaces.current)?.path ?? '' }, ...prev]);
     setActiveSession(id);
     setItems([]);
     setStreaming('');
     setRunStatus(null);
-  }, [L]);
+  }, [L, workspaces]);
+
+  /* ---- 工作区管理(2026-10-11 对标 DSH:左栏工作区栏 + 新建会话选工作区) ----
+     hmharness 语义:工作区是 runtime 级单选 cwd(/api/workspaces/use),
+     切换影响后续任务;任务运行中切换会被 runtime 409 拒绝,UI 如实转达。 */
+  const [wsMenuOpen, setWsMenuOpen] = useState(false);
+
+  const switchWorkspace = useCallback(async (id: string): Promise<boolean> => {
+    if (bridge === undefined) return false;
+    const r = await bridge.workspaceUse(id);
+    if ('ok' in r && r.ok === true) {
+      void refreshWorkspaces();
+      setFsData(null); // Files 面板跟随新工作区根
+      return true;
+    }
+    if ('error' in r) {
+      setExportHint(L.sidebar.wsAddFailed(r.error));
+      setTimeout(() => setExportHint(''), 4_000);
+    }
+    return false;
+  }, [refreshWorkspaces, L]);
+
+  /** 在指定工作区新建会话(先切换 runtime cwd 再建)。 */
+  const newSessionIn = useCallback(async (wsId: string): Promise<void> => {
+    setWsMenuOpen(false);
+    if (wsId !== workspaces?.current) await switchWorkspace(wsId);
+    newSession();
+  }, [workspaces, switchWorkspace, newSession]);
+
+  /** 菜单里的"添加工作区":原生目录选择 → 注册 → 自动切换。 */
+  const addWorkspaceBrowse = useCallback(async (): Promise<void> => {
+    if (bridge === undefined) return;
+    const picked = await bridge.pickDirectory(L.dirDialog.title);
+    if (!('ok' in picked) || picked.ok !== true || picked.path === undefined) return;
+    const path = picked.path;
+    const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+    const r = await bridge.workspaceAdd(name, path);
+    if ('ok' in r && r.ok === true) {
+      const list = await bridge.workspaces();
+      if ('items' in list) {
+        setWorkspaces({ current: list.current, items: list.items });
+        const hit = list.items.find((w) => w.path.toLowerCase() === path.toLowerCase());
+        if (hit !== undefined) await switchWorkspace(hit.id);
+      }
+    } else if ('error' in r) {
+      setExportHint(L.sidebar.wsAddFailed(r.error));
+      setTimeout(() => setExportHint(''), 4_000);
+    }
+  }, [L, switchWorkspace]);
 
   // Ctrl+K 命令面板 / Ctrl+N 新会话(03 §六;键盘优先)
   useEffect(() => {
@@ -684,7 +733,17 @@ export function App(): React.ReactElement {
       )}
       <aside className="sidebar" aria-label={L.nav.sessions}>
         <div className="sidebar-head">
-          <button className="btn primary" onClick={newSession}>{L.sidebar.newSession}</button>
+          <div className="new-session-group">
+            <button className="btn primary grow" onClick={newSession} title={workspaces !== null ? L.sidebar.newInWs(workspaces.items.find((w) => w.id === workspaces.current)?.name ?? '') : ''}>{L.sidebar.newSession}</button>
+            <button
+              className="btn primary"
+              aria-label={L.sidebar.pickWsFirst}
+              title={L.sidebar.pickWsFirst}
+              aria-expanded={wsMenuOpen}
+              onClick={() => setWsMenuOpen((v) => !v)}
+              disabled={workspaces === null}
+            >▾</button>
+          </div>
           <input
             className="session-search"
             type="search"
@@ -694,6 +753,40 @@ export function App(): React.ReactElement {
             aria-label={L.sidebar.searchPlaceholder}
           />
         </div>
+        {/* 工作区管理栏(对标 DSH:切换/添加;runtime 语义=全局 cwd) */}
+        <button
+          className="workspace-bar"
+          aria-label={L.sidebar.workspaceBarAria}
+          aria-expanded={wsMenuOpen}
+          onClick={() => setWsMenuOpen((v) => !v)}
+        >
+          <span className="ws-bar-label">{L.sidebar.workspaceBar}</span>
+          <span className="ws-bar-name">{workspaces !== null ? (workspaces.items.find((w) => w.id === workspaces.current)?.name ?? L.dock.none) : L.dock.loading}</span>
+          <span className="ws-bar-caret" aria-hidden="true">▾</span>
+        </button>
+        {wsMenuOpen && (
+          <>
+            <div className="ws-menu-backdrop" onClick={() => setWsMenuOpen(false)} aria-hidden="true" />
+            <div className="ws-menu" role="menu" aria-label={L.sidebar.wsMenuAria}>
+              {workspaces !== null && workspaces.items.map((w) => (
+                <button
+                  key={w.id}
+                  role="menuitem"
+                  className={`ws-menu-item${w.id === workspaces.current ? ' current' : ''}`}
+                  onClick={() => void newSessionIn(w.id)}
+                  title={L.sidebar.newInWs(w.name)}
+                >
+                  <span className="ws-menu-name">📁 {w.name}</span>
+                  <span className="ws-menu-path">{w.path}</span>
+                  {w.id === workspaces.current && <span className="ws-menu-check">✓ {L.sidebar.wsCurrent}</span>}
+                </button>
+              ))}
+              <button role="menuitem" className="ws-menu-item add" onClick={() => { setWsMenuOpen(false); void addWorkspaceBrowse(); }}>
+                <span className="ws-menu-name">{L.sidebar.wsAdd}</span>
+              </button>
+            </div>
+          </>
+        )}
         <div className="session-list" role="list">
           {sessions
             .filter((s) => {
@@ -710,7 +803,7 @@ export function App(): React.ReactElement {
                 aria-label={L.sidebar.openAria(s.title !== '' ? s.title : s.id)}
               >
                 <span className="session-title">{pinned.has(s.id) ? L.sidebar.pinnedFirst : ''}{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
-                <span className="session-time">{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
+                <span className="session-time" title={s.cwd !== '' ? L.sidebar.sessionIn(s.cwd) : ''}>{s.updatedAt.slice(0, 16).replace('T', ' ')}{s.cwd !== '' ? ` · 📁 ${s.cwd.split(/[\\/]/).filter(Boolean).pop() ?? ''}` : ''}</span>
               </button>
               <button className={`session-export${pinned.has(s.id) ? ' pinned' : ''}`} aria-label={pinned.has(s.id) ? L.sidebar.unpinAria(s.id) : L.sidebar.pinAria(s.id)} title={L.sidebar.pinTitle} onClick={() => togglePin(s.id)}>{pinned.has(s.id) ? '★' : '☆'}</button>
               <button className="session-export" aria-label={L.sidebar.exportAria(s.id)} title={L.sidebar.exportTitle} onClick={() => void exportSession(s.id)}>⤓</button>
