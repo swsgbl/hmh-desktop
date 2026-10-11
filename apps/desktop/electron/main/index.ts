@@ -323,6 +323,13 @@ if (!app.requestSingleInstanceLock()) {
       return hostCall(event, (c) => c.postJson<{ ok: boolean; runId?: string }>('/api/task', { text: task, sessionId: sid, mode: m, attachments: atts, images: imgs }));
     });
 
+    // ---- 模型切换(runtime POST /api/model:切 chat 路由,config 即时生效) ----
+    ipcMain.handle('bridge:model-set', (event, name: unknown) => {
+      const n = typeof name === 'string' ? name.trim().slice(0, 80) : '';
+      if (n === '') return Promise.resolve({ error: 'name required', code: 'BAD_REQUEST' });
+      return hostCall(event, (c) => c.postJson<{ ok: boolean; model?: string }>('/api/model', { name: n }));
+    });
+
     // ---- 📎 文件上传(本地多选;runtime 校验 insideWs,工作区外文件会被 400) ----
     ipcMain.handle('bridge:pick-files', async (event, title: unknown) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
@@ -746,7 +753,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'onEventBatches', 'onHostState', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'providerSave', 'providers', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'providerSave', 'providers', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

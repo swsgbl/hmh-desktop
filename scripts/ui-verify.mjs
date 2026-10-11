@@ -26,6 +26,7 @@ const child = spawn(exe, args, {
     HMH_DESKTOP_UIVERIFY: '1',
     HMH_DESKTOP_UIVERIFY_MODE: mode,
     HMH_DESKTOP_UIVERIFY_SHOTS: join(root, `ui-verify-shots-${mode}`),
+    ...(process.argv.includes('--real-task') ? { HMH_DESKTOP_UIVERIFY_REAL_TASK: '1' } : {}),
   },
 });
 let tail = '';
@@ -44,5 +45,6 @@ child.on('exit', (code) => {
   }
   process.exit(code ?? 1);
 });
-// 硬超时:fake 3 分钟 / real 4 分钟
-setTimeout(() => { try { child.kill(); } catch {} }, mode === 'real' ? 240_000 : 180_000);
+// 硬超时:fake 4 分钟;real 只读 5 分钟;real 含真实任务 8 分钟(模型回复可慢)
+const realTask = process.argv.includes('--real-task');
+setTimeout(() => { try { child.kill(); } catch {} }, mode === 'real' ? (realTask ? 480_000 : 300_000) : 240_000);

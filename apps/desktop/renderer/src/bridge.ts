@@ -97,6 +97,7 @@ export interface HmhBridge {
   sendTask(text: string, sessionId: string, mode?: 'ask' | 'auto' | 'yolo', attachments?: string[], images?: Array<{ name: string; dataUrl: string }>): Promise<{ ok: boolean; runId?: string; code?: string } | { error: string; code: string }>;
   pickFiles(title?: string): Promise<{ ok: boolean; paths?: string[]; canceled?: boolean } | { error: string; code: string }>;
   pickDirectory(title?: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
+  modelSet(name: string): Promise<{ ok: boolean; model?: string } | { error: string; code: string }>;
   fsSearch(q: string): Promise<{ results: Array<{ rel: string; path: string }> } | { error: string; code: string }>;
   approve(granted: boolean, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   interrupt(sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
@@ -104,7 +105,7 @@ export interface HmhBridge {
   exportSession(id: string, title?: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
   approvalGet(): Promise<{ settings?: { approval?: string } } | { error: string; code: string }>;
   approvalSet(mode: 'ask' | 'auto'): Promise<{ ok: boolean } | { error: string; code: string }>;
-  providers(): Promise<{ providersDetail?: ProviderDetailDto[]; model?: string } | { error: string; code: string }>;
+  providers(): Promise<{ providersDetail?: ProviderDetailDto[]; model?: string; chatProvider?: string } | { error: string; code: string }>;
   providerSave(provider: { name: string; baseUrl: string; model: string; apiKey?: string }): Promise<{ ok: boolean } | { error: string; code: string }>;
   workspaces(): Promise<{ current: string; items: WorkspaceDto[] } | { error: string; code: string }>;
   workspaceUse(id: string): Promise<{ ok: boolean } | { error: string; code: string }>;

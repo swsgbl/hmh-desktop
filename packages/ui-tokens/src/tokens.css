@@ -10,6 +10,7 @@
   --hmh-accent-hover: #4a90f9;
   --hmh-danger: #f85149;
   --hmh-warn: #d29922;
+  --hmh-user-turn-bg: #1c2a3d;
 
   --hmh-status-planning: #a371f7;
   --hmh-status-running: #2f81f7;
@@ -25,4 +26,28 @@
   --hmh-radius-lg: 14px;
   --hmh-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   --hmh-font-mono: 'Cascadia Code', Consolas, 'JetBrains Mono', monospace;
+}
+
+/* 亮色主题(2026-10-11 对标 DSH:设置-外观-浅色;<html data-theme="light">) */
+:root[data-theme='light'] {
+  --hmh-bg: #f6f7f9;
+  --hmh-bg-raised: #ffffff;
+  --hmh-bg-panel: #eef0f3;
+  --hmh-border: #d5d8de;
+  --hmh-text: #1f2328;
+  --hmh-text-dim: #5b616b;
+  --hmh-accent: #0969da;
+  --hmh-accent-hover: #218bff;
+  --hmh-danger: #cf222e;
+  --hmh-warn: #9a6700;
+  --hmh-user-turn-bg: #dbeafe;
+
+  --hmh-status-planning: #8250df;
+  --hmh-status-running: #0969da;
+  --hmh-status-waiting: #9a6700;
+  --hmh-status-verifying: #0969da;
+  --hmh-status-recovering: #bc4c00;
+  --hmh-status-completed: #1a7f37;
+  --hmh-status-failed: #cf222e;
+  --hmh-status-cancelled: #5b616b;
 }

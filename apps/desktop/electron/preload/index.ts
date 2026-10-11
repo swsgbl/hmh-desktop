@@ -41,6 +41,9 @@ const bridge = {
   pickDirectory(title?: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:pick-directory', title);
   },
+  modelSet(name: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:model-set', name);
+  },
   fsSearch(q: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:fs-search', q);
   },

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventEnvelope, RunStatus } from '@hmh-desktop/contracts';
 import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type ProviderDetailDto, type SessionPreviewDto, type WorkspaceDto } from './bridge.ts';
 import { useLocale } from './i18n.ts';
+import { useTheme, type Theme } from './theme.ts';
 
 interface SessionRow {
   id: string;
@@ -34,6 +35,7 @@ type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs';
 
 export function App(): React.ReactElement {
   const { locale, L, setLocale } = useLocale();
+  const { theme, setTheme } = useTheme();
   const [state, setState] = useState<BridgeState | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [activeSession, setActiveSession] = useState<string>('');
@@ -67,6 +69,8 @@ export function App(): React.ReactElement {
   // Provider 设置(03 §七)
   const [providers, setProviders] = useState<ProviderDetailDto[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
+  const [chatProvider, setChatProvider] = useState<string>('');
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [providerForm, setProviderForm] = useState({ name: '', baseUrl: '', model: '', apiKey: '' });
   const [providerHint, setProviderHint] = useState('');
   // 会话搜索(03 §六)
@@ -284,7 +288,21 @@ export function App(): React.ReactElement {
     const r = await bridge.providers();
     if ('providersDetail' in r && Array.isArray(r.providersDetail)) setProviders(r.providersDetail);
     if ('model' in r && typeof r.model === 'string') setCurrentModel(r.model);
+    if ('chatProvider' in r && typeof r.chatProvider === 'string') setChatProvider(r.chatProvider);
   }, []);
+
+  /** 模型切换(runtime POST /api/model:切 chat 路由,config 即时生效)。 */
+  const switchModel = useCallback(async (name: string): Promise<void> => {
+    if (bridge === undefined) return;
+    setModelMenuOpen(false);
+    const r = await bridge.modelSet(name);
+    if ('ok' in r && r.ok === true) {
+      void refreshProviders();
+    } else if ('error' in r) {
+      setExportHint(L.topbar.modelSwitchFailed(r.error));
+      setTimeout(() => setExportHint(''), 4_000);
+    }
+  }, [refreshProviders, L]);
 
   const saveProvider = useCallback(async () => {
     if (bridge === undefined) return;
@@ -687,6 +705,16 @@ export function App(): React.ReactElement {
             <div className="settings-note">{L.settings.shareNote}</div>
             <div className="settings-section">{L.settings.prefsSection}</div>
             <div className="settings-row">
+              <span>{L.settings.appearance}</span>
+              <div className="seg">
+                {(['system', 'light', 'dark'] as Theme[]).map((t) => (
+                  <button key={t} className={theme === t ? 'on' : ''} onClick={() => setTheme(t)} aria-pressed={theme === t}>
+                    {t === 'system' ? L.settings.themeSystem : t === 'light' ? L.settings.themeLight : L.settings.themeDark}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="settings-row">
               <span>{L.settings.language}</span>
               <div className="seg">
                 <button className={locale === 'zh' ? 'on' : ''} onClick={() => setLocale('zh')} aria-pressed={locale === 'zh'}>中文</button>
@@ -826,7 +854,38 @@ export function App(): React.ReactElement {
           {workspaces !== null && (
             <span className="topbar-ws" title={L.topbar.workspaceTitle}>{workspaces.items.find((w) => w.id === workspaces.current)?.name ?? L.dock.none}</span>
           )}
-          {currentModel !== '' && <span className="topbar-model" title={L.topbar.modelTitle}>{currentModel}</span>}
+          {currentModel !== '' && (
+            <span className="model-picker-anchor">
+              <button
+                className="topbar-model as-button"
+                title={L.topbar.modelMenuTitle}
+                aria-label={L.topbar.modelMenuAria}
+                aria-expanded={modelMenuOpen}
+                onClick={() => setModelMenuOpen((v) => !v)}
+                disabled={providers.length < 2}
+              >{currentModel} ▾</button>
+              {modelMenuOpen && (
+                <>
+                  <div className="ws-menu-backdrop" onClick={() => setModelMenuOpen(false)} aria-hidden="true" />
+                  <div className="ws-menu model-menu" role="menu" aria-label={L.topbar.modelMenuAria}>
+                    {providers.map((p) => (
+                      <button
+                        key={p.name}
+                        role="menuitem"
+                        className={`ws-menu-item${p.name === chatProvider ? ' current' : ''}`}
+                        onClick={() => void switchModel(p.name)}
+                        title={p.baseUrl}
+                      >
+                        <span className="ws-menu-name">{p.model}</span>
+                        <span className="ws-menu-path">{p.name}{p.hasKey ? '' : ' · no key'}</span>
+                        {p.name === chatProvider && <span className="ws-menu-check">✓ {L.topbar.modelCurrent}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </span>
+          )}
           <span className="spacer" />
           {state?.mode === 'fake' && (
             <button className="guide-pill" title={L.topbar.demoBadgeTitle} onClick={() => setRuntimeDismissed(false)}>{L.topbar.demoBadge}</button>

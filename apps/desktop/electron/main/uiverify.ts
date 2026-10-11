@@ -26,7 +26,8 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       const [ok, detail] = await fn();
       results.push([name, ok, detail]);
     } catch (err) {
-      results.push([name, false, String(err).slice(0, 160)]);
+      const detail = err instanceof Error && err.stack !== undefined ? err.stack : String(err);
+      results.push([name, false, detail.slice(0, 300)]);
     }
     const last = results[results.length - 1]!;
     console.log(`UIVERIFY ${last[1] ? 'PASS' : 'FAIL'} | ${last[0]} | ${last[2]}`);
@@ -37,7 +38,7 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
     for (;;) {
       const r = (await js(`(function(){ try { return JSON.stringify((function(){ ${predicateCode} })()); } catch(e){ return JSON.stringify({ok:false, detail:String(e).slice(0,120)}); } })()`)) as string;
       let parsed: { ok?: boolean; detail?: string };
-      try { parsed = JSON.parse(r) as { ok?: boolean; detail?: string }; } catch { parsed = { ok: false, detail: r.slice(0, 120) }; }
+      try { parsed = JSON.parse(r) as { ok?: boolean; detail?: string }; } catch { parsed = { ok: false, detail: String(r).slice(0, 120) }; }
       if (parsed.ok === true) return [true, String(parsed.detail ?? '')];
       if (Date.now() - started > timeoutMs) return [false, `${label}: ${String(parsed.detail ?? 'timeout')}`];
       await sleep(250);
@@ -261,6 +262,42 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return [closed[0], `${w[1]}; ${closed[1]}`];
     });
 
+    /* ========== fake:模型选择器(顶栏切换 chat 路由) ========== */
+    await step('模型选择器:顶栏菜单列出 providers 并可切换', async () => {
+      const w = await waitFor('model button', `var b=document.querySelector('.topbar-model.as-button');
+        return {ok: !!b && b.disabled === false, detail: b ? b.textContent : 'none'};`, 6_000);
+      if (!w[0]) return w;
+      await js(`(function(){ var b=document.querySelector('.topbar-model.as-button'); if(b) b.click(); })()`);
+      const m = await waitFor('model menu', `var m=document.querySelector('.model-menu');
+        var items = m ? m.querySelectorAll('.ws-menu-item').length : 0;
+        var cur = m ? m.querySelectorAll('.ws-menu-item.current').length : 0;
+        return {ok: items >= 2 && cur >= 1, detail: 'items='+items+' current='+cur};`, 5_000);
+      if (!m[0]) return m;
+      await shot('model-menu');
+      // 切到第二个 provider(fake: demo-vision/fake-m-vision)
+      await js(`(function(){ var its=[].slice.call(document.querySelectorAll('.model-menu .ws-menu-item')); var it=its[its.length-1]; if(it) it.click(); })()`);
+      return waitFor('model switched', `var b=document.querySelector('.topbar-model.as-button');
+        return {ok: !!b && b.textContent.indexOf('fake-m-vision') >= 0, detail: 'badge='+(b?b.textContent:'none')};`, 6_000);
+    });
+
+    /* ========== fake:主题(浅色生效→恢复深色) ========== */
+    await step('主题:设置切浅色生效,恢复深色', async () => {
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'p', ctrlKey:true, shiftKey:true, bubbles:true}))`);
+      const w = await waitFor('settings open', `var s=document.querySelector('.cmdk.settings');
+        return {ok: !!s, detail: s ? 'open' : 'not open'};`, 5_000);
+      if (!w[0]) return w;
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.cmdk.settings .seg button')).find(function(x){return x.textContent.trim()==='浅色'||x.textContent.trim()==='Light';}); if(b) b.click(); })()`);
+      const light = await waitFor('light theme', `var dt=document.documentElement.dataset.theme;
+        var bg = getComputedStyle(document.body).backgroundColor;
+        var m = /\\d+/g; var nums=(bg.match(m)||['0','0','0']).map(Number);
+        return {ok: dt==='light' && nums[0]>200 && nums[1]>200 && nums[2]>200, detail: 'theme='+dt+' bg='+bg};`, 5_000);
+      await shot('light-theme');
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.cmdk.settings .seg button')).find(function(x){return x.textContent.trim()==='深色'||x.textContent.trim()==='Dark';}); if(b) b.click(); })()`);
+      const dark = await waitFor('dark back', `return {ok: document.documentElement.dataset.theme==='dark', detail: 'theme='+document.documentElement.dataset.theme};`, 5_000);
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))`);
+      return [light[0] && dark[0], `light: ${light[1]}; dark: ${dark[1]}`];
+    });
+
     /* ========== fake:顶栏 中/EN 快捷切换(可发现性) ========== */
     await step('顶栏快捷切换:中/EN 一键切换', async () => {
       const w = await waitFor('lang seg', `var s=document.querySelector('.lang-seg');
@@ -387,6 +424,31 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       const p = JSON.parse(r) as { up: boolean; lang: boolean; browse: boolean };
       return [p.up && p.lang && p.browse, `📎=${p.up} 中/EN=${p.lang} 📁=${p.browse}; ${ws[1]}`];
     });
+    /* ========== real:真实任务端到端首验(发短任务→模型回复) ==========
+       用户 glm-5.3 已配置;提示词约束直接回复。若 agent 请求审批,轮询里
+       自动点批准(最多见卡即点,幂等)。超时 150s。 */
+    if (process.env.HMH_DESKTOP_UIVERIFY_REAL_TASK === '1') {
+      await step('真实任务:发送→模型回复(端到端首验)', async () => {
+        await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'n', ctrlKey:true, bubbles:true}))`);
+        await sleep(400);
+        await typeInto('.composer textarea', '请只回复两个字:收到(本次验收任务,不要使用任何工具,直接回复)');
+        await sleep(200);
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.composer button')).find(function(x){return x.textContent.trim()==='发送';}); if(b) b.click(); })()`);
+        const sent = await waitFor('user turn', `var t=document.querySelector('.turn.user');
+          var s = (t && t.textContent) ? String(t.textContent) : '';
+          return {ok: s.indexOf('收到')>=0 || s.indexOf('验收任务')>=0, detail: s.slice(0,30) || 'none'};`, 10_000);
+        if (!sent[0]) return sent;
+        const reply = await waitFor('assistant reply', `
+          var ap = document.querySelector('.approval-card button');
+          if (ap && ap.textContent.trim().indexOf('批准')>=0) ap.click();
+          var ts=[].slice.call(document.querySelectorAll('.turn')).filter(function(x){ return x.className.indexOf('user')<0 && x.className.indexOf('approval')<0 && x.className.indexOf('system')<0 && x.textContent.trim().length>0 && x.textContent.indexOf('回合')<0; });
+          var sum = document.querySelector('.turn-sum');
+          return {ok: ts.length>=1 && !!sum, detail: 'assistant='+ts.length+' sum='+(sum?sum.textContent:'none')+' first='+(ts[0]?ts[0].textContent.replace(/\\s+/g,' ').slice(0,40):'none')};
+        `, 150_000);
+        await shot('real-task');
+        return reply;
+      });
+    }
     await step('工作区:左栏工作区栏可见(真实工作区名)', async () => {
       return waitFor('workspace bar', `var b=document.querySelector('.workspace-bar');
         var n = b ? (b.querySelector('.ws-bar-name')||{}).textContent : '';

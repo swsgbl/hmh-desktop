@@ -70,7 +70,9 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
   };
   const fakeProviders = new Map<string, { baseUrl: string; model: string; apiKey: string }>([
     ['demo', { baseUrl: 'http://127.0.0.1:9/v1', model: 'fake-m', apiKey: 'sk-demo-1234' }],
+    ['demo-vision', { baseUrl: 'http://127.0.0.1:9/v1', model: 'fake-m-vision', apiKey: 'sk-demo-5678' }],
   ]);
+  let fakeChatProvider = 'demo';
 
   const emit = (sessionId: string, runId: string, kind: EventKind, payload: Record<string, unknown>): number => {
     const key = `${sessionId}\0${runId}`;
@@ -212,7 +214,8 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
       // providersDetail:与 hmharness 同形——key 只出 hasKey/末四位,永不明文
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
-        daemonVersion: 'fake-0.0.0', desktop: true, model: 'fake-model', locale: 'zh',
+        daemonVersion: 'fake-0.0.0', desktop: true, model: fakeProviders.get(fakeChatProvider)?.model ?? 'fake-model',
+        chatProvider: fakeChatProvider, locale: 'zh',
         busySessions: [...sessions.keys()].slice(0, 2),
         approvalPending: pending !== null,
         settings: { approval: 'ask' },
@@ -238,6 +241,22 @@ export async function startFakeHost(opts: { token: string; quiet?: boolean }): P
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true }));
       setTimeout(() => process.exit(1), 50);
+      return;
+    }
+    if (req.method === 'POST' && url.pathname === '/api/model') {
+      // 模型切换(与 hmharness /api/model 同形:切 chat 路由)
+      void (async () => {
+        const body = JSON.parse((await readBody()) || '{}') as { name?: unknown };
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        if (!fakeProviders.has(name)) {
+          res.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(desktopError('SCHEMA_MISMATCH', 'provider not found', { retryable: false })));
+          return;
+        }
+        fakeChatProvider = name;
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, model: fakeProviders.get(name)?.model }));
+      })();
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/task') {
