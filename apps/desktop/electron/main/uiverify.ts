@@ -262,6 +262,27 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return [closed[0], `${w[1]}; ${closed[1]}`];
     });
 
+    /* ========== fake:会话按工作区分组 + 展开/收起 ========== */
+    await step('会话分组:组头出现(工作区名+数量)', async () => {
+      return waitFor('group head', `var h=document.querySelector('.ws-group-head');
+        var n = h ? (h.querySelector('.ws-group-name')||{}).textContent : '';
+        var c = h ? (h.querySelector('.ws-group-count')||{}).textContent : '';
+        return {ok: !!h && n.length > 0 && c.length > 0, detail: 'name='+n+' count='+c};`, 8_000);
+    });
+    await step('会话分组:点击组头收起,再点展开恢复', async () => {
+      const before = (await js(`document.querySelectorAll('.session-item').length`)) as number;
+      if (before === 0) return [false, 'no sessions to group'];
+      await js(`(function(){ var h=document.querySelector('.ws-group-head'); if(h) h.click(); })()`);
+      const collapsed = await waitFor('collapsed', `var g=document.querySelector('.ws-group');
+        var hidden = document.querySelectorAll('.session-item').length < ${before};
+        return {ok: hidden, detail: 'items='+document.querySelectorAll('.session-item').length+' before=${before}'};`, 5_000);
+      await shot('ws-group-collapsed');
+      await js(`(function(){ var h=document.querySelector('.ws-group-head'); if(h) h.click(); })()`);
+      const expanded = await waitFor('expanded back', `var n=document.querySelectorAll('.session-item').length;
+        return {ok: n >= ${before}, detail: 'items='+n};`, 5_000);
+      return [collapsed[0] && expanded[0], `collapse: ${collapsed[1]}; expand: ${expanded[1]}`];
+    });
+
     /* ========== fake:模型选择器(顶栏切换 chat 路由) ========== */
     await step('模型选择器:顶栏菜单列出 providers 并可切换', async () => {
       const w = await waitFor('model button', `var b=document.querySelector('.topbar-model.as-button');
@@ -449,6 +470,11 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         return reply;
       });
     }
+    await step('会话分组:左栏按工作区分组(组头可见)', async () => {
+      return waitFor('group head', `var h=document.querySelector('.ws-group-head');
+        var n = h ? (h.querySelector('.ws-group-name')||{}).textContent : '';
+        return {ok: !!h && n.length > 0, detail: 'name='+n};`, 15_000);
+    });
     await step('工作区:左栏工作区栏可见(真实工作区名)', async () => {
       return waitFor('workspace bar', `var b=document.querySelector('.workspace-bar');
         var n = b ? (b.querySelector('.ws-bar-name')||{}).textContent : '';

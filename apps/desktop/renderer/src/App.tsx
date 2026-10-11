@@ -90,6 +90,18 @@ export function App(): React.ReactElement {
   const [pinned, setPinned] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(window.localStorage.getItem('hmh.pinned') ?? '[]') as string[]); } catch { return new Set(); }
   });
+  // 会话分组收起状态(按 cwd 键,本地偏好)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(window.localStorage.getItem('hmh.collapsedWs') ?? '[]') as string[]); } catch { return new Set(); }
+  });
+  const toggleGroup = useCallback((key: string): void => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { window.localStorage.setItem('hmh.collapsedWs', JSON.stringify([...next])); } catch { /* 私有模式 */ }
+      return next;
+    });
+  }, []);
   const streamRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef('');
   activeRef.current = activeSession;
@@ -369,6 +381,17 @@ export function App(): React.ReactElement {
     setItems([]);
     setStreaming('');
     setRunStatus(null);
+    // 打开时自动展开其所属工作区组(收起状态里删掉该 cwd)
+    const cwd = sessions.find((s) => s.id === id)?.cwd ?? '';
+    if (cwd !== '') {
+      setCollapsedGroups((prev) => {
+        if (!prev.has(cwd)) return prev;
+        const next = new Set(prev);
+        next.delete(cwd);
+        try { window.localStorage.setItem('hmh.collapsedWs', JSON.stringify([...next])); } catch { /* 私有模式 */ }
+        return next;
+      });
+    }
     if (bridge === undefined) return;
     const r = await bridge.sessionPreview(id);
     if ('messages' in r && Array.isArray(r.messages)) {
@@ -379,7 +402,7 @@ export function App(): React.ReactElement {
       }
       setItems(loaded.slice(-40));
     }
-  }, []);
+  }, [sessions]);
 
   const newSession = useCallback(() => {
     const id = `web-${Date.now().toString(36)}`;
@@ -618,6 +641,33 @@ export function App(): React.ReactElement {
 
   const busy = runStatus === 'running' || runStatus === 'waiting_approval' || runStatus === 'planning' || runStatus === 'verifying';
   const num = (v: unknown): string => (typeof v === 'number' && Number.isFinite(v) ? String(v) : L.dock.noData);
+
+  /** 会话按工作区分组(2026-10-11:组头可展开/收起)。当前工作区组置顶,
+   *  其余按组内最新活动排序;组内收藏优先。 */
+  const sessionGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = sessions.filter((s) =>
+      q === '' || s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.task.toLowerCase().includes(q));
+    const map = new Map<string, SessionRow[]>();
+    for (const s of filtered) {
+      const key = s.cwd || '';
+      const arr = map.get(key);
+      if (arr === undefined) map.set(key, [s]); else arr.push(s);
+    }
+    const curWsPath = workspaces?.items.find((w) => w.id === workspaces.current)?.path ?? '';
+    const list = [...map.entries()].map(([cwd, items]) => ({
+      cwd,
+      name: cwd === '' ? L.sidebar.noWs : (cwd.split(/[\\/]/).filter(Boolean).pop() ?? cwd),
+      items: [...items].sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id))),
+    }));
+    list.sort((a, b) => {
+      const aCur = a.cwd === curWsPath ? 1 : 0;
+      const bCur = b.cwd === curWsPath ? 1 : 0;
+      if (aCur !== bCur) return bCur - aCur;
+      return (b.items[0]?.updatedAt ?? '').localeCompare(a.items[0]?.updatedAt ?? '');
+    });
+    return list;
+  }, [sessions, search, pinned, workspaces, L]);
   const statusLabel = (s: string): string => {
     switch (s) {
       case 'planning': return L.status.planning;
@@ -816,29 +866,41 @@ export function App(): React.ReactElement {
           </>
         )}
         <div className="session-list" role="list">
-          {sessions
-            .filter((s) => {
-              if (search.trim() === '') return true;
-              const q = search.trim().toLowerCase();
-              return s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.task.toLowerCase().includes(q);
-            })
-            .sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)))
-            .map((s) => (
-            <div key={s.id} role="listitem" className={`session-row${s.id === activeSession ? ' active' : ''}`}>
-              <button
-                className="session-item"
-                onClick={() => void openSession(s.id)}
-                aria-label={L.sidebar.openAria(s.title !== '' ? s.title : s.id)}
-              >
-                <span className="session-title">{pinned.has(s.id) ? L.sidebar.pinnedFirst : ''}{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
-                <span className="session-time" title={s.cwd !== '' ? L.sidebar.sessionIn(s.cwd) : ''}>{s.updatedAt.slice(0, 16).replace('T', ' ')}{s.cwd !== '' ? ` · 📁 ${s.cwd.split(/[\\/]/).filter(Boolean).pop() ?? ''}` : ''}</span>
-              </button>
-              <button className={`session-export${pinned.has(s.id) ? ' pinned' : ''}`} aria-label={pinned.has(s.id) ? L.sidebar.unpinAria(s.id) : L.sidebar.pinAria(s.id)} title={L.sidebar.pinTitle} onClick={() => togglePin(s.id)}>{pinned.has(s.id) ? '★' : '☆'}</button>
-              <button className="session-export" aria-label={L.sidebar.exportAria(s.id)} title={L.sidebar.exportTitle} onClick={() => void exportSession(s.id)}>⤓</button>
-              <button className="session-export" aria-label={L.sidebar.archiveAria(s.id)} title={L.sidebar.archiveTitle} onClick={() => void sessionOp(s.id, 'archive')}>🗄</button>
-              <button className="session-export danger" aria-label={L.sidebar.deleteAria(s.id)} title={L.sidebar.deleteTitle} onClick={() => void sessionOp(s.id, 'delete')}>🗑</button>
-            </div>
-          ))}
+          {sessionGroups.map((g) => {
+            // 搜索时强制展开(过滤结果必须可见);打开会话时该组已自动展开
+            const collapsed = collapsedGroups.has(g.cwd) && search.trim() === '';
+            return (
+              <div key={g.cwd || '(none)'} className="ws-group">
+                <button
+                  className="ws-group-head"
+                  aria-expanded={!collapsed}
+                  aria-label={L.sidebar.wsGroupAria(g.name, g.items.length)}
+                  title={g.cwd !== '' ? L.sidebar.sessionIn(g.cwd) : ''}
+                  onClick={() => toggleGroup(g.cwd)}
+                >
+                  <span className={`ws-group-caret${collapsed ? '' : ' open'}`} aria-hidden="true">▸</span>
+                  <span className="ws-group-name">📁 {g.name}</span>
+                  <span className="ws-group-count">{L.sidebar.sessionCountUnit(g.items.length)}</span>
+                </button>
+                {!collapsed && g.items.map((s) => (
+                  <div key={s.id} role="listitem" className={`session-row${s.id === activeSession ? ' active' : ''}`}>
+                    <button
+                      className="session-item"
+                      onClick={() => void openSession(s.id)}
+                      aria-label={L.sidebar.openAria(s.title !== '' ? s.title : s.id)}
+                    >
+                      <span className="session-title">{pinned.has(s.id) ? L.sidebar.pinnedFirst : ''}{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
+                      <span className="session-time">{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
+                    </button>
+                    <button className={`session-export${pinned.has(s.id) ? ' pinned' : ''}`} aria-label={pinned.has(s.id) ? L.sidebar.unpinAria(s.id) : L.sidebar.pinAria(s.id)} title={L.sidebar.pinTitle} onClick={() => togglePin(s.id)}>{pinned.has(s.id) ? '★' : '☆'}</button>
+                    <button className="session-export" aria-label={L.sidebar.exportAria(s.id)} title={L.sidebar.exportTitle} onClick={() => void exportSession(s.id)}>⤓</button>
+                    <button className="session-export" aria-label={L.sidebar.archiveAria(s.id)} title={L.sidebar.archiveTitle} onClick={() => void sessionOp(s.id, 'archive')}>🗄</button>
+                    <button className="session-export danger" aria-label={L.sidebar.deleteAria(s.id)} title={L.sidebar.deleteTitle} onClick={() => void sessionOp(s.id, 'delete')}>🗑</button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
           {sessions.length === 0 && <div className="empty-hint">{L.sidebar.empty}</div>}
           {cursor !== null && (
             <button className="btn ghost sm more" onClick={() => void refreshSessions(cursor)}>{L.sidebar.loadMore}</button>
