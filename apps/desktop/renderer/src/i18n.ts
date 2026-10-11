@@ -43,6 +43,12 @@ const zh = {
     noWs: '未记录工作区',
     wsGroupAria: (name: string, n: number): string => `${name}(${n} 个会话),点击展开或收起`,
     sessionCountUnit: (n: number): string => `${n} 个会话`,
+    filterAll: '全部',
+    filterRunning: '运行中',
+    filterDone: '已完成',
+    filterFailed: '失败',
+    filterAria: '按状态过滤会话',
+    runningTitle: '任务运行中',
     pinnedFirst: '★ ',
     pinAria: (id: string): string => `收藏置顶 ${id}`,
     unpinAria: (id: string): string => `取消收藏 ${id}`,
@@ -79,6 +85,8 @@ const zh = {
     modelMenuTitle: '切换模型',
     modelCurrent: '当前',
     modelSwitchFailed: (e: string): string => `切换模型失败:${e}`,
+    collapseSidebar: '收起侧栏',
+    expandSidebar: '展开侧栏',
   },
   stream: {
     emptyNoSession: '新建一个会话,或从左侧选择',
@@ -232,6 +240,19 @@ const zh = {
   runtimeDialog: { title: '选择 hmharness 的 desktop-host 入口' },
   filesDialog: { title: '选择要附加的文件(可多选)' },
   dirDialog: { title: '选择文件夹' },
+  shortcuts: {
+    title: '快捷键',
+    items: [
+      { k: 'Ctrl + K', d: '命令面板' },
+      { k: 'Ctrl + N', d: '新建会话' },
+      { k: 'Ctrl + Shift + P', d: '设置' },
+      { k: 'Ctrl + /', d: '快捷键帮助' },
+      { k: 'Enter', d: '发送(或注入运行中任务)' },
+      { k: 'Shift + Enter', d: '换行' },
+      { k: 'Ctrl + Enter', d: '换行模式下的发送' },
+      { k: 'Esc', d: '关闭弹层' },
+    ],
+  },
 };
 
 const en: typeof zh = {
@@ -268,6 +289,12 @@ const en: typeof zh = {
     noWs: 'No workspace recorded',
     wsGroupAria: (name: string, n: number): string => `${name} (${n} sessions), click to expand or collapse`,
     sessionCountUnit: (n: number): string => `${n} sessions`,
+    filterAll: 'All',
+    filterRunning: 'Running',
+    filterDone: 'Done',
+    filterFailed: 'Failed',
+    filterAria: 'Filter sessions by status',
+    runningTitle: 'Task running',
     pinnedFirst: '★ ',
     pinAria: (id: string): string => `Pin session ${id}`,
     unpinAria: (id: string): string => `Unpin session ${id}`,
@@ -304,6 +331,8 @@ const en: typeof zh = {
     modelMenuTitle: 'Switch model',
     modelCurrent: 'current',
     modelSwitchFailed: (e: string): string => `Failed to switch model: ${e}`,
+    collapseSidebar: 'Collapse sidebar',
+    expandSidebar: 'Expand sidebar',
   },
   stream: {
     emptyNoSession: 'Create a session, or pick one from the left',
@@ -457,6 +486,19 @@ const en: typeof zh = {
   runtimeDialog: { title: 'Choose the hmharness desktop-host entry' },
   filesDialog: { title: 'Choose files to attach (multi-select)' },
   dirDialog: { title: 'Choose a folder' },
+  shortcuts: {
+    title: 'Keyboard shortcuts',
+    items: [
+      { k: 'Ctrl + K', d: 'Command palette' },
+      { k: 'Ctrl + N', d: 'New session' },
+      { k: 'Ctrl + Shift + P', d: 'Settings' },
+      { k: 'Ctrl + /', d: 'This shortcut help' },
+      { k: 'Enter', d: 'Send (or inject into the running task)' },
+      { k: 'Shift + Enter', d: 'New line' },
+      { k: 'Ctrl + Enter', d: 'Send in newline mode' },
+      { k: 'Esc', d: 'Close overlays' },
+    ],
+  },
 };
 
 export type Strings = typeof zh;

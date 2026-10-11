@@ -68,6 +68,28 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .ws-group-caret.open { transform: rotate(90deg); }
 .ws-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-group-count { font-size: 11px; opacity: 0.7; flex-shrink: 0; }
+
+/* 会话运行中状态点(03 §六:左侧导航运行中状态点) */
+.session-running-dot {
+  display: inline-block; width: 7px; height: 7px; margin-right: 5px;
+  border-radius: 50%; background: var(--hmh-status-running);
+  vertical-align: baseline; animation: hmh-pulse 1.6s ease-in-out infinite;
+}
+@keyframes hmh-pulse { 50% { opacity: 0.35; } }
+
+/* 侧栏收缩 + 状态过滤 + 快捷键面板 */
+.app-shell.no-sidebar { grid-template-columns: 0 1fr auto; }
+.app-shell.no-sidebar .sidebar { display: none; }
+.icon-btn { padding: 4px 8px; flex-shrink: 0; }
+.status-filter {
+  margin-top: 6px; padding: 6px 8px; font: 13px var(--hmh-font-ui);
+  background: var(--hmh-bg-panel); color: var(--hmh-text);
+  border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm); outline: none;
+}
+.status-filter:focus { border-color: var(--hmh-accent); }
+.shortcut-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; gap: 16px; }
+.shortcut-desc { font-size: 14px; }
+.shortcut-key { font: 12px var(--hmh-font-mono); background: var(--hmh-bg-panel); border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm); padding: 3px 8px; color: var(--hmh-text-dim); }
 /* min-height:0:flex:1 子项默认 min-height:auto,超长会话列表会撑破容器而不是滚动 */
 .session-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
 .session-item {

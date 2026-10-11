@@ -16,6 +16,7 @@ interface SessionRow {
   id: string;
   title: string;
   task: string;
+  outcome: string;
   turns: number;
   toolUses: number;
   updatedAt: string;
@@ -73,8 +74,15 @@ export function App(): React.ReactElement {
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [providerForm, setProviderForm] = useState({ name: '', baseUrl: '', model: '', apiKey: '' });
   const [providerHint, setProviderHint] = useState('');
-  // 会话搜索(03 §六)
+  // 会话搜索(03 §六)+ 状态过滤(全部/运行中/已完成/失败)
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'ok' | 'failed'>('all');
+  // 侧栏收缩(03 §六:左侧导航可收缩;本地偏好)+ 快捷键面板 + 运行中会话集合
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return window.localStorage.getItem('hmh.sidebarCollapsed') === '1'; } catch { return false; }
+  });
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [busySessions, setBusySessions] = useState<Set<string>>(new Set());
   // 工作区(03 §六)
   const [workspaces, setWorkspaces] = useState<{ current: string; items: WorkspaceDto[] } | null>(null);
   const [wsAddPath, setWsAddPath] = useState('');
@@ -215,7 +223,7 @@ export function App(): React.ReactElement {
     if (bridge === undefined) return;
     const r = await bridge.sessions();
     if ('sessions' in r && Array.isArray(r.sessions)) {
-      const mapped = r.sessions.map((s) => ({ id: s.id, title: s.title, task: s.task, turns: s.turns, toolUses: s.toolUses, updatedAt: s.updatedAt, cwd: s.cwd }));
+      const mapped = r.sessions.map((s) => ({ id: s.id, title: s.title, task: s.task, outcome: s.outcome, turns: s.turns, toolUses: s.toolUses, updatedAt: s.updatedAt, cwd: s.cwd }));
       setSessions((prev) => (cur === null ? mapped : [...prev, ...mapped.filter((m) => !prev.some((p) => p.id === m.id))]));
       setCursor('nextCursor' in r && typeof r.nextCursor === 'string' ? r.nextCursor : null);
     }
@@ -301,6 +309,7 @@ export function App(): React.ReactElement {
     if ('providersDetail' in r && Array.isArray(r.providersDetail)) setProviders(r.providersDetail);
     if ('model' in r && typeof r.model === 'string') setCurrentModel(r.model);
     if ('chatProvider' in r && typeof r.chatProvider === 'string') setChatProvider(r.chatProvider);
+    if ('busySessions' in r && Array.isArray(r.busySessions)) setBusySessions(new Set(r.busySessions));
   }, []);
 
   /** 模型切换(runtime POST /api/model:切 chat 路由,config 即时生效)。 */
@@ -406,7 +415,7 @@ export function App(): React.ReactElement {
 
   const newSession = useCallback(() => {
     const id = `web-${Date.now().toString(36)}`;
-    setSessions((prev) => [{ id, title: L.sidebar.newSessionTitle, task: '', turns: 0, toolUses: 0, updatedAt: new Date().toISOString(), cwd: workspaces?.items.find((w) => w.id === workspaces.current)?.path ?? '' }, ...prev]);
+    setSessions((prev) => [{ id, title: L.sidebar.newSessionTitle, task: '', outcome: '', turns: 0, toolUses: 0, updatedAt: new Date().toISOString(), cwd: workspaces?.items.find((w) => w.id === workspaces.current)?.path ?? '' }, ...prev]);
     setActiveSession(id);
     setItems([]);
     setStreaming('');
@@ -473,9 +482,13 @@ export function App(): React.ReactElement {
       } else if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         setSettingsOpen(true);
+      } else if (e.ctrlKey && e.key === '/') {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
       } else if (e.key === 'Escape') {
         setCmdOpen(false);
         setSettingsOpen(false);
+        setShortcutsOpen(false);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -643,11 +656,16 @@ export function App(): React.ReactElement {
   const num = (v: unknown): string => (typeof v === 'number' && Number.isFinite(v) ? String(v) : L.dock.noData);
 
   /** 会话按工作区分组(2026-10-11:组头可展开/收起)。当前工作区组置顶,
-   *  其余按组内最新活动排序;组内收藏优先。 */
+   *  其余按组内最新活动排序;组内收藏优先;支持文本搜索与状态过滤。 */
   const sessionGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = sessions.filter((s) =>
-      q === '' || s.id.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || s.task.toLowerCase().includes(q));
+    const filtered = sessions.filter((s) => {
+      if (q !== '' && !s.id.toLowerCase().includes(q) && !s.title.toLowerCase().includes(q) && !s.task.toLowerCase().includes(q)) return false;
+      if (statusFilter === 'running') return busySessions.has(s.id);
+      if (statusFilter === 'ok') return s.outcome === 'ok';
+      if (statusFilter === 'failed') return s.outcome === 'failed';
+      return true;
+    });
     const map = new Map<string, SessionRow[]>();
     for (const s of filtered) {
       const key = s.cwd || '';
@@ -667,7 +685,7 @@ export function App(): React.ReactElement {
       return (b.items[0]?.updatedAt ?? '').localeCompare(a.items[0]?.updatedAt ?? '');
     });
     return list;
-  }, [sessions, search, pinned, workspaces, L]);
+  }, [sessions, search, statusFilter, busySessions, pinned, workspaces, L]);
   const statusLabel = (s: string): string => {
     switch (s) {
       case 'planning': return L.status.planning;
@@ -698,7 +716,20 @@ export function App(): React.ReactElement {
   }, [state, hostState, hostInfo, L]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebarCollapsed ? ' no-sidebar' : ''}`}>
+      {shortcutsOpen && (
+        <div className="cmdk-overlay" role="dialog" aria-label={L.shortcuts.title} onClick={() => setShortcutsOpen(false)}>
+          <div className="cmdk" onClick={(e) => e.stopPropagation()}>
+            <div className="cmdk-head">{L.shortcuts.title}(Ctrl + /)</div>
+            {L.shortcuts.items.map((it) => (
+              <div key={it.k} className="shortcut-row">
+                <span className="shortcut-desc">{it.d}</span>
+                <kbd className="shortcut-key">{it.k}</kbd>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {state !== null && state.mode === 'fake' && hostState === 'ready' && !runtimeDismissed && (
         <div className="runtime-guide" role="dialog" aria-label={L.guide.dialogAria}>
           <div className="runtime-guide-card">
@@ -830,6 +861,17 @@ export function App(): React.ReactElement {
             onChange={(e) => setSearch(e.target.value)}
             aria-label={L.sidebar.searchPlaceholder}
           />
+          <select
+            className="status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'running' | 'ok' | 'failed')}
+            aria-label={L.sidebar.filterAria}
+          >
+            <option value="all">{L.sidebar.filterAll}</option>
+            <option value="running">{L.sidebar.filterRunning}</option>
+            <option value="ok">{L.sidebar.filterDone}</option>
+            <option value="failed">{L.sidebar.filterFailed}</option>
+          </select>
         </div>
         {/* 工作区管理栏(对标 DSH:切换/添加;runtime 语义=全局 cwd) */}
         <button
@@ -890,7 +932,7 @@ export function App(): React.ReactElement {
                       aria-label={L.sidebar.openAria(s.title !== '' ? s.title : s.id)}
                     >
                       <span className="session-title">{pinned.has(s.id) ? L.sidebar.pinnedFirst : ''}{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
-                      <span className="session-time">{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
+                      <span className="session-time">{busySessions.has(s.id) && <span className="session-running-dot" title={L.sidebar.runningTitle} aria-label={L.sidebar.runningTitle} />}{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
                     </button>
                     <button className={`session-export${pinned.has(s.id) ? ' pinned' : ''}`} aria-label={pinned.has(s.id) ? L.sidebar.unpinAria(s.id) : L.sidebar.pinAria(s.id)} title={L.sidebar.pinTitle} onClick={() => togglePin(s.id)}>{pinned.has(s.id) ? '★' : '☆'}</button>
                     <button className="session-export" aria-label={L.sidebar.exportAria(s.id)} title={L.sidebar.exportTitle} onClick={() => void exportSession(s.id)}>⤓</button>
@@ -911,6 +953,17 @@ export function App(): React.ReactElement {
 
       <main className="workspace" aria-label={L.nav.workspace}>
         <header className="topbar">
+          <button
+            className="btn ghost icon-btn"
+            aria-label={sidebarCollapsed ? L.topbar.expandSidebar : L.topbar.collapseSidebar}
+            title={sidebarCollapsed ? L.topbar.expandSidebar : L.topbar.collapseSidebar}
+            onClick={() => {
+              setSidebarCollapsed((v) => {
+                try { window.localStorage.setItem('hmh.sidebarCollapsed', v ? '0' : '1'); } catch { /* 私有模式 */ }
+                return !v;
+              });
+            }}
+          >{sidebarCollapsed ? '⇥' : '⇤'}</button>
           <span className={`host-dot ${hostBadge.connected ? 'on' : 'off'}`} aria-hidden="true" />
           <span className="host-label">{hostBadge.label}{hostBadge.detail !== '' ? ` · ${hostBadge.detail}` : ''}</span>
           {workspaces !== null && (

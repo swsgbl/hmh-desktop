@@ -12,7 +12,7 @@
  * 经 50ms 批量推给 renderer;sendTask/approve/interrupt/sessions 全部转发
  * 给 host —— fake 与真实 hmharness desktop-host 走同一条代码路径。
  */
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session, shell, Tray, Notification, Menu, nativeImage } from 'electron';
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { existsSync, realpathSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
@@ -86,6 +86,51 @@ if (!app.requestSingleInstanceLock()) {
           if (!w.isDestroyed()) w.webContents.send('bridge:event-batch', batch);
         }
       }, 50);
+    }
+    notifyEvent(env);
+  }
+
+  /* ---- 系统托盘 + 通知(03 号 §一:桌面产品需要系统托盘、通知) ----
+     审批等待必须打扰(用户必须决策);完成/失败仅在窗口失焦时提醒。 */
+  const TRAY_ICON_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAR0lEQVR4nGNgQAPSsor/8WF09URrxGsQqZoxDIEJ6Dd+B2N0hbjEMWwn1QCwIYPTAFyYfgYMfBiQZADFCYkqSZnizERJdgYAlL5rsDc2aTcAAAAASUVORK5CYII=';
+  let tray: Tray | null = null;
+  function focusMainWindow(): void {
+    const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+    if (win === undefined) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  }
+  function setupTray(): void {
+    if (tray !== null) return;
+    const icon = nativeImage.createFromDataURL(`data:image/png;base64,${TRAY_ICON_BASE64}`);
+    tray = new Tray(icon);
+    tray.setToolTip('HMH Desktop');
+    tray.on('click', focusMainWindow);
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: '显示主窗口', click: focusMainWindow },
+      { type: 'separator' },
+      { label: '退出', click: () => { app.quit(); } },
+    ]));
+  }
+  function notifyEvent(env: EventEnvelope): void {
+    // 验收/截图/渲染探针模式静默(不往用户桌面弹测试通知)
+    if (process.env.HMH_DESKTOP_UIVERIFY === '1' || process.env.HMH_DESKTOP_SNAPSHOT !== undefined || process.env.HMH_DESKTOP_RENDER_TEST === '1') return;
+    if (!Notification.isSupported()) return;
+    const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+    const focused = win?.isFocused() ?? false;
+    const mk = (title: string, body: string): void => {
+      const n = new Notification({ title, body, icon: nativeImage.createFromDataURL(`data:image/png;base64,${TRAY_ICON_BASE64}`) });
+      n.on('click', focusMainWindow);
+      n.show();
+    };
+    if (env.kind === 'approval.required') {
+      const p = env.payload as { tool?: string };
+      mk('HMH 需要审批', `${String(p.tool ?? '操作')} 等待你的批准`);
+    } else if (env.kind === 'run.completed' && !focused) {
+      mk('HMH 任务完成', `会话 ${env.sessionId} 的任务已完成`);
+    } else if (env.kind === 'run.failed' && !focused) {
+      mk('HMH 任务失败', `会话 ${env.sessionId} 的任务失败,点击查看`);
     }
   }
 
@@ -606,6 +651,9 @@ if (!app.requestSingleInstanceLock()) {
     if (process.env.HMH_DESKTOP_UIVERIFY === '1' && process.env.HMH_DESKTOP_UIVERIFY_MODE !== 'real') {
       process.env.HMH_DESKTOP_FAKE = '1';
     }
+    // Windows 通知归属(否则显示为 electron.exe)
+    app.setAppUserModelId('dev.hmh.desktop');
+    setupTray();
     // CSP(dev 与 prod 不同;prod 不允许任何远程源)
     const csp = isDev
       ? [

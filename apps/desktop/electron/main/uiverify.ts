@@ -283,6 +283,45 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return [collapsed[0] && expanded[0], `collapse: ${collapsed[1]}; expand: ${expanded[1]}`];
     });
 
+    /* ========== fake:快捷键帮助面板(Ctrl+/) ========== */
+    await step('快捷键帮助:Ctrl+/ 打开,Esc 关闭', async () => {
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'/', ctrlKey:true, bubbles:true}))`);
+      const w = await waitFor('shortcuts open', `var s=document.querySelector('.cmdk');
+        var rows = s ? s.querySelectorAll('.shortcut-row').length : 0;
+        return {ok: rows >= 5, detail: 'rows='+rows};`, 5_000);
+      if (!w[0]) return w;
+      await shot('shortcuts');
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))`);
+      return waitFor('shortcuts closed', `return {ok: !document.querySelector('.cmdk-overlay'), detail: 'closed'};`, 5_000);
+    });
+
+    /* ========== fake:侧栏收缩 + 状态过滤 ========== */
+    await step('侧栏收缩:⇤ 收起左栏,⇥ 展开恢复', async () => {
+      const w = await waitFor('toggle btn', `var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return x.textContent.trim()==='⇤'||x.textContent.trim()==='⇥';});
+        return {ok: !!b, detail: 'btn='+(b?b.textContent.trim():'none')};`, 5_000);
+      if (!w[0]) return w;
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return x.textContent.trim()==='⇤'||x.textContent.trim()==='⇥';}); if(b) b.click(); })()`);
+      const hidden = await waitFor('sidebar hidden', `var sb=document.querySelector('.sidebar');
+        var gone = !sb || getComputedStyle(sb).display === 'none';
+        return {ok: gone, detail: 'display='+(sb?getComputedStyle(sb).display:'none')};`, 5_000);
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return x.textContent.trim()==='⇤'||x.textContent.trim()==='⇥';}); if(b) b.click(); })()`);
+      const shown = await waitFor('sidebar back', `var sb=document.querySelector('.sidebar');
+        return {ok: !!sb && getComputedStyle(sb).display !== 'none', detail: 'display='+(sb?getComputedStyle(sb).display:'none')};`, 5_000);
+      return [hidden[0] && shown[0], `hide: ${hidden[1]}; show: ${shown[1]}`];
+    });
+    await step('状态过滤:下拉切换到"运行中"不崩溃并恢复', async () => {
+      const sel = await waitFor('filter select', `var s=document.querySelector('.status-filter');
+        return {ok: !!s && s.options.length >= 4, detail: 'options='+(s?s.options.length:0)};`, 5_000);
+      if (!sel[0]) return sel;
+      await js(`(function(){ var s=document.querySelector('.status-filter'); s.value='running'; s.dispatchEvent(new Event('change',{bubbles:true})); })()`);
+      await sleep(500);
+      const r1 = (await js(`document.querySelectorAll('.session-item').length`)) as number;
+      await js(`(function(){ var s=document.querySelector('.status-filter'); s.value='all'; s.dispatchEvent(new Event('change',{bubbles:true})); })()`);
+      await sleep(500);
+      const r2 = (await js(`document.querySelectorAll('.session-item').length`)) as number;
+      return [r2 >= r1 && r2 >= 1, `running=${r1} all=${r2}`];
+    });
+
     /* ========== fake:模型选择器(顶栏切换 chat 路由) ========== */
     await step('模型选择器:顶栏菜单列出 providers 并可切换', async () => {
       const w = await waitFor('model button', `var b=document.querySelector('.topbar-model.as-button');
