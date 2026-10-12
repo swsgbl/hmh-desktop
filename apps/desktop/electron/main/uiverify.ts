@@ -190,6 +190,14 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return w;
     });
 
+    /* ========== fake:Dock:远程页签(手机远程控制面板) ========== */
+    await step('Dock:远程页签(手机远程控制面板)', async () => {
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='远程'||x.textContent==='Remote';}); if(t) t.click(); })()`);
+      return waitFor('remote pane', `var p=document.querySelector('.dock-body');
+        var t = p ? p.textContent : '';
+        return {ok: !!p && (t.indexOf('手机远程控制')>=0 || t.indexOf('Phone remote')>=0), detail: t.replace(/\\s+/g,' ').slice(0,50)};`, 6_000);
+    });
+
     /* ========== fake:搜索过滤 ========== */
     await step('会话搜索:过滤生效', async () => {
       const before = (await js(`document.querySelectorAll('.session-item').length`)) as number;

@@ -16,8 +16,8 @@ import { app, BrowserWindow, dialog, ipcMain, session, shell, Tray, Notification
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { existsSync, realpathSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { homedir, networkInterfaces } from 'node:os';
+import { execFileSync, spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
@@ -132,6 +132,128 @@ if (!app.requestSingleInstanceLock()) {
     } else if (env.kind === 'run.failed' && !focused) {
       mk('HMH 任务失败', `会话 ${env.sessionId} 的任务失败,点击查看`);
     }
+  }
+
+  /* ---- 自定义中文应用菜单(替换 Electron 英文默认菜单) ----
+     视图态动作(主题/语言/侧栏/面板)经 menu:action 转发 renderer。 */
+  function buildAppMenu(): void {
+    const send = (a: string): void => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) w.webContents.send('menu:action', a);
+      }
+    };
+    const template: Array<Electron.MenuItemConstructorOptions> = [
+      {
+        label: '文件',
+        submenu: [
+          { label: '新建会话', accelerator: 'CmdOrCtrl+N', click: (): void => send('new-session') },
+          { type: 'separator' },
+          { label: '退出', role: 'quit' },
+        ],
+      },
+      {
+        label: '编辑',
+        submenu: [
+          { role: 'undo', label: '撤销' },
+          { role: 'redo', label: '重做' },
+          { type: 'separator' },
+          { role: 'cut', label: '剪切' },
+          { role: 'copy', label: '复制' },
+          { role: 'paste', label: '粘贴' },
+          { role: 'selectAll', label: '全选' },
+        ],
+      },
+      {
+        label: '查看',
+        submenu: [
+          { label: '重新加载界面', role: 'reload' },
+          ...(isDev ? [{ role: 'toggleDevTools' as const, label: '开发者工具' }] : []),
+          { type: 'separator' },
+          { label: '深色主题', click: (): void => send('theme-dark') },
+          { label: '浅色主题', click: (): void => send('theme-light') },
+          { label: '切换 中文 / English', click: (): void => send('toggle-locale') },
+          { label: '收起 / 展开侧栏', click: (): void => send('toggle-sidebar') },
+        ],
+      },
+      {
+        label: '窗口',
+        submenu: [
+          { role: 'minimize', label: '最小化' },
+          { role: 'zoom', label: '缩放' },
+          { type: 'separator' },
+          { role: 'close', label: '关闭' },
+        ],
+      },
+      {
+        label: '帮助',
+        submenu: [
+          { label: '快捷键', accelerator: 'CmdOrCtrl+/', click: (): void => send('shortcuts') },
+          {
+            label: '关于 HMH Desktop',
+            click: (): void => {
+              const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+              if (win !== undefined) {
+                void dialog.showMessageBox(win, {
+                  type: 'info',
+                  title: '关于 HMH Desktop',
+                  message: 'HMH Desktop',
+                  detail: `本地优先的 HMH Agent 图形工作台\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}\n模式: ${bridge.mode === 'real' ? '真实 hmharness' : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
+                });
+              }
+            },
+          },
+        ],
+      },
+    ];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  }
+
+  /* ---- 手机远程控制(03 号:Web 7788 是浏览器/远程/手机入口,ADR-005:
+     Desktop 不默认打开 LAN —— 这里是用户显式启动的入口) ---- */
+  const WEB_PORT = 7788;
+  async function probeWebRemote(): Promise<{ up: boolean; version: string }> {
+    try {
+      const r = await fetch(`http://127.0.0.1:${WEB_PORT}/api/state`, { signal: AbortSignal.timeout(1500) });
+      if (!r.ok) return { up: false, version: '' };
+      const d = (await r.json()) as { daemonVersion?: string };
+      return { up: true, version: String(d.daemonVersion ?? '') };
+    } catch { return { up: false, version: '' }; }
+  }
+  /** 手机可路由的 LAN IP(RFC1918,排除虚拟网卡)。 */
+  function lanIpOf(): string {
+    const VIRTUAL = /vmware|virtual|hyper-?v|vethernet|wsl|tailscale|loopback|bluetooth|vbox|docker|tap-|pseudo/i;
+    const isRfc1918 = (a: string): boolean => /^10\./.test(a) || /^192\.168\./.test(a) || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
+    let lanIp = '';
+    let fallback = '';
+    for (const [name, list] of Object.entries(networkInterfaces())) {
+      for (const n of list ?? []) {
+        if (n.family !== 'IPv4' || n.internal || !isRfc1918(n.address)) continue;
+        if (!VIRTUAL.test(name)) lanIp = lanIp || n.address;
+        else fallback = fallback || n.address;
+      }
+    }
+    return lanIp || fallback;
+  }
+  /** CLI 入口(runtime 自动发现的 repo;fake 模式无 repo 返回空)。 */
+  function cliEntryOf(): string {
+    if (runtimeEntry === null) return '';
+    try {
+      const p = join(repoRootOf(runtimeEntry), 'packages', 'cli', 'src', 'main.ts');
+      return existsSync(p) ? p : '';
+    } catch { return ''; }
+  }
+  function runCli(args: string[]): void {
+    const entry = cliEntryOf();
+    if (entry === '') return;
+    const repo = repoRootOf(runtimeEntry ?? entry);
+    const child = spawn(process.execPath, ['--import', 'tsx', entry, ...args], {
+      cwd: repo,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      env: { ELECTRON_RUN_AS_NODE: '1' },
+    });
+    child.unref();
   }
 
   function broadcastHostState(s: HostState, info: { restartCount: number; lastError?: string }): void {
@@ -373,6 +495,39 @@ if (!app.requestSingleInstanceLock()) {
       const n = typeof name === 'string' ? name.trim().slice(0, 80) : '';
       if (n === '') return Promise.resolve({ error: 'name required', code: 'BAD_REQUEST' });
       return hostCall(event, (c) => c.postJson<{ ok: boolean; model?: string }>('/api/model', { name: n }));
+    });
+
+    // ---- 手机远程控制(7788 web 守护;用户显式启动,ADR-005 不默认开 LAN) ----
+    ipcMain.handle('bridge:remote-web-status', async (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const p = await probeWebRemote();
+      return { up: p.up, version: p.version, lanIp: lanIpOf(), port: WEB_PORT, available: cliEntryOf() !== '' };
+    });
+    ipcMain.handle('bridge:remote-web-start', async (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      if (cliEntryOf() === '') return { error: 'no hmharness runtime detected', code: 'HOST_NOT_READY' };
+      if ((await probeWebRemote()).up) {
+        return { ok: true, already: true, lanUrl: `http://${lanIpOf() || '127.0.0.1'}:${WEB_PORT}` };
+      }
+      runCli(['web', 'start', '--exposure=lan']);
+      // 守护进程冷启动(tsx 编译整套 CLI):轮询 25s
+      for (let i = 0; i < 50; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        if ((await probeWebRemote()).up) {
+          return { ok: true, lanUrl: `http://${lanIpOf() || '127.0.0.1'}:${WEB_PORT}` };
+        }
+      }
+      return { error: 'web daemon did not come up within 25s (see HMH_HOME/web.log)', code: 'RUNTIME_CRASHED' };
+    });
+    ipcMain.handle('bridge:remote-web-stop', async (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      runCli(['web', 'stop']);
+      for (let i = 0; i < 20; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        if (!(await probeWebRemote()).up) return { ok: true };
+      }
+      const still = (await probeWebRemote()).up;
+      return still ? { error: 'still running', code: 'BRIDGE_ERROR' } : { ok: true };
     });
 
     // ---- 📎 文件上传(本地多选;runtime 校验 insideWs,工作区外文件会被 400) ----
@@ -654,6 +809,7 @@ if (!app.requestSingleInstanceLock()) {
     // Windows 通知归属(否则显示为 electron.exe)
     app.setAppUserModelId('dev.hmh.desktop');
     setupTray();
+    buildAppMenu();
     // CSP(dev 与 prod 不同;prod 不允许任何远程源)
     const csp = isDev
       ? [
@@ -801,7 +957,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'providerSave', 'providers', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onMenuAction', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'providerSave', 'providers', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

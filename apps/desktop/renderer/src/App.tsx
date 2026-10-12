@@ -32,7 +32,7 @@ type Item =
   | { kind: 'turnsum'; id: string; turns: number; tools: number; tokens: number | null }
   | { kind: 'error'; id: string; code: string; message: string; sessionId: string; runId: string };
 
-type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs';
+type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs' | 'remote';
 
 export function App(): React.ReactElement {
   const { locale, L, setLocale } = useLocale();
@@ -470,6 +470,23 @@ export function App(): React.ReactElement {
     }
   }, [L, switchWorkspace]);
 
+  // 应用菜单动作(查看→主题/语言/侧栏;帮助→快捷键;文件→新建)
+  useEffect(() => {
+    if (bridge === undefined) return;
+    const off = bridge.onMenuAction((action) => {
+      if (action === 'new-session') newSession();
+      else if (action === 'shortcuts') setShortcutsOpen(true);
+      else if (action === 'theme-dark') setTheme('dark');
+      else if (action === 'theme-light') setTheme('light');
+      else if (action === 'toggle-locale') setLocale(locale === 'zh' ? 'en' : 'zh');
+      else if (action === 'toggle-sidebar') setSidebarCollapsed((v) => {
+        try { window.localStorage.setItem('hmh.sidebarCollapsed', v ? '0' : '1'); } catch { /* 私有模式 */ }
+        return !v;
+      });
+    });
+    return off;
+  }, [locale, newSession, setTheme, setLocale]);
+
   // Ctrl+K 命令面板 / Ctrl+N 新会话(03 §六;键盘优先)
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -619,6 +636,30 @@ export function App(): React.ReactElement {
     }
   }, [L]);
 
+  // 手机远程控制(7788 web 守护;用户显式启动)
+  const [remoteWeb, setRemoteWeb] = useState<{ up: boolean; version: string; lanIp: string; port: number; available: boolean } | null>(null);
+  const [remoteBusy, setRemoteBusy] = useState(false);
+  const refreshRemoteWeb = useCallback(async () => {
+    if (bridge === undefined) return;
+    const r = await bridge.remoteWebStatus();
+    if ('up' in r) setRemoteWeb(r);
+  }, []);
+  const startRemoteWeb = useCallback(async () => {
+    if (bridge === undefined) return;
+    setRemoteBusy(true);
+    const r = await bridge.remoteWebStart();
+    if ('ok' in r && r.ok === true) { void refreshRemoteWeb(); }
+    else if ('error' in r) { setExportHint(r.error); setTimeout(() => setExportHint(''), 5_000); }
+    setRemoteBusy(false);
+  }, [refreshRemoteWeb]);
+  const stopRemoteWeb = useCallback(async () => {
+    if (bridge === undefined) return;
+    setRemoteBusy(true);
+    await bridge.remoteWebStop();
+    void refreshRemoteWeb();
+    setRemoteBusy(false);
+  }, [refreshRemoteWeb]);
+
   /* ---- M5:Evidence 面板 ---- */
   const loadCog = useCallback(async () => {
     if (bridge === undefined) return;
@@ -638,7 +679,8 @@ export function App(): React.ReactElement {
     if (dockTab === 'files' && workspaces === null && hostState === 'ready') void refreshWorkspaces();
     if (dockTab === 'evidence' && cog === null && hostState === 'ready') void loadCog();
     if (dockTab === 'diff' && hostState === 'ready') void loadDiff();
-  }, [dockTab, hostState, fsData, cog, workspaces, loadFs, loadCog, loadDiff, refreshWorkspaces]);
+    if (dockTab === 'remote') void refreshRemoteWeb();
+  }, [dockTab, hostState, fsData, cog, workspaces, loadFs, loadCog, loadDiff, refreshWorkspaces, refreshRemoteWeb]);
 
   useEffect(() => {
     if (hostState === 'ready') void refreshProviders(); // 顶栏模型 + 首跑引导数据
@@ -1200,7 +1242,7 @@ export function App(): React.ReactElement {
       {dockOpen && (
         <aside className="dock" aria-label={L.nav.dock}>
           <div className="dock-tabs" role="tablist">
-            {(['overview', 'files', 'diff', 'evidence', 'logs'] as DockTab[]).map((t) => (
+            {(['overview', 'files', 'diff', 'evidence', 'logs', 'remote'] as DockTab[]).map((t) => (
               <button
                 key={t}
                 role="tab"
@@ -1208,7 +1250,7 @@ export function App(): React.ReactElement {
                 className={`dock-tab${dockTab === t ? ' active' : ''}`}
                 onClick={() => setDockTab(t)}
               >
-                {t === 'overview' ? L.dock.tabOverview : t === 'files' ? L.dock.tabFiles : t === 'diff' ? L.dock.tabDiff : t === 'evidence' ? L.dock.tabEvidence : L.dock.tabLogs}
+                {t === 'overview' ? L.dock.tabOverview : t === 'files' ? L.dock.tabFiles : t === 'diff' ? L.dock.tabDiff : t === 'evidence' ? L.dock.tabEvidence : t === 'logs' ? L.dock.tabLogs : L.dock.tabRemote}
               </button>
             ))}
           </div>
@@ -1326,6 +1368,27 @@ export function App(): React.ReactElement {
                   ))}
                   {logs.length === 0 && <div className="empty-hint">{L.dock.logsEmpty}</div>}
                 </div>
+              </div>
+            )}
+            {dockTab === 'remote' && (
+              <div className="evidence-pane">
+                <div className="fs-preview-head">{L.dock.remoteTitle}</div>
+                <div className="dock-row">
+                  <span className="dock-k">{L.dock.hostState}</span>
+                  <span className="dock-v">{remoteWeb === null ? L.dock.loading : remoteWeb.up ? L.dock.remoteRunning(remoteWeb.version) : L.dock.remoteStopped}</span>
+                </div>
+                {remoteWeb !== null && remoteWeb.up && (
+                  <div className="dock-row"><span className="dock-k">{L.dock.remoteLanUrl(`http://${remoteWeb.lanIp || '127.0.0.1'}:${remoteWeb.port}`)}</span></div>
+                )}
+                <div className="remote-actions">
+                  {remoteWeb === null || remoteWeb.up ? (
+                    <button className="btn danger" disabled={remoteBusy || remoteWeb === null} onClick={() => void stopRemoteWeb()}>{remoteBusy ? L.dock.loading : L.dock.remoteStop}</button>
+                  ) : (
+                    <button className="btn primary" disabled={remoteBusy || !remoteWeb.available} title={remoteWeb.available ? '' : L.dock.remoteNoRuntime} onClick={() => void startRemoteWeb()}>{remoteBusy ? L.dock.loading : L.dock.remoteStart}</button>
+                  )}
+                </div>
+                <div className="dock-note">{L.dock.remoteSteps}</div>
+                <div className="dock-note">{L.dock.remoteSecurityNote}</div>
               </div>
             )}
           </div>

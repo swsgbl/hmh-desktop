@@ -90,6 +90,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .shortcut-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; gap: 16px; }
 .shortcut-desc { font-size: 14px; }
 .shortcut-key { font: 12px var(--hmh-font-mono); background: var(--hmh-bg-panel); border: 1px solid var(--hmh-border); border-radius: var(--hmh-radius-sm); padding: 3px 8px; color: var(--hmh-text-dim); }
+.remote-actions { display: flex; gap: 8px; padding: 8px 4px; }
 /* min-height:0:flex:1 子项默认 min-height:auto,超长会话列表会撑破容器而不是滚动 */
 .session-list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
 .session-item {

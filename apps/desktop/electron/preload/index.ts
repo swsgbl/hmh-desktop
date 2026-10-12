@@ -44,6 +44,21 @@ const bridge = {
   modelSet(name: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:model-set', name);
   },
+  remoteWebStatus(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:remote-web-status');
+  },
+  remoteWebStart(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:remote-web-start');
+  },
+  remoteWebStop(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:remote-web-stop');
+  },
+  /** 应用菜单 → renderer 动作(主题/语言/侧栏/面板)。 */
+  onMenuAction(cb: (action: string) => void): () => void {
+    const listener = (_e: Electron.IpcRendererEvent, action: string): void => cb(action);
+    ipcRenderer.on('menu:action', listener);
+    return () => ipcRenderer.removeListener('menu:action', listener);
+  },
   fsSearch(q: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:fs-search', q);
   },
