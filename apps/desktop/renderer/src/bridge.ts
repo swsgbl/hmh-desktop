@@ -102,6 +102,8 @@ export interface HmhBridge {
   remoteWebStart(): Promise<{ ok: boolean; already?: boolean; lanUrl?: string } | { error: string; code: string }>;
   remoteWebStop(): Promise<{ ok: boolean } | { error: string; code: string }>;
   onMenuAction(cb: (action: string) => void): () => void;
+  chromeTheme(dark: boolean): Promise<{ ok: boolean } | { error: string; code: string }>;
+  popupMainMenu(): Promise<{ ok: boolean } | { error: string; code: string }>;
   fsSearch(q: string): Promise<{ results: Array<{ rel: string; path: string }> } | { error: string; code: string }>;
   approve(granted: boolean, sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;
   interrupt(sessionId: string): Promise<{ ok: boolean } | { error: string; code: string }>;

@@ -113,15 +113,28 @@ export function App(): React.ReactElement {
   const streamRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef('');
   activeRef.current = activeSession;
+  /** 最近一次本地发送的任务原文(去重键:run.started 的 task 以它结尾即为同一条)。 */
+  const sentRef = useRef('');
 
   const applyEnvelope = useCallback((env: EventEnvelope) => {
     if (env.kind === 'run.started') {
       setRunStatus('running');
       setStreaming('');
-      setItems((prev) => [
-        ...prev,
-        { kind: 'user', id: env.eventId, text: String((env.payload as { task?: string }).task ?? '') },
-      ]);
+      // 去重:send() 已本地即时上屏同一条用户消息(optimistic 回显),
+      // run.started 信封回流时不再重复 push —— 否则每条消息渲染两遍。
+      // 附件/图片任务的 task 是 runtime 组装版([images]/[referenced files]
+      // 前缀+原文),故以"task 以本地发送的原文结尾"判定同一消息。
+      const task = String((env.payload as { task?: string }).task ?? '');
+      setItems((prev) => {
+        const last = prev[prev.length - 1];
+        if (last !== undefined && last.kind === 'user' && task !== '' && sentRef.current !== '' && task.endsWith(sentRef.current)) {
+          return prev;
+        }
+        return [
+          ...prev,
+          { kind: 'user', id: env.eventId, text: task },
+        ];
+      });
     } else if (env.kind === 'tool.started') {
       const p = env.payload as { name?: string; argsPreview?: string };
       setItems((prev) => [...prev, { kind: 'tool', id: env.eventId, name: String(p.name ?? ''), argsPreview: String(p.argsPreview ?? '') }]);
@@ -470,12 +483,14 @@ export function App(): React.ReactElement {
     }
   }, [L, switchWorkspace]);
 
-  // 应用菜单动作(查看→主题/语言/侧栏;帮助→快捷键;文件→新建)
+  // 应用菜单动作(标题栏 ☰/托盘 → 主题/面板;文件→新建)
   useEffect(() => {
     if (bridge === undefined) return;
     const off = bridge.onMenuAction((action) => {
       if (action === 'new-session') newSession();
       else if (action === 'shortcuts') setShortcutsOpen(true);
+      else if (action === 'open-settings') setSettingsOpen(true);
+      else if (action === 'open-remote') setDockTab('remote');
       else if (action === 'theme-dark') setTheme('dark');
       else if (action === 'theme-light') setTheme('light');
       else if (action === 'toggle-locale') setLocale(locale === 'zh' ? 'en' : 'zh');
@@ -593,6 +608,7 @@ export function App(): React.ReactElement {
     setAttachments([]);
     setImages([]);
     setRunStatus('running');
+    sentRef.current = text; // 去重键:run.started 回流时识别同一条消息
     const imgNames = imgs.map((im) => `@${im.name}`).join(' ');
     setItems((prev) => [...prev, { kind: 'user', id: `local-${Date.now()}`, text: `${imgNames !== '' ? `${imgNames}\n` : ''}${attachments.length > 0 ? `${attachments.map((a) => `@${a.rel}`).join(' ')}\n` : ''}${text}` }]);
     const r = await bridge.sendTask(text, activeSession, 'ask', atts, imgs);
@@ -758,7 +774,18 @@ export function App(): React.ReactElement {
   }, [state, hostState, hostInfo, L]);
 
   return (
-    <div className={`app-shell${sidebarCollapsed ? ' no-sidebar' : ''}`}>
+    <>
+      <header className="titlebar">
+        <button
+          className="btn ghost titlebar-menu"
+          aria-label={L.shortcuts.title}
+          title={L.shortcuts.title}
+          onClick={() => { if (bridge !== undefined) void bridge.popupMainMenu(); }}
+        >☰</button>
+        <span className="titlebar-title">HMH Desktop</span>
+        <span className="titlebar-spacer" aria-hidden="true" />
+      </header>
+      <div className={`app-shell${sidebarCollapsed ? ' no-sidebar' : ''}`}>
       {shortcutsOpen && (
         <div className="cmdk-overlay" role="dialog" aria-label={L.shortcuts.title} onClick={() => setShortcutsOpen(false)}>
           <div className="cmdk" onClick={(e) => e.stopPropagation()}>
@@ -1394,6 +1421,7 @@ export function App(): React.ReactElement {
           </div>
         </aside>
       )}
-    </div>
+      </div>
+    </>
   );
 }

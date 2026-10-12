@@ -12,7 +12,7 @@
  * 经 50ms 批量推给 renderer;sendTask/approve/interrupt/sessions 全部转发
  * 给 host —— fake 与真实 hmharness desktop-host 走同一条代码路径。
  */
-import { app, BrowserWindow, dialog, ipcMain, session, shell, Tray, Notification, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, session, shell, Tray, Notification, Menu, nativeImage, nativeTheme } from 'electron';
 import { join, dirname, isAbsolute, resolve } from 'node:path';
 import { existsSync, realpathSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
@@ -94,6 +94,11 @@ if (!app.requestSingleInstanceLock()) {
      审批等待必须打扰(用户必须决策);完成/失败仅在窗口失焦时提醒。 */
   const TRAY_ICON_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAR0lEQVR4nGNgQAPSsor/8WF09URrxGsQqZoxDIEJ6Dd+B2N0hbjEMWwn1QCwIYPTAFyYfgYMfBiQZADFCYkqSZnizERJdgYAlL5rsDc2aTcAAAAASUVORK5CYII=';
   let tray: Tray | null = null;
+  const sendMenuAction = (a: string): void => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send('menu:action', a);
+    }
+  };
   function focusMainWindow(): void {
     const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
     if (win === undefined) return;
@@ -108,9 +113,12 @@ if (!app.requestSingleInstanceLock()) {
     tray.setToolTip('HMH Desktop');
     tray.on('click', focusMainWindow);
     tray.setContextMenu(Menu.buildFromTemplate([
+      { label: '新建会话', click: (): void => sendMenuAction('new-session') },
       { label: '显示主窗口', click: focusMainWindow },
+      { label: '手机远程控制', click: (): void => sendMenuAction('open-remote') },
+      { label: '设置', click: (): void => sendMenuAction('open-settings') },
       { type: 'separator' },
-      { label: '退出', click: () => { app.quit(); } },
+      { label: '退出', click: (): void => { app.quit(); } },
     ]));
   }
   function notifyEvent(env: EventEnvelope): void {
@@ -134,23 +142,22 @@ if (!app.requestSingleInstanceLock()) {
     }
   }
 
-  /* ---- 自定义中文应用菜单(替换 Electron 英文默认菜单) ----
-     视图态动作(主题/语言/侧栏/面板)经 menu:action 转发 renderer。 */
-  function buildAppMenu(): void {
-    const send = (a: string): void => {
-      for (const w of BrowserWindow.getAllWindows()) {
-        if (!w.isDestroyed()) w.webContents.send('menu:action', a);
+  /* ---- 自定义标题栏(2026-10-11 用户反馈:亮色模式顶部黑条=原生菜单栏
+     不跟主题;菜单与设置重复) ---- 方案:隐藏式标题栏 + titleBarOverlay
+     (颜色随主题),菜单栏 autoHide(Alt 呼出)且精简为系统级能力;
+     常用动作走 renderer 标题栏 ☰ 主菜单(唯一入口)。 */
+  const chromeFor = (dark: boolean): { color: string; symbolColor: string } =>
+    dark ? { color: '#1b1d21', symbolColor: '#f5f5f6' } : { color: '#f6f7f9', symbolColor: '#1f2328' };
+  function applyChrome(dark: boolean): void {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) {
+        try { w.setTitleBarOverlay(chromeFor(dark)); } catch { /* 仅 Windows 支持 */ }
       }
-    };
+    }
+  }
+  function buildAppMenu(): void {
+    // 精简:只保留 UI 没有的系统级能力(剪贴板/窗口);其余唯一入口在 UI。
     const template: Array<Electron.MenuItemConstructorOptions> = [
-      {
-        label: '文件',
-        submenu: [
-          { label: '新建会话', accelerator: 'CmdOrCtrl+N', click: (): void => send('new-session') },
-          { type: 'separator' },
-          { label: '退出', role: 'quit' },
-        ],
-      },
       {
         label: '编辑',
         submenu: [
@@ -164,18 +171,6 @@ if (!app.requestSingleInstanceLock()) {
         ],
       },
       {
-        label: '查看',
-        submenu: [
-          { label: '重新加载界面', role: 'reload' },
-          ...(isDev ? [{ role: 'toggleDevTools' as const, label: '开发者工具' }] : []),
-          { type: 'separator' },
-          { label: '深色主题', click: (): void => send('theme-dark') },
-          { label: '浅色主题', click: (): void => send('theme-light') },
-          { label: '切换 中文 / English', click: (): void => send('toggle-locale') },
-          { label: '收起 / 展开侧栏', click: (): void => send('toggle-sidebar') },
-        ],
-      },
-      {
         label: '窗口',
         submenu: [
           { role: 'minimize', label: '最小化' },
@@ -184,28 +179,38 @@ if (!app.requestSingleInstanceLock()) {
           { role: 'close', label: '关闭' },
         ],
       },
-      {
-        label: '帮助',
-        submenu: [
-          { label: '快捷键', accelerator: 'CmdOrCtrl+/', click: (): void => send('shortcuts') },
-          {
-            label: '关于 HMH Desktop',
-            click: (): void => {
-              const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
-              if (win !== undefined) {
-                void dialog.showMessageBox(win, {
-                  type: 'info',
-                  title: '关于 HMH Desktop',
-                  message: 'HMH Desktop',
-                  detail: `本地优先的 HMH Agent 图形工作台\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}\n模式: ${bridge.mode === 'real' ? '真实 hmharness' : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
-                });
-              }
-            },
-          },
-        ],
-      },
     ];
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  }
+  /** 标题栏 ☰ 主菜单(常用动作的唯一入口;视图态经 menu:action 转发)。 */
+  function popupMainMenu(): void {
+    const send = (a: string): void => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed()) w.webContents.send('menu:action', a);
+      }
+    };
+    const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
+    if (win === undefined) return;
+    Menu.buildFromTemplate([
+      { label: '新建会话', accelerator: 'CmdOrCtrl+N', click: (): void => send('new-session') },
+      { label: '设置', accelerator: 'CmdOrCtrl+Shift+P', click: (): void => send('open-settings') },
+      { label: '快捷键', accelerator: 'CmdOrCtrl+/', click: (): void => send('shortcuts') },
+      { type: 'separator' },
+      { label: '手机远程控制', click: (): void => send('open-remote') },
+      { type: 'separator' },
+      {
+        label: '关于 HMH Desktop',
+        click: (): void => {
+          void dialog.showMessageBox(win, {
+            type: 'info',
+            title: '关于 HMH Desktop',
+            message: 'HMH Desktop',
+            detail: `本地优先的 HMH Agent 图形工作台\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}\n模式: ${bridge.mode === 'real' ? '真实 hmharness' : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
+          });
+        },
+      },
+      { label: '退出', role: 'quit' },
+    ]).popup({ window: win });
   }
 
   /* ---- 手机远程控制(03 号:Web 7788 是浏览器/远程/手机入口,ADR-005:
@@ -497,6 +502,18 @@ if (!app.requestSingleInstanceLock()) {
       return hostCall(event, (c) => c.postJson<{ ok: boolean; model?: string }>('/api/model', { name: n }));
     });
 
+    // ---- 标题栏主题同步(浅色模式不再有黑条)+ ☰ 主菜单 ----
+    ipcMain.handle('bridge:chrome-theme', (event, dark: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      applyChrome(dark === true);
+      return { ok: true };
+    });
+    ipcMain.handle('bridge:popup-main-menu', (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      popupMainMenu();
+      return { ok: true };
+    });
+
     // ---- 手机远程控制(7788 web 守护;用户显式启动,ADR-005 不默认开 LAN) ----
     ipcMain.handle('bridge:remote-web-status', async (event) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
@@ -759,6 +776,11 @@ if (!app.requestSingleInstanceLock()) {
       show: false,
       backgroundColor: '#141416',
       title: 'HMH Desktop',
+      // 隐藏式标题栏:原生窗口控制(overlay 提供)+颜色随主题(renderer 经
+      // chrome-theme 同步)——根治亮色模式顶部黑条;菜单栏 autoHide(Alt 呼出)。
+      titleBarStyle: 'hidden',
+      titleBarOverlay: { ...chromeFor(nativeTheme.shouldUseDarkColors), height: 36 },
+      autoHideMenuBar: true,
       webPreferences: {
         preload: preloadPath,
         contextIsolation: true,
@@ -957,7 +979,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onMenuAction', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'providerSave', 'providers', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'chromeTheme', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onMenuAction', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'popupMainMenu', 'providerSave', 'providers', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

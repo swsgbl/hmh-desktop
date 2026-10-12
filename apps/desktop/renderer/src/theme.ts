@@ -3,6 +3,7 @@
  * 的 web 主题互不干涉)。system 跟随 prefers-color-scheme 并监听变化。
  */
 import { useEffect, useState } from 'react';
+import { bridge } from './bridge.ts';
 
 export type Theme = 'system' | 'dark' | 'light';
 
@@ -29,6 +30,8 @@ export function useTheme(): { theme: Theme; resolved: 'dark' | 'light'; setTheme
       const r = resolve(theme);
       setResolved(r);
       document.documentElement.dataset.theme = r;
+      // 原生标题栏 overlay 同步(浅色模式不再有黑条)
+      void bridge?.chromeTheme(r === 'dark');
     };
     apply();
     if (theme !== 'system' || typeof window.matchMedia !== 'function') return;

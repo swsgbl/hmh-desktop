@@ -70,11 +70,12 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
   await sleep(1_200); // 会话列表/顶栏数据落地
 
   /* ========== 通用:布局几何(用户报障的直接断言) ========== */
-  await step('布局:三栏+composer 在视口内(输入框可见)', async () => {
+  await step('布局:标题栏+三栏+composer 在视口内(输入框可见)', async () => {
     const r = (await js(`(function(){
       var q = document.querySelector.bind(document);
-      var shell = q('.app-shell'), sb = q('.sidebar'), ws = q('.workspace'), ta = q('.composer textarea');
-      if (!shell || !sb || ! ws || !ta) return JSON.stringify({ok:false, detail:'missing:' + [!shell && 'shell', !sb && 'sidebar', !ws && 'workspace', !ta && 'textarea'].filter(Boolean).join(',')});
+      var tb = q('.titlebar'), shell = q('.app-shell'), sb = q('.sidebar'), ws = q('.workspace'), ta = q('.composer textarea');
+      var missing = [!tb && 'titlebar', !shell && 'shell', !sb && 'sidebar', !ws && 'workspace', !ta && 'textarea'].filter(Boolean).join(',');
+      if (missing !== '') return JSON.stringify({ok:false, detail:'missing:'+missing});
       var r = ta.getBoundingClientRect(), vh = window.innerHeight, vw = window.innerWidth;
       var hint = q('.empty-hint.big'); var hr = hint ? hint.getBoundingClientRect() : null;
       return JSON.stringify({ ok: r.height > 30 && r.bottom <= vh && r.width > 100 && hr !== null && hr.top >= 0 && hr.bottom <= vh,
@@ -104,8 +105,8 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         return {ok: !!t && t.disabled === false && (t.placeholder||'').indexOf('描述目标') >= 0, detail: t ? ('disabled='+t.disabled+' ph='+(t.placeholder||'').slice(0,20)) : 'no ta'};`, 5_000);
     });
 
-    /* ========== fake:发送任务 → 用户轮出现 ========== */
-    await step('输入并发送任务,用户消息上屏', async () => {
+    /* ========== fake:发送任务 → 用户轮出现(且仅一条,双消息回归) ========== */
+    await step('输入并发送任务,用户消息上屏且不重复', async () => {
       await typeInto('.composer textarea', '验收任务:写入一个文件');
       await sleep(200);
       await js(`(function(){
@@ -113,8 +114,8 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         var b = btns.find(function(x){ return x.textContent.trim() === '发送'; });
         if (b) b.click();
       })()`);
-      return waitFor('user turn', `var t=document.querySelector('.turn.user');
-        return {ok: !!t && t.textContent.indexOf('验收任务') >= 0, detail: t ? t.textContent.slice(0, 40) : 'no user turn'};`, 8_000);
+      return waitFor('exactly one user turn', `var ts=[].slice.call(document.querySelectorAll('.turn.user')).filter(function(x){ return x.textContent.indexOf('验收任务') >= 0; });
+        return {ok: ts.length === 1, detail: 'count='+ts.length+' text='+(ts[0]?ts[0].textContent.slice(0,30):'none')};`, 8_000);
     });
 
     /* ========== fake:工具卡(read_file 完成) ========== */
@@ -404,9 +405,13 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       await typeInto('.composer textarea', '看这张图');
       await sleep(200);
       await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.composer button')).find(function(x){return x.textContent.trim()==='发送';}); if(b) b.click(); })()`);
-      const done = await waitFor('image sent', `var ts=[].slice.call(document.querySelectorAll('.turn'));
-        var hit = ts.filter(function(x){ return x.textContent.indexOf('[images: 1]') >= 0; });
-        return {ok: hit.length >= 1, detail: 'turns-with-image='+hit.length};`, 12_000);
+      const done = await waitFor('image sent', `
+        var ap = document.querySelector('.approval-card button');
+        if (ap && ap.textContent.trim().indexOf('批准')>=0) ap.click();
+        var ts=[].slice.call(document.querySelectorAll('.turn'));
+        var hit = ts.filter(function(x){ return x.className.indexOf('user')<0 && x.textContent.indexOf('[images: 1]') >= 0; });
+        return {ok: hit.length >= 1, detail: 'runtime-echo-with-image='+hit.length};
+      `, 15_000);
       await shot('pasted-image');
       return done;
     });

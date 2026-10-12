@@ -52,7 +52,9 @@ export interface HostEndpoint {
 /** HostReadyLine 的类型守卫从 contracts 引入,避免双实现。 */
 import { isHostReadyLine } from '@hmh-desktop/contracts';
 
-const DEFAULT_START_TIMEOUT_MS = 20_000;
+// 45s:hmharness 真实入口经 tsx 冷编译整套 CLI,机器高负载时可超 20s
+// (2026-10-11 连续验收中间歇性 HOST_NOT_READY 的根因;空闲实测 6s)。
+const DEFAULT_START_TIMEOUT_MS = 45_000;
 const DEFAULT_MAX_RESTARTS = 3;
 const DEFAULT_GRACEFUL_MS = 5_000;
 

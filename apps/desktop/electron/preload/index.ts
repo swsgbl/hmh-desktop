@@ -59,6 +59,12 @@ const bridge = {
     ipcRenderer.on('menu:action', listener);
     return () => ipcRenderer.removeListener('menu:action', listener);
   },
+  chromeTheme(dark: boolean): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:chrome-theme', dark);
+  },
+  popupMainMenu(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:popup-main-menu');
+  },
   fsSearch(q: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:fs-search', q);
   },
