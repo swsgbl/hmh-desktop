@@ -11,3 +11,12 @@ build/
 *.tsbuildinfo
 .DS_Store
 test-out.log
+
+# 私有开发文档提取物(用户文档全文,绝不入库)
+docx-*.txt
+hmh-doc-*/
+
+# 验收/诊断产物(截图与探针输出)
+dom-probe.json
+ui-shot*.png
+ui-verify-shots-*/
