@@ -53,6 +53,9 @@ const bridge = {
   remoteWebStop(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:remote-web-stop');
   },
+  remoteWebAutostart(enabled: boolean): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:remote-web-autostart', enabled);
+  },
   /** 应用菜单 → renderer 动作(主题/语言/侧栏/面板)。 */
   onMenuAction(cb: (action: string) => void): () => void {
     const listener = (_e: Electron.IpcRendererEvent, action: string): void => cb(action);

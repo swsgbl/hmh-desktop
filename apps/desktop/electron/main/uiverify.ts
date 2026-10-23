@@ -191,12 +191,14 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return w;
     });
 
-    /* ========== fake:Dock:远程页签(手机远程控制面板) ========== */
+    /* ========== fake:Dock:远程页签(手机远程控制面板+开机自启行) ========== */
     await step('Dock:远程页签(手机远程控制面板)', async () => {
       await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='远程'||x.textContent==='Remote';}); if(t) t.click(); })()`);
       return waitFor('remote pane', `var p=document.querySelector('.dock-body');
         var t = p ? p.textContent : '';
-        return {ok: !!p && (t.indexOf('手机远程控制')>=0 || t.indexOf('Phone remote')>=0), detail: t.replace(/\\s+/g,' ').slice(0,50)};`, 6_000);
+        var okT = t.indexOf('手机远程控制')>=0 || t.indexOf('Phone remote')>=0;
+        var okA = t.indexOf('开机自启')>=0 || t.indexOf('Autostart')>=0;
+        return {ok: !!p && okT && okA, detail: t.replace(/\\s+/g,' ').slice(0,60)};`, 6_000);
     });
 
     /* ========== fake:搜索过滤 ========== */

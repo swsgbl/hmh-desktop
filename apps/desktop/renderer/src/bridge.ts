@@ -98,9 +98,10 @@ export interface HmhBridge {
   pickFiles(title?: string): Promise<{ ok: boolean; paths?: string[]; canceled?: boolean } | { error: string; code: string }>;
   pickDirectory(title?: string): Promise<{ ok: boolean; path?: string; canceled?: boolean } | { error: string; code: string }>;
   modelSet(name: string): Promise<{ ok: boolean; model?: string } | { error: string; code: string }>;
-  remoteWebStatus(): Promise<{ up: boolean; version: string; lanIp: string; port: number; available: boolean } | { error: string; code: string }>;
+  remoteWebStatus(): Promise<{ up: boolean; version: string; lanIp: string; port: number; available: boolean; autostart: boolean } | { error: string; code: string }>;
   remoteWebStart(): Promise<{ ok: boolean; already?: boolean; lanUrl?: string } | { error: string; code: string }>;
   remoteWebStop(): Promise<{ ok: boolean } | { error: string; code: string }>;
+  remoteWebAutostart(enabled: boolean): Promise<{ ok: boolean; autostart: boolean } | { error: string; code: string }>;
   onMenuAction(cb: (action: string) => void): () => void;
   chromeTheme(dark: boolean): Promise<{ ok: boolean } | { error: string; code: string }>;
   popupMainMenu(): Promise<{ ok: boolean } | { error: string; code: string }>;

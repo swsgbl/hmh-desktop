@@ -224,6 +224,16 @@ if (!app.requestSingleInstanceLock()) {
       return { up: true, version: String(d.daemonVersion ?? '') };
     } catch { return { up: false, version: '' }; }
   }
+  /** 开机自启是否已装(runtime web-daemon 的启动项文件存在性;0.23.37 新能力)。 */
+  function webAutostartInstalled(): boolean {
+    const home = process.env.HOME ?? '';
+    const candidates = process.platform === 'win32'
+      ? [join(process.env.APPDATA ?? '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup', 'hmharness-web-daemon.cmd')]
+      : process.platform === 'darwin'
+        ? [join(home, 'Library', 'LaunchAgents', 'hmharness-web-daemon.plist')]
+        : [join(home, '.config', 'systemd', 'user', 'hmharness-web-daemon.service')];
+    return candidates.some((p) => { try { return existsSync(p); } catch { return false; } });
+  }
   /** 手机可路由的 LAN IP(RFC1918,排除虚拟网卡)。 */
   function lanIpOf(): string {
     const VIRTUAL = /vmware|virtual|hyper-?v|vethernet|wsl|tailscale|loopback|bluetooth|vbox|docker|tap-|pseudo/i;
@@ -518,7 +528,22 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('bridge:remote-web-status', async (event) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
       const p = await probeWebRemote();
-      return { up: p.up, version: p.version, lanIp: lanIpOf(), port: WEB_PORT, available: cliEntryOf() !== '' };
+      return { up: p.up, version: p.version, lanIp: lanIpOf(), port: WEB_PORT, available: cliEntryOf() !== '', autostart: webAutostartInstalled() };
+    });
+    // ---- 开机自启(0.23.37 web install-daemon/uninstall-daemon;登录即守护在线) ----
+    ipcMain.handle('bridge:remote-web-autostart', async (event, enabled: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      if (cliEntryOf() === '') return { error: 'no hmharness runtime detected', code: 'HOST_NOT_READY' };
+      runCli(['web', enabled === true ? 'install-daemon' : 'uninstall-daemon']);
+      // install-daemon 立即拉起守护:轮询确认;uninstall 即时生效
+      if (enabled === true) {
+        for (let i = 0; i < 50; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          if ((await probeWebRemote()).up) return { ok: true, autostart: webAutostartInstalled() };
+        }
+        return { error: 'daemon did not come up within 25s', code: 'RUNTIME_CRASHED' };
+      }
+      return { ok: true, autostart: webAutostartInstalled() };
     });
     ipcMain.handle('bridge:remote-web-start', async (event) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
@@ -979,7 +1004,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'chromeTheme', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onMenuAction', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'popupMainMenu', 'providerSave', 'providers', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'chromeTheme', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onMenuAction', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'popupMainMenu', 'providerSave', 'providers', 'remoteWebAutostart', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

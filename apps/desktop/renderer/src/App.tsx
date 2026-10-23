@@ -653,7 +653,7 @@ export function App(): React.ReactElement {
   }, [L]);
 
   // 手机远程控制(7788 web 守护;用户显式启动)
-  const [remoteWeb, setRemoteWeb] = useState<{ up: boolean; version: string; lanIp: string; port: number; available: boolean } | null>(null);
+  const [remoteWeb, setRemoteWeb] = useState<{ up: boolean; version: string; lanIp: string; port: number; available: boolean; autostart: boolean } | null>(null);
   const [remoteBusy, setRemoteBusy] = useState(false);
   const refreshRemoteWeb = useCallback(async () => {
     if (bridge === undefined) return;
@@ -672,6 +672,14 @@ export function App(): React.ReactElement {
     if (bridge === undefined) return;
     setRemoteBusy(true);
     await bridge.remoteWebStop();
+    void refreshRemoteWeb();
+    setRemoteBusy(false);
+  }, [refreshRemoteWeb]);
+  const setRemoteAutostart = useCallback(async (enabled: boolean) => {
+    if (bridge === undefined) return;
+    setRemoteBusy(true);
+    const r = await bridge.remoteWebAutostart(enabled);
+    if ('error' in r) { setExportHint(r.error); setTimeout(() => setExportHint(''), 5_000); }
     void refreshRemoteWeb();
     setRemoteBusy(false);
   }, [refreshRemoteWeb]);
@@ -1404,6 +1412,10 @@ export function App(): React.ReactElement {
                   <span className="dock-k">{L.dock.hostState}</span>
                   <span className="dock-v">{remoteWeb === null ? L.dock.loading : remoteWeb.up ? L.dock.remoteRunning(remoteWeb.version) : L.dock.remoteStopped}</span>
                 </div>
+                <div className="dock-row">
+                  <span className="dock-k">{L.dock.remoteAutostart}</span>
+                  <span className="dock-v">{remoteWeb === null ? L.dock.loading : remoteWeb.autostart ? L.dock.remoteAutostartOn : L.dock.remoteAutostartOff}</span>
+                </div>
                 {remoteWeb !== null && remoteWeb.up && (
                   <div className="dock-row"><span className="dock-k">{L.dock.remoteLanUrl(`http://${remoteWeb.lanIp || '127.0.0.1'}:${remoteWeb.port}`)}</span></div>
                 )}
@@ -1413,8 +1425,15 @@ export function App(): React.ReactElement {
                   ) : (
                     <button className="btn primary" disabled={remoteBusy || !remoteWeb.available} title={remoteWeb.available ? '' : L.dock.remoteNoRuntime} onClick={() => void startRemoteWeb()}>{remoteBusy ? L.dock.loading : L.dock.remoteStart}</button>
                   )}
+                  {remoteWeb !== null && (remoteWeb.autostart ? (
+                    <button className="btn ghost" disabled={remoteBusy} onClick={() => void setRemoteAutostart(false)}>{L.dock.remoteAutostartDisable}</button>
+                  ) : (
+                    <button className="btn ghost" disabled={remoteBusy || !remoteWeb.available} title={remoteWeb.available ? '' : L.dock.remoteNoRuntime} onClick={() => void setRemoteAutostart(true)}>{L.dock.remoteAutostartEnable}</button>
+                  ))}
                 </div>
                 <div className="dock-note">{L.dock.remoteSteps}</div>
+                <div className="dock-note">{L.dock.remoteAutostartHint}</div>
+                <div className="dock-note">{L.dock.remoteStopNote}</div>
                 <div className="dock-note">{L.dock.remoteSecurityNote}</div>
               </div>
             )}
