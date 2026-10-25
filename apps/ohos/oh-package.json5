@@ -1,0 +1,7 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "hmh-desktop-ohos",
+  "version": "1.0.0",
+  "description": "HMH Desktop - HarmonyOS client for hmharness runtime",
+  "dependencies": {}
+}

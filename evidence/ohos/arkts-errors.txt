@@ -1,0 +1,15 @@
+Error Message: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'. At File: G:/hmh-desktop/apps/ohos/entry/src/main/ets/core/Reducer.ets:12:37
+
+Error Message: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'. At File: G:/hmh-desktop/apps/ohos/entry/src/main/ets/core/Reducer.ets:12:55
+
+Error Message: Object literal must correspond to some explicitly declared class or interface (arkts-no-untyped-obj-literals) At File: G:/hmh-desktop/apps/ohos/entry/src/main/ets/core/Reducer.ets:186:65
+
+Error Message: Object literal must correspond to some explicitly declared class or interface (arkts-no-untyped-obj-literals) At File: G:/hmh-desktop/apps/ohos/entry/src/main/ets/model/AppStore.ets:79:28
+
+Error Message: Object literal must correspond to some explicitly declared class or interface (arkts-no-untyped-obj-literals) At File: G:/hmh-desktop/apps/ohos/entry/src/main/ets/model/AppStore.ets:85:21
+
+Error Message: Use explicit types instead of "any", "unknown" (arkts-no-any-unknown) At File: G:/hmh-desktop/apps/ohos/entry/src/main/ets/model/AppStore.ets:91:21
+
+Error Message: Property 'getOrCreate' does not exist on type 'typeof AppStorage'. Did you mean 'SetOrCreate'? At File: G:/hmh-desktop/apps/ohos/entry/src/main/ets/model/AppStore.ets:91:38
