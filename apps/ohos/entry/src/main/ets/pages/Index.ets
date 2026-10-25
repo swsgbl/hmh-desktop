@@ -1,26 +1,34 @@
 /**
- * v2 主框架:底部 6 Tab(总览/会话/工作区/文件/日志/设置) + 顶部连接状态条
+ * v3 主框架:三栏工作台(1:1 复刻 .app-shell grid: 264px | 1fr | 360px)
+ *   titlebar 36px(☰ | HMH Desktop)
+ *   Row[ Sidebar | WorkspacePane | DockPane ]
+ *   设置=弹层(蓝本 cmdk.settings 480px 居中)
+ * VM 1280×800 横屏 → ≥1100 三栏成立
  */
 import { AppStore } from '../model/AppStore'
-import { SessionsPage } from './SessionsPage'
-import { WorkspacesPage } from './WorkspacesPage'
-import { FilesPage } from './FilesPage'
-import { SettingsPage } from './SettingsPage'
-import { OverviewPage } from './OverviewPage'
-import { LogsPage } from './LogsPage'
+import { Sidebar } from './Sidebar'
+import { WorkspacePane } from './WorkspacePane'
+import { DockPane } from './DockPane'
+import { Theme } from '../theme/Theme'
 import { t } from '../model/I18n'
+import { SettingsPage } from './SettingsPage'
 
 @Entry
 @Component
 struct Index {
-  @State currentTab: number = 1
+  @State activeId: string = ''
   @State locale: string = 'zh'
-  @StorageProp('sseConnected') sseConnected: boolean = false
+  @State sidebarOpen: boolean = true
   @StorageProp('localeRev') localeRev: number = 0
+  @StorageProp('sseConnected') sseConnected: boolean = false
+  @StorageProp('settingsOpen') settingsOpen: boolean = false
+  @StorageProp('openSessionRev') openSessionRev: number = 0
   private store: AppStore = AppStore.get()
 
   aboutToAppear(): void {
     this.locale = this.store.locale
+    // Sidebar 的 openSession 经 AppStorage 传递
+    AppStorage.setOrCreate('settingsOpen', false)
   }
 
   private L(key: string): string {
@@ -28,62 +36,76 @@ struct Index {
   }
 
   build() {
-    Column() {
+    Column({ space: 0 }) {
+      // ---- titlebar 36px ----
       Row({ space: 8 }) {
-        Circle({ width: 8, height: 8 })
-          .fill(this.store.baseUrl === '' ? '#C0392B' : (this.sseConnected ? '#0A7D32' : '#B26A00'))
+        Text('☰')
+          .fontSize(17)
+          .fontColor(Theme.dim)
+          .padding({ left: 10, right: 10 })
+          .onClick(() => {
+            this.sidebarOpen = !this.sidebarOpen
+          })
         Text('HMH Desktop')
-          .fontSize(14)
-          .fontWeight(FontWeight.Bold)
-          .layoutWeight(1)
-        if (this.store.baseUrl === '') {
-          Text(this.L('status.idle'))
-            .fontSize(11)
-            .fontColor('#C0392B')
-        }
+          .fontSize(13)
+          .fontColor(Theme.dim)
+        Blank()
       }
-      .padding({ left: 16, right: 16, top: 10, bottom: 6 })
+      .height(36)
       .width('100%')
+      .backgroundColor(Theme.raised)
+      .alignItems(VerticalAlign.Center)
 
-      Tabs({ barPosition: BarPosition.End, index: this.currentTab }) {
-        TabContent() {
-          OverviewPage()
+      // ---- 三栏 grid 等价:Row[264|1fr|360] ----
+      Row({ space: 0 }) {
+        if (this.sidebarOpen) {
+          Sidebar({ activeId: this.activeId })
         }
-        .tabBar(this.L('dock.overview'))
-
-        TabContent() {
-          SessionsPage()
-        }
-        .tabBar(this.locale === 'en' ? 'Sessions' : '会话')
-
-        TabContent() {
-          WorkspacesPage()
-        }
-        .tabBar(this.L('dock.ws'))
-
-        TabContent() {
-          FilesPage()
-        }
-        .tabBar(this.L('dock.files'))
-
-        TabContent() {
-          LogsPage()
-        }
-        .tabBar(this.L('dock.logs'))
-
-        TabContent() {
-          SettingsPage()
-        }
-        .tabBar(this.L('set.title'))
+        WorkspacePane({ activeId: this.activeId })
+        DockPane()
       }
       .layoutWeight(1)
       .width('100%')
-      .onChange((idx: number) => {
-        this.currentTab = idx
-      })
+      .alignItems(VerticalAlign.Top)
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#F1F3F5')
+    .backgroundColor(Theme.bg)
+
+    // ---- 设置弹层(居中 480px) ----
+    .overlay(this.settingsLayer(), { align: Alignment.Center })
+  }
+
+  @Builder
+  settingsLayer() {
+    if (this.settingsOpen) {
+      Column() {
+        // 弹层头(标题+关闭)
+        Row({ space: 8 }) {
+          Text(this.L('set.title'))
+            .fontSize(14)
+            .fontColor(Theme.text)
+            .layoutWeight(1)
+          Text('×')
+            .fontSize(18)
+            .fontColor(Theme.dim)
+            .padding(6)
+            .onClick(() => {
+              this.settingsOpen = false
+            })
+        }
+        .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+        .width('100%')
+
+        // 复用 v2 SettingsPage(内容全量:连接/外观/语言/模型/审批/Provider)
+        SettingsPage()
+      }
+      .width(480)
+      .constraintSize({ maxHeight: '80%' })
+      .backgroundColor(Theme.raised)
+      .border({ width: 1, color: Theme.border })
+      .borderRadius(14)
+      .padding({ bottom: 12 })
+    }
   }
 }
