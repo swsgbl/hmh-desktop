@@ -1,22 +1,34 @@
 /**
- * 主框架:底部 Tab(会话/工作区/文件/设置) + 顶部连接状态条
+ * v2 主框架:底部 6 Tab(总览/会话/工作区/文件/日志/设置) + 顶部连接状态条
  */
 import { AppStore } from '../model/AppStore'
 import { SessionsPage } from './SessionsPage'
 import { WorkspacesPage } from './WorkspacesPage'
 import { FilesPage } from './FilesPage'
 import { SettingsPage } from './SettingsPage'
+import { OverviewPage } from './OverviewPage'
+import { LogsPage } from './LogsPage'
+import { t } from '../model/I18n'
 
 @Entry
 @Component
 struct Index {
-  @State currentTab: number = 0
+  @State currentTab: number = 1
+  @State locale: string = 'zh'
   @StorageProp('sseConnected') sseConnected: boolean = false
+  @StorageProp('localeRev') localeRev: number = 0
   private store: AppStore = AppStore.get()
+
+  aboutToAppear(): void {
+    this.locale = this.store.locale
+  }
+
+  private L(key: string): string {
+    return t(key, this.locale === 'en' ? 'en' : 'zh')
+  }
 
   build() {
     Column() {
-      // 顶部状态条
       Row({ space: 8 }) {
         Circle({ width: 8, height: 8 })
           .fill(this.store.baseUrl === '' ? '#C0392B' : (this.sseConnected ? '#0A7D32' : '#B26A00'))
@@ -25,7 +37,7 @@ struct Index {
           .fontWeight(FontWeight.Bold)
           .layoutWeight(1)
         if (this.store.baseUrl === '') {
-          Text('未配置')
+          Text(this.L('status.idle'))
             .fontSize(11)
             .fontColor('#C0392B')
         }
@@ -33,27 +45,36 @@ struct Index {
       .padding({ left: 16, right: 16, top: 10, bottom: 6 })
       .width('100%')
 
-      // 内容区
       Tabs({ barPosition: BarPosition.End, index: this.currentTab }) {
+        TabContent() {
+          OverviewPage()
+        }
+        .tabBar(this.L('dock.overview'))
+
         TabContent() {
           SessionsPage()
         }
-        .tabBar('会话')
+        .tabBar(this.locale === 'en' ? 'Sessions' : '会话')
 
         TabContent() {
           WorkspacesPage()
         }
-        .tabBar('工作区')
+        .tabBar(this.L('dock.ws'))
 
         TabContent() {
           FilesPage()
         }
-        .tabBar('文件')
+        .tabBar(this.L('dock.files'))
+
+        TabContent() {
+          LogsPage()
+        }
+        .tabBar(this.L('dock.logs'))
 
         TabContent() {
           SettingsPage()
         }
-        .tabBar('设置')
+        .tabBar(this.L('set.title'))
       }
       .layoutWeight(1)
       .width('100%')

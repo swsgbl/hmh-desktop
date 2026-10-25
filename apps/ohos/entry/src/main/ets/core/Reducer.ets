@@ -3,6 +3,7 @@
  * 双协议:LAN 旧事件名 + hmh 信封。去重/sessionId 过滤/状态转移。
  */
 import { RunEvent, RunEventKind, RawEvent, ChatState, ChatMessage, ApprovalCard } from '../model/Types'
+import { TurnItemsState, initialTurnItems, onTool, onToolResult, onFinal, onRunStart } from '../model/TurnItems'
 
 export function toRunEvent(raw: RawEvent, currentSession: string, seqFallback: number): RunEvent | null {
   const d = raw.data as Record<string, Object>
@@ -128,6 +129,12 @@ function isNum(s: string): boolean {
   return true
 }
 
+function appendLog(logs: string[], line: string): string[] {
+  const arr = logs.slice()
+  arr.push(line)
+  return arr.length > 200 ? arr.slice(arr.length - 200) : arr
+}
+
 /** 状态归约:返回新状态(浅拷贝+数组重建,驱动 ArkUI @State 刷新) */
 export function reduce(st: ChatState, ev: RunEvent): ChatState {
   if (st.seenEventIds.has(ev.eventId)) {
@@ -146,15 +153,29 @@ export function reduce(st: ChatState, ev: RunEvent): ChatState {
     lastFinalText: st.lastFinalText,
     lastError: st.lastError,
     lastEventSeq: Math.max(st.lastEventSeq, ev.seq),
-    seenEventIds: seen
+    seenEventIds: seen,
+    turnItems: st.turnItems,
+    logs: st.logs
   }
 
   const extra = ev.extra as Record<string, Object>
   switch (ev.kind) {
-    case 'run.started':
+    case 'tool.started': {
+    const argsRaw: Object | undefined = extra['args']
+    next.turnItems = onTool(next.turnItems, ev.name, argsRaw !== undefined ? argsRaw : null)
+    break
+  }
+  case 'tool.completed': {
+    const isErr = extra['isError'] === true
+    const pv = typeof extra['preview'] === 'string' ? extra['preview'] as string : ''
+    next.turnItems = onToolResult(next.turnItems, ev.name, isErr, pv)
+    break
+  }
+  case 'run.started':
       next.running = true
       next.queuePosition = 0
       next.streamBuf = ''
+      next.turnItems = onRunStart(next.turnItems)
       break
     case 'queued':
       if (typeof extra['position'] === 'number') {
@@ -174,12 +195,28 @@ export function reduce(st: ChatState, ev: RunEvent): ChatState {
       next.streaming = false
       next.streamBuf = ''
       next.lastFinalText = ev.text
+      // final 附带 turns/toolUses/usage → turnSum + 交付物卡
+      const turns = typeof extra['turns'] === 'number' ? extra['turns'] as number : 0
+      const toolUses = typeof extra['toolUses'] === 'number' ? extra['toolUses'] as number : 0
+      const usageRaw: Object | undefined = extra['usage']
+      let tokens = -1
+      if (usageRaw !== undefined && typeof usageRaw === 'object') {
+        const u = usageRaw as Record<string, Object>
+        if (typeof u['totalTokens'] === 'number') {
+          tokens = u['totalTokens'] as number
+        }
+      }
+      next.turnItems = onFinal(next.turnItems, turns, toolUses, tokens)
       break
     }
     case 'run.failed':
       next.running = false
       next.streaming = false
       next.lastError = ev.text
+      next.logs = appendLog(next.logs, `⚠ ${ev.text}`)
+      break
+    case 'line':
+      next.logs = appendLog(next.logs, ev.text)
       break
     case 'approval.required': {
       const argsRaw: Object | undefined = extra['args']

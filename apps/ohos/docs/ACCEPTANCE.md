@@ -66,3 +66,34 @@
 **结论:鸿蒙版 HMH-OHOS 验收通过(6/6 门)。** PC-Windows 版、Web-7788、HarmonyOS 三端同源(runtime 单一真相)格局成立。
 审批卡/聊天流的补充截图(原 3 张要求)由 shot-home/settings + e2e-dump 布局链替代举证——UI 真实渲染已由用户亲手操作证实。
 监督工具链:scripts/agent-{watch,last,sessions,sentinel}.mjs + dispatch-ohos*.mjs(棒次派发)+audit-token/redact-hilog(安全复核)。
+
+---
+
+## v2 棒 4 · ArkTS 装配记录(2026-10-26 00:2x-00:4x)
+
+**构建链**:deploy.mjs 全链通过(build→patch23→VM 签→install),装机 3 次成功。
+
+### 已装配+真机举证(矩阵项 → 证据)
+| 项 | 状态 | 证据 |
+|---|---|---|
+| #1 工具折叠卡 | ✅ 装配+真机 | v2-chat1/2/3.json:`✓ run_command ×2 + ⟳ run_command 执行中…`(running/ok 两态);shot-v2-chat-tools.jpeg |
+| #2 交付物卡 | ✅ 代码装配(Reducer onFinal→DeliverableItem);真机待 write 类任务 | deliverableCard builder(v2-chat*.json 未见:本任务只跑了 run_command) |
+| #3 回合汇总 | ✅ 代码装配(turnSumText);真机待 final 带 turns/usage | 同上 |
+| #8 会话分组+收藏+状态过滤+折叠 | ✅ 装配+真机 | v2-tabs.json:`▾ G:\hmh-desktop · 12 个会话`+☆+全部/运行中/已完成/失败 chips;shot-v2-sessions.jpeg |
+| #12 归档/删除 | ✅ 装配+真机可见 | v2-tabs.json:每卡「归档(可恢复)/删除(移入回收站,可恢复)」行;交互 POST /api/sessions/:id/{archive,delete}(未逐个点击——会污染真实会话列表,留待用户实测) |
+| #13 加载更多 | ✅ 装配+真机可见 | v2-tabs.json:「加载更多」按钮(nextCursor 非空时显示) |
+| #14 运行点 | ✅ 装配 | buildRows 从 state.busySessions 标 running(真机:任务跑时列表项变蓝「运行中」——本棒任务跑时未回列表页截图,逻辑与 #8 同源) |
+| #16 总览 Tab | ✅ 装配+真机 | v2-overview.json:runtime 0.23.39/模式 lan/模型 glm-5.3/provider glm/会话数/运行状态/host/工作区 全真实数据;shot-v2-overview.jpeg |
+| #17 日志 Tab | ✅ 装配+真机 | v2-logs.json:「运行日志(runtime line 流,最近 200 条)」+空态提示(累积逻辑:Reducer line→appendLog 上限 200) |
+| #18 主题 | ✅ 装配+真机 | v2-settings3.json:外观(跟随系统/浅色/深色)chips 上屏;saveTheme→preferences 持久(配色应用未做全局色映射——如实:仅选择器+持久化,深浅色板待下棒) |
+| #19 i18n | ✅ 装配+真机 | v2-settings-en.json:点 English 后 Appearance/System/Light/Dark/Language 即时切换;v2-settings3.json:中文态;saveLocale→preferences |
+| #15 模型选择 | ◐ 部分 | SettingsPage 模型 chips+POST /api/model 装配;真机未显示——/api/state(LAN)无 providers 数组,数据源需换 /api/providers 或等蓝本对齐(如实:交互就绪,数据源待查) |
+
+### 未装配(下棒)
+- #4 会话内搜索、#5 相册图片附件、#6 @文件引用、#7 审批模式切换(ask/auto)、#9 导出 Markdown、#10 重命名、#11 Provider 管理、#20 通知(approvalReq→notificationManager)
+- 主题深浅色板全局映射(当前仅选择器)
+
+### 真机操作备注
+- 6 Tab 布局 TabBar y≈641:总览(282) 会话(410) 工作区(538) 文件(666) 日志(852) 设置(996)
+- app 内点击需 aa start 拉回前台(多窗口抢焦点)
+- 归档/删除未真点(防污染真实会话);发送 auto 任务已在 PC 侧验通(node send-task2.cjs 纯 http,token 只进请求头)

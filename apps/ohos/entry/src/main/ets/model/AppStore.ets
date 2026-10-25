@@ -20,12 +20,19 @@ export interface StoreListener {
 const PREF_FILE = 'hmh_store'
 const KEY_BASE = 'baseUrl'
 const KEY_TOKEN = 'token'
+const KEY_LOCALE = 'locale'
+const KEY_PINNED = 'pinned'
+const KEY_COLLAPSED = 'collapsedGroups'
 
 export class AppStore {
   private static instance: AppStore | null = null
 
   baseUrl: string = ''
   token: string = ''
+  locale: string = 'zh'
+  theme: string = 'system'
+  pinned: Set<string> = new Set<string>()
+  collapsedGroups: Set<string> = new Set<string>()
   chat: ChatState = newChatState('')
   serverState: StateObj | null = null
   sseConnected: boolean = false
@@ -50,6 +57,54 @@ export class AppStore {
     this.prefs = await preferences.getPreferences(context, PREF_FILE)
     this.baseUrl = await this.prefs.get(KEY_BASE, '') as string
     this.token = await this.prefs.get(KEY_TOKEN, '') as string
+    this.locale = await this.prefs.get(KEY_LOCALE, 'zh') as string
+    this.theme = await this.prefs.get('theme', 'system') as string
+    this.pinned = this.parseSet(await this.prefs.get(KEY_PINNED, '[]') as string)
+    this.collapsedGroups = this.parseSet(await this.prefs.get(KEY_COLLAPSED, '[]') as string)
+  }
+
+  private parseSet(raw: string): Set<string> {
+    try {
+      const arr = JSON.parse(raw) as string[]
+      return new Set<string>(arr)
+    } catch (e) {
+      return new Set<string>()
+    }
+  }
+
+  private async persistSet(key: string, s: Set<string>): Promise<void> {
+    if (this.prefs !== null) {
+      await this.prefs.put(key, JSON.stringify(Array.from(s)))
+      await this.prefs.flush()
+    }
+  }
+
+  async savePinned(s: Set<string>): Promise<void> {
+    this.pinned = s
+    await this.persistSet(KEY_PINNED, s)
+  }
+
+  async saveCollapsed(s: Set<string>): Promise<void> {
+    this.collapsedGroups = s
+    await this.persistSet(KEY_COLLAPSED, s)
+  }
+
+  async saveLocale(l: string): Promise<void> {
+    this.locale = l
+    if (this.prefs !== null) {
+      await this.prefs.put(KEY_LOCALE, l)
+      await this.prefs.flush()
+    }
+    AppStorage.setOrCreate('localeRev', (AppStorage.get<number>('localeRev') ?? 0) + 1)
+  }
+
+  async saveTheme(th: string): Promise<void> {
+    this.theme = th
+    if (this.prefs !== null) {
+      await this.prefs.put('theme', th)
+      await this.prefs.flush()
+    }
+    AppStorage.setOrCreate('themeRev', (AppStorage.get<number>('themeRev') ?? 0) + 1)
   }
 
   async saveConfig(baseUrl: string, token: string): Promise<void> {

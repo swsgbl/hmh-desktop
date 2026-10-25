@@ -1,11 +1,14 @@
 /**
- * M-O2 会话纵切片:会话列表(历史) + 进入会话(SSE 订阅 + 发送 + 流式渲染 + 审批卡 + 打断)
+ * v2 会话页:分组列表(pin/过滤/折叠/加载更多/管理) + 聊天流(turn-items 卡片)
  */
 import { AppStore } from '../model/AppStore'
 import { guardSessionsResp } from '../model/Guards'
 import { SessionInfo, ChatState, ChatMessage, TaskReq, SimpleSidReq, ApproveReq, StateObj } from '../model/Types'
 import { ApiError, toApiError } from '../net/ApiClient'
 import { ApprovalCardView } from '../components/ApprovalCard'
+import { SessionRow, SessionGroup, applyFilter, groupByWorkspace, toggleGroup, wsGroupLabel } from '../model/SessionList'
+import { ToolItem, TurnSumItem, DeliverableItem, turnSumText } from '../model/TurnItems'
+import { t, Locale } from '../model/I18n'
 
 @Component
 export struct SessionsPage {
@@ -17,14 +20,23 @@ export struct SessionsPage {
   @State chat: ChatState = AppStore.get().chat
   @State input: string = ''
   @State sending: boolean = false
+  @State filter: string = 'all'
+  @State pinned: Set<string> = new Set<string>()
+  @State collapsed: Set<string> = new Set<string>()
+  @State nextCursor: string = ''
+  @State locale: string = 'zh'
+  @State expandedTool: string = ''
   @StorageProp('chatRev') chatRev: number = 0
   @StorageProp('sseConnected') sseConnected: boolean = false
+  @StorageProp('localeRev') localeRev: number = 0
   private store: AppStore = AppStore.get()
   private scroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
+    this.locale = this.store.locale
+    this.pinned = new Set<string>(this.store.pinned)
+    this.collapsed = new Set<string>(this.store.collapsedGroups)
     this.refresh()
-    // 订阅 store 的 chat 状态变化(reduce 后的权威快照)
     AppStore.get().setListener({
       onChatState: (st: ChatState) => {
         this.chat = st
@@ -40,6 +52,31 @@ export struct SessionsPage {
     AppStore.get().setListener(null)
   }
 
+  private L(key: string): string {
+    return t(key, this.locale === 'en' ? 'en' : 'zh')
+  }
+
+  private buildRows(): SessionRow[] {
+    const rows: SessionRow[] = []
+    const busy = this.store.serverState?.busySessions ?? []
+    for (let i = 0; i < this.sessions.length; i++) {
+      const s = this.sessions[i]
+      const r = new SessionRow()
+      r.id = s.id
+      r.title = s.title !== '' ? s.title : (s.task !== '' ? s.task.slice(0, 40) : s.id.slice(0, 12))
+      r.task = s.task
+      r.outcome = s.outcome
+      r.workspace = s.cwd
+      r.running = busy.indexOf(s.id) >= 0
+      r.turns = s.turns
+      r.toolUses = s.toolUses
+      r.pinned = this.pinned.has(s.id)
+      r.updatedAt = s.updatedAt
+      rows.push(r)
+    }
+    return rows
+  }
+
   build() {
     if (!this.inChat) {
       this.listBody()
@@ -51,148 +88,234 @@ export struct SessionsPage {
   // ---------- 会话列表 ----------
   @Builder
   listBody() {
-    Column({ space: 12 }) {
-      Row({ space: 12 }) {
-        Text('会话')
-          .fontSize(22)
+    Column({ space: 10 }) {
+      Row({ space: 8 }) {
+        Text(this.L('dock.ws') === 'Workspace' ? 'Sessions' : '会话')
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .layoutWeight(1)
-        Button('刷新')
+        Button(this.L('side.new'))
           .fontSize(13)
-          .height(36)
-          .onClick(() => this.refresh())
+          .height(34)
+          .onClick(() => this.openSession(''))
+      }
+      .width('100%')
+
+      // 过滤条
+      Row({ space: 6 }) {
+        ForEach(['all', 'running', 'done', 'failed'], (f: string) => {
+          Text(this.filterLabel(f))
+            .fontSize(12)
+            .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+            .backgroundColor(this.filter === f ? '#1565C0' : '#E8EAED')
+            .fontColor(this.filter === f ? '#FFFFFF' : '#444444')
+            .borderRadius(14)
+            .onClick(() => {
+              this.filter = f
+            })
+        }, (f: string) => f)
       }
       .width('100%')
 
       if (this.loading) {
-        LoadingProgress().width(28).height(28)
-        Text('加载中...').fontSize(13).fontColor('#888888')
+        LoadingProgress().width(24).height(24)
       }
       if (this.errMsg !== '') {
-        Text(this.errMsg).fontSize(13).fontColor('#C0392B')
+        Text(this.errMsg).fontSize(12).fontColor('#C0392B')
       }
 
       Scroll(this.scroller) {
-        Column({ space: 10 }) {
-          ForEach(this.sessions, (s: SessionInfo) => {
-            Column({ space: 4 }) {
-              Row({ space: 8 }) {
-                Text(s.title)
-                  .fontSize(15)
+        Column({ space: 8 }) {
+          ForEach(this.groups(), (g: SessionGroup) => {
+            Column({ space: 6 }) {
+              // 组头
+              Row({ space: 6 }) {
+                Text(g.collapsed ? '▸' : '▾')
+                  .fontSize(14)
+                  .fontColor('#666666')
+                Text(wsGroupLabel(g.workspace, g.rows.length))
+                  .fontSize(13)
                   .fontWeight(FontWeight.Medium)
-                  .maxLines(1)
-                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .fontColor('#555555')
                   .layoutWeight(1)
-                Text(`${s.turns} 轮 · ${s.toolUses} 工具`)
-                  .fontSize(11)
-                  .fontColor('#999999')
               }
               .width('100%')
-              Row({ space: 8 }) {
-                Text(s.updatedAt !== '' ? s.updatedAt.slice(0, 19) : s.id.slice(0, 12))
-                  .fontSize(11)
-                  .fontColor('#999999')
-                if (s.outcome !== '') {
-                  Text(s.outcome === 'ok' ? '✓ ok' : s.outcome)
-                    .fontSize(11)
-                    .fontColor(s.outcome === 'ok' ? '#0A7D32' : '#B26A00')
-                }
+              .onClick(() => {
+                this.collapsed = toggleGroup(this.collapsed, g.workspace)
+                this.store.collapsedGroups = this.collapsed
+              })
+              if (!g.collapsed) {
+                ForEach(g.rows, (s: SessionRow) => {
+                  this.sessionCard(s)
+                }, (s: SessionRow) => s.id)
               }
-              .width('100%')
             }
-            .padding(12)
-            .backgroundColor('#FFFFFF')
-            .borderRadius(12)
             .width('100%')
-            .onClick(() => this.openSession(s.id))
-          }, (s: SessionInfo) => s.id)
+          }, (g: SessionGroup) => g.workspace + g.rows.length)
         }
         .width('100%')
       }
       .layoutWeight(1)
       .width('100%')
 
-      Button('新建会话')
-        .width('100%')
-        .height(44)
-        .onClick(() => this.openSession(''))
+      if (this.nextCursor !== '') {
+        Button(this.L('side.loadMore'))
+          .fontSize(13)
+          .height(36)
+          .width('100%')
+          .onClick(() => this.loadMore())
+      }
     }
-    .padding(16)
+    .padding(14)
     .width('100%')
     .height('100%')
   }
 
-  // ---------- 会话聊天 ----------
+  @Builder
+  sessionCard(s: SessionRow) {
+    Column({ space: 4 }) {
+      Row({ space: 8 }) {
+        Text(s.pinned ? '★' : '☆')
+          .fontSize(16)
+          .fontColor(s.pinned ? '#F5A623' : '#BBBBBB')
+          .onClick(() => this.togglePin(s.id))
+        Column({ space: 2 }) {
+          Text(s.title)
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Row({ space: 6 }) {
+            Text(`${s.turns} 轮 · ${s.toolUses} 工具`)
+              .fontSize(10)
+              .fontColor('#999999')
+            if (s.running) {
+              Text(this.L('status.running'))
+                .fontSize(10)
+                .fontColor('#1565C0')
+            } else if (s.outcome === 'error') {
+              Text(this.L('status.failed'))
+                .fontSize(10)
+                .fontColor('#C0392B')
+            } else if (s.outcome === 'ok') {
+              Text('✓')
+                .fontSize(10)
+                .fontColor('#0A7D32')
+            }
+          }
+          .width('100%')
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+      .width('100%')
+      Row({ space: 10 }) {
+        Text(s.updatedAt !== '' ? s.updatedAt.slice(0, 16).replace('T', ' ') : '')
+          .fontSize(10)
+          .fontColor('#999999')
+          .layoutWeight(1)
+        Text(this.L('side.archive'))
+          .fontSize(10)
+          .fontColor('#1565C0')
+          .onClick(() => this.doOp(s.id, 'archive'))
+        Text(this.L('side.delete'))
+          .fontSize(10)
+          .fontColor('#C0392B')
+          .onClick(() => this.doOp(s.id, 'delete'))
+      }
+      .width('100%')
+    }
+    .padding(10)
+    .backgroundColor('#FFFFFF')
+    .borderRadius(10)
+    .width('100%')
+    .onClick(() => this.openSession(s.id))
+  }
+
+  // ---------- 聊天 ----------
   @Builder
   chatBody() {
     Column({ space: 8 }) {
       Row({ space: 8 }) {
         Button('←')
-          .fontSize(16)
-          .height(36)
-          .width(44)
+          .fontSize(15)
+          .height(34)
+          .width(40)
           .onClick(() => this.closeSession())
         Column({ space: 2 }) {
-          Text(this.activeId === '' ? '新会话' : this.activeId.slice(0, 14))
-            .fontSize(15)
+          Text(this.activeId === '' ? this.L('side.new') : this.activeId.slice(0, 14))
+            .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .maxLines(1)
           Row({ space: 6 }) {
-            Circle({ width: 8, height: 8 })
+            Circle({ width: 7, height: 7 })
               .fill(this.sseConnected ? '#0A7D32' : '#C0392B')
-            Text(this.sseConnected ? (this.chat.running ? '运行中' : '已连接') : '连接中...')
-              .fontSize(11)
+            Text(this.sseConnected ? (this.chat.running ? this.L('status.running') : this.L('status.connected')) : '...')
+              .fontSize(10)
               .fontColor('#888888')
-            if (this.chat.queuePosition > 0) {
-              Text(`排队 #${this.chat.queuePosition}`).fontSize(11).fontColor('#B26A00')
-            }
           }
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
         if (this.chat.running) {
-          Button('打断')
-            .fontSize(13)
-            .height(36)
+          Button(this.L('stream.taskFailed') === 'Task failed' ? 'Interrupt' : '打断')
+            .fontSize(12)
+            .height(32)
             .backgroundColor('#C0392B')
             .onClick(() => this.doInterrupt())
         }
       }
       .width('100%')
 
-      // 消息流
-      List({ space: 10, scroller: this.scroller }) {
+      List({ space: 8, scroller: this.scroller }) {
         ListItem() {
-          Column({ space: 4 }) {
+          Column({ space: 6 }) {
             ForEach(this.chat.messages, (m: ChatMessage, idx: number) => {
-              Column({ space: 4 }) {
+              Column({ space: 3 }) {
                 Text(m.role === 'user' ? '我' : 'AI')
-                  .fontSize(11)
+                  .fontSize(10)
                   .fontColor(m.role === 'user' ? '#1565C0' : '#0A7D32')
                   .alignSelf(m.role === 'user' ? ItemAlign.End : ItemAlign.Start)
                 Text(m.text)
-                  .fontSize(14)
-                  .padding(10)
+                  .fontSize(13)
+                  .padding(8)
                   .backgroundColor(m.role === 'user' ? '#E3F2FD' : '#F1F8E9')
-                  .borderRadius(10)
+                  .borderRadius(8)
                   .alignSelf(m.role === 'user' ? ItemAlign.End : ItemAlign.Start)
                   .constraintSize({ maxWidth: '85%' })
               }
               .width('100%')
             }, (m: ChatMessage, idx: number) => `${idx}`)
-            // 流式缓冲
+
+            // 工具卡/交付物卡/回合汇总(turn-items)
+            ForEach(this.chat.turnItems.items, (it: ToolItem | TurnSumItem | DeliverableItem, idx: number) => {
+              Column() {
+                if (it instanceof ToolItem) {
+                  this.toolCard(it)
+                } else if (it instanceof DeliverableItem) {
+                  this.deliverableCard(it)
+                } else if (it instanceof TurnSumItem) {
+                  Text(turnSumText((it as TurnSumItem).turns, (it as TurnSumItem).toolUses, (it as TurnSumItem).tokens))
+                    .fontSize(11)
+                    .fontColor('#888888')
+                    .padding({ top: 4, bottom: 4 })
+                }
+              }
+              .width('100%')
+            }, (it: ToolItem | TurnSumItem | DeliverableItem, idx: number) => `${idx}`)
+
             if (this.chat.streaming && this.chat.streamBuf !== '') {
               Text(this.chat.streamBuf)
-                .fontSize(14)
-                .padding(10)
+                .fontSize(13)
+                .padding(8)
                 .backgroundColor('#F1F8E9')
-                .borderRadius(10)
+                .borderRadius(8)
                 .alignSelf(ItemAlign.Start)
                 .constraintSize({ maxWidth: '85%' })
             }
             if (this.chat.lastError !== '') {
               Text(`⚠ ${this.chat.lastError}`)
-                .fontSize(13)
+                .fontSize(12)
                 .fontColor('#C0392B')
                 .width('100%')
             }
@@ -203,7 +326,6 @@ export struct SessionsPage {
       .layoutWeight(1)
       .width('100%')
 
-      // 审批卡
       if (this.chat.approval !== null) {
         ApprovalCardView({
           card: this.chat.approval,
@@ -212,16 +334,15 @@ export struct SessionsPage {
         })
       }
 
-      // 输入区
       Row({ space: 8 }) {
-        TextInput({ text: this.input, placeholder: '输入任务...' })
+        TextInput({ text: this.input, placeholder: this.L('comp.phEnter') })
           .onChange((v: string) => {
             this.input = v
           })
           .layoutWeight(1)
           .enabled(!this.sending)
-        Button(this.chat.running ? '注入' : '发送')
-          .height(40)
+        Button(this.chat.running ? this.L('comp.inject') : this.L('comp.send'))
+          .height(38)
           .enabled(this.input !== '' && !this.sending)
           .onClick(() => this.doSend())
       }
@@ -232,21 +353,154 @@ export struct SessionsPage {
     .height('100%')
   }
 
+  @Builder
+  toolCard(it: ToolItem) {
+    Column({ space: 3 }) {
+      Row({ space: 6 }) {
+        Text(it.status === 'running' ? '⟳' : (it.status === 'error' ? '✗' : '✓'))
+          .fontSize(12)
+          .fontColor(it.status === 'running' ? '#1565C0' : (it.status === 'error' ? '#C0392B' : '#0A7D32'))
+        Text(it.name)
+          .fontSize(11)
+          .fontWeight(FontWeight.Medium)
+          .layoutWeight(1)
+          .maxLines(1)
+        if (it.status === 'running') {
+          Text(this.L('stream.toolRunning'))
+            .fontSize(10)
+            .fontColor('#1565C0')
+        }
+      }
+      .width('100%')
+      .onClick(() => {
+        this.expandedTool = this.expandedTool === it.name ? '' : it.name
+      })
+      if (this.expandedTool === it.name) {
+        if (it.argsPreview !== '') {
+          Text(it.argsPreview)
+            .fontSize(10)
+            .fontColor('#666666')
+            .width('100%')
+            .maxLines(3)
+        }
+        if (it.resultPreview !== '') {
+          Text(it.resultPreview)
+            .fontSize(10)
+            .fontColor('#444444')
+            .width('100%')
+            .maxLines(6)
+        }
+      }
+    }
+    .padding(8)
+    .backgroundColor('#F5F5F5')
+    .borderRadius(8)
+    .width('100%')
+    .alignSelf(ItemAlign.Start)
+    .constraintSize({ maxWidth: '85%' })
+  }
+
+  @Builder
+  deliverableCard(d: DeliverableItem) {
+    Row({ space: 6 }) {
+      Text('📦')
+        .fontSize(12)
+      Text(d.relPath)
+        .fontSize(11)
+        .fontColor('#0A7D32')
+        .layoutWeight(1)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Text(d.tool)
+        .fontSize(9)
+        .fontColor('#999999')
+    }
+    .padding(8)
+    .backgroundColor('#E8F5E9')
+    .borderRadius(8)
+    .width('100%')
+    .alignSelf(ItemAlign.Start)
+    .constraintSize({ maxWidth: '85%' })
+  }
+
   // ---------- 动作 ----------
+  private filterLabel(f: string): string {
+    if (f === 'running') {
+      return this.L('side.filterRunning')
+    }
+    if (f === 'done') {
+      return this.L('side.filterDone')
+    }
+    if (f === 'failed') {
+      return this.L('side.filterFailed')
+    }
+    return this.L('side.filterAll')
+  }
+
+  private groups(): SessionGroup[] {
+    const rows = applyFilter(this.buildRows(), this.filter === 'running' ? 'running' : (this.filter === 'done' ? 'done' : (this.filter === 'failed' ? 'failed' : 'all')))
+    return groupByWorkspace(rows, this.collapsed)
+  }
+
+  private togglePin(id: string): void {
+    const n = new Set<string>(this.pinned)
+    if (n.has(id)) {
+      n.delete(id)
+    } else {
+      n.add(id)
+    }
+    this.pinned = n
+    this.store.pinned = n
+  }
+
   private async refresh(): Promise<void> {
     this.loading = true
     this.errMsg = ''
     try {
-      const resp = await this.store.api().getJson<Object>('/api/sessions?limit=100')
+      const resp = await this.store.api().getJson<Object>('/api/sessions?limit=50')
       const g = guardSessionsResp(resp)
       this.sessions = g.sessions
+      this.nextCursor = g.nextCursor
       if (g.sessions.length === 0) {
-        this.errMsg = '(暂无历史会话,点「新建会话」开始)'
+        this.errMsg = this.L('side.empty')
       }
     } catch (e) {
       this.errMsg = this.errText(e)
     }
     this.loading = false
+  }
+
+  private async loadMore(): Promise<void> {
+    if (this.nextCursor === '') {
+      return
+    }
+    try {
+      const resp = await this.store.api().getJson<Object>(`/api/sessions?limit=50&cursor=${encodeURIComponent(this.nextCursor)}`)
+      const g = guardSessionsResp(resp)
+      const merged = this.sessions.slice()
+      for (let i = 0; i < g.sessions.length; i++) {
+        merged.push(g.sessions[i])
+      }
+      this.sessions = merged
+      this.nextCursor = g.nextCursor
+    } catch (e) {
+      this.errMsg = this.errText(e)
+    }
+  }
+
+  private async doOp(id: string, op: string): Promise<void> {
+    try {
+      await this.store.api().postJson<Object>(`/api/sessions/${encodeURIComponent(id)}/${op}`, null)
+      const kept: SessionInfo[] = []
+      for (let i = 0; i < this.sessions.length; i++) {
+        if (this.sessions[i].id !== id) {
+          kept.push(this.sessions[i])
+        }
+      }
+      this.sessions = kept
+    } catch (e) {
+      this.errMsg = this.errText(e)
+    }
   }
 
   private openSession(id: string): void {

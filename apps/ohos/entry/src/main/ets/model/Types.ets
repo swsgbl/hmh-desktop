@@ -3,6 +3,7 @@
  * 契约来源:G:\hmharness\packages\web\src\server.ts (LAN 7788)
  * 注意:ArkTS 严苛模式——只用接口/类,不用 any,不用字面量推类型
  */
+import { TurnItemsState, initialTurnItems } from './TurnItems'
 
 // ---------- /api/state ----------
 export interface WorkspaceInfo {
@@ -176,6 +177,8 @@ export interface ChatState {
   lastError: string
   lastEventSeq: number     // 已见最大 SSE seq(重连 Last-Event-ID)
   seenEventIds: Set<string>
+  turnItems: TurnItemsState  // v2: 工具卡/交付物卡/回合汇总
+  logs: string[]             // v2: runtime line 流(最近 200)
 }
 
 // ---------- 简单请求体 ----------
@@ -183,8 +186,20 @@ export interface SimpleSidReq {
   sessionId: string
 }
 
+export interface RenameReq {
+  title: string
+}
+
 export interface WsUseReq {
   id: string
+}
+
+export interface LocaleReq {
+  locale: string
+}
+
+export interface ModelReq {
+  name: string
 }
 
 export function newChatState(sessionId: string): ChatState {
@@ -199,6 +214,8 @@ export function newChatState(sessionId: string): ChatState {
     lastFinalText: '',
     lastError: '',
     lastEventSeq: 0,
-    seenEventIds: new Set<string>()
+    seenEventIds: new Set<string>(),
+    turnItems: initialTurnItems(),
+    logs: []
   } as ChatState
 }
