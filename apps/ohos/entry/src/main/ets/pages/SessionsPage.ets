@@ -13,6 +13,7 @@ export struct SessionsPage {
   @State loading: boolean = false
   @State errMsg: string = ''
   @State activeId: string = ''
+  @State inChat: boolean = false
   @State chat: ChatState = AppStore.get().chat
   @State input: string = ''
   @State sending: boolean = false
@@ -23,10 +24,24 @@ export struct SessionsPage {
 
   aboutToAppear(): void {
     this.refresh()
+    // 订阅 store 的 chat 状态变化(reduce 后的权威快照)
+    AppStore.get().setListener({
+      onChatState: (st: ChatState) => {
+        this.chat = st
+      },
+      onServerState: (_st: StateObj | null) => {
+      },
+      onSseStatus: (_c: boolean, _m: string) => {
+      }
+    })
+  }
+
+  aboutToDisappear(): void {
+    AppStore.get().setListener(null)
   }
 
   build() {
-    if (this.activeId === '') {
+    if (!this.inChat) {
       this.listBody()
     } else {
       this.chatBody()
@@ -236,12 +251,14 @@ export struct SessionsPage {
 
   private openSession(id: string): void {
     this.activeId = id
+    this.inChat = true
     this.store.startSse(id)
   }
 
   private closeSession(): void {
     this.store.stopSse()
     this.activeId = ''
+    this.inChat = false
   }
 
   private async doSend(): Promise<void> {

@@ -9,6 +9,7 @@ import { SseClient, SseFrame } from '../net/SseClient'
 import { toRunEvent, reduce } from '../core/Reducer'
 import { ChatState, newChatState, StateObj, RawEvent } from '../model/Types'
 import { guardState } from '../model/Guards'
+import { normalizeBaseUrl } from '../model/UrlNorm'
 
 export interface StoreListener {
   onChatState: (st: ChatState) => void
@@ -52,11 +53,11 @@ export class AppStore {
   }
 
   async saveConfig(baseUrl: string, token: string): Promise<void> {
-    this.baseUrl = baseUrl
-    this.token = token
+    this.baseUrl = normalizeBaseUrl(baseUrl)
+    this.token = token.trim()
     if (this.prefs !== null) {
-      await this.prefs.put(KEY_BASE, baseUrl)
-      await this.prefs.put(KEY_TOKEN, token)
+      await this.prefs.put(KEY_BASE, this.baseUrl)
+      await this.prefs.put(KEY_TOKEN, this.token)
       await this.prefs.flush()
     }
   }

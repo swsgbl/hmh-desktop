@@ -12,6 +12,9 @@ build/
 .DS_Store
 test-out.log
 
+# 鸿蒙 E2E 工具与构建暂存(hilog 抓包等,含敏感风险,永不入库)
+.hm-tmp/
+
 # 私有开发文档提取物(用户文档全文,绝不入库)
 docx-*.txt
 hmh-doc-*/

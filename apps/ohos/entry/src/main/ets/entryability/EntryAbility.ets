@@ -5,11 +5,37 @@ import { AppStore } from '../model/AppStore'
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     console.info('HMH Desktop EntryAbility onCreate')
-    AppStore.get().initPrefs(this.context).then(() => {
+    const store = AppStore.get()
+    store.initPrefs(this.context).then(() => {
+      // E2E/debug 通道:aa start --ps hmhUrl <url> --ps hmhToken <token> 直达配置(仅 LAN 调试用)
+      const p = want.parameters as Record<string, Object>
+      const u = p !== undefined && typeof p['hmhUrl'] === 'string' ? p['hmhUrl'] as string : ''
+      const t = p !== undefined && typeof p['hmhToken'] === 'string' ? p['hmhToken'] as string : ''
+      if (u !== '' || t !== '') {
+        const baseUrl = u !== '' ? u : store.baseUrl
+        const token = t !== '' ? t : store.token
+        store.saveConfig(baseUrl, token).then(() => {
+          console.info('config applied from want parameters')
+        })
+      }
       console.info('AppStore prefs ready')
     }).catch((e: object) => {
       console.error('AppStore initPrefs error: ' + JSON.stringify(e))
     })
+  }
+
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    const p = want.parameters as Record<string, Object>
+    const u = p !== undefined && typeof p['hmhUrl'] === 'string' ? p['hmhUrl'] as string : ''
+    const t = p !== undefined && typeof p['hmhToken'] === 'string' ? p['hmhToken'] as string : ''
+    if (u !== '' || t !== '') {
+      const store = AppStore.get()
+      const baseUrl = u !== '' ? u : store.baseUrl
+      const token = t !== '' ? t : store.token
+      store.saveConfig(baseUrl, token).then(() => {
+        console.info('config re-applied from want parameters')
+      })
+    }
   }
 
   onDestroy(): void {

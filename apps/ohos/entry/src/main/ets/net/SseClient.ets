@@ -54,6 +54,7 @@ export class SseClient {
     const client = http.createHttp()
     this.client = client
     client.on('headersReceive', (header: object) => {
+      console.info('SSE diag headersReceive (connected)')
       this.handlers.onOpen()
     })
     client.on('dataReceive', (chunk: ArrayBuffer) => {
@@ -64,6 +65,7 @@ export class SseClient {
       this.ingest(text)
     })
     client.on('dataEnd', () => {
+      console.info('SSE diag dataEnd')
       this.scheduleReconnect('stream end')
     })
     client.on('dataReceiveProgress', (p: http.DataReceiveProgressInfo) => {
@@ -85,17 +87,20 @@ export class SseClient {
       readTimeout: 0
     }
     client.requestInStream(this.url, options).then((code: number) => {
+      console.info(`SSE diag requestInStream code=${code}`)
       if (code >= 400) {
         this.handlers.onError(`SSE HTTP ${code}`)
         this.close()
       }
     }).catch((e: object) => {
+      console.info(`SSE diag requestInStream failed: ${JSON.stringify(e).slice(0, 120)}`)
       this.scheduleReconnect('connect failed')
     })
   }
 
   /** 喂入文本块,分帧后回调(与 SseFramer.push 同构) */
   private ingest(chunk: string): void {
+    console.info(`SSE diag ingest len=${chunk.length} head=${chunk.slice(0, 60)}`)
     this.buf += chunk.replace(/\r\n/g, '\n')
     for (;;) {
       const idx = this.buf.indexOf('\n\n')
@@ -109,6 +114,7 @@ export class SseClient {
         if (f.id !== '') {
           this.lastEventId = f.id
         }
+        console.info(`SSE diag frame event=${f.event} id=${f.id}`)
         this.handlers.onFrame(f)
       }
     }
