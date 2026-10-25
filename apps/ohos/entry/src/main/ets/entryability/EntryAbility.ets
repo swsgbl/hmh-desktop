@@ -1,6 +1,7 @@
 import { UIAbility, AbilityConstant, Want } from '@kit.AbilityKit'
 import { window } from '@kit.ArkUI'
 import { AppStore } from '../model/AppStore'
+import { bootstrapAfterPrefs } from '../model/Bootstrap'
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -19,6 +20,8 @@ export default class EntryAbility extends UIAbility {
         })
       }
       console.info('AppStore prefs ready')
+      // P0.2: launch auto-reconnect (health check + global SSE) when configured
+      bootstrapAfterPrefs()
     }).catch((e: object) => {
       console.error('AppStore initPrefs error: ' + JSON.stringify(e))
     })
@@ -34,6 +37,7 @@ export default class EntryAbility extends UIAbility {
       const token = t !== '' ? t : store.token
       store.saveConfig(baseUrl, token).then(() => {
         console.info('config re-applied from want parameters')
+        bootstrapAfterPrefs()
       })
     }
   }
