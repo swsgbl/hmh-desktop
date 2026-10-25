@@ -93,6 +93,33 @@
 - #4 会话内搜索、#5 相册图片附件、#6 @文件引用、#7 审批模式切换(ask/auto)、#9 导出 Markdown、#10 重命名、#11 Provider 管理、#20 通知(approvalReq→notificationManager)
 - 主题深浅色板全局映射(当前仅选择器)
 
+---
+
+## v2 棒 6 · 收尾批实施记录(2026-10-26 01:0x-01:5x)
+
+### ⚠️ P0 事件还原(诚实申报)
+本棒复现了"装完即消失":install successfully → 3s 后 bm dump GONE。**排查结论:棒内自伤**——deploy.mjs 的 BUNDLE 常量被我改成 `com.hmharvest.ohos`(误以为 app.json5 笔误),但 profile.p7b(棒 2 生成)与 app.json5 真包名均为 `com.hmh.desktop.ohos` → 包名/profile 不匹配 → BMS 装后静默清除。**已改回并 ALIVE 复验(len=16334)**。给后续的教训:vm-sign23.sh 的 profile 与 app.json5 bundleName 必须一致,改包名必须同步重生成 profile.p7b。
+
+### 已装配+真机举证(本棒 6 项)
+| 项 | 状态 | 证据 |
+|---|---|---|
+| #15/#12-新 模型选择 | ✅ **E2E PASS** | dump:`当前 chat 模型`+15 chips(name:model);点 deepseek:flash → **`当前: deepseek-flash`** 回读确认;PC 侧 probe2.cjs `/api/model {name:'glm'}` → 200 `{"ok":true,"model":"glm-5.3"}` 双向实证 |
+| #13-新 审批模式 | ✅ 装配+API 双证 | dump:`审批模式`+`每次询问 (默认)`/`自动执行` chips 上屏;PC 侧 `/api/config {approval:'ask'\|'auto'}` 均 200 `{"ok":true}`;app 内点击未观测到 UI 反馈(见未尽事项 2) |
+| #14-新 Provider | ✅ 装配+真机 | dump:15 provider 行(name+model+purposes 徽标 chat,evolve,bench/vision);`+ 新增 Provider` 表单(name/baseUrl/model/apiKey 掩码+校验按钮,"仅校验不写入服务端"防污染真实 config——Zode 授权的降级验收) |
+| #11 @文件引用 | ✅ **E2E 半程实证** | 会话页 `@` 按钮 @242,580 → 弹层(搜索框+搜索+×)→输"23"→**真实命中 5 文件**(docx-01_审核报告.docx.txt、.hm-tmp/entry-api23-*.hap ×4);点选/attachments 随任务的最终发送因会话 busy(见未尽事项 3) |
+| #19 通知 | ✅ 代码装配 | Notify.ets+AppStore.publishApprovalNotify(approval.required→notificationManager+wantAgent 拉起);notify.test.ts 2/2;真机触发需审批任务(见未尽事项 4) |
+| #10 相册图片 | ✅ 代码装配 | SessionsPage 📷 按钮+PhotoViewPicker(≤3张≤6MB→base64→images);真机需相册(见未尽事项 5) |
+
+### 单测
+61/61 全绿(原 52 + settings-biz 7 + notify 2)。
+
+### 未尽事项(如实)
+1. **Tab 数疑云**:早前 dump 曾见 4-Tab(设置页),后 hmm-dump.cjs(窗口过滤)稳定见 6-Tab——判断当时是窗口层叠/滚出屏导致漏读;6-Tab 以 hmm 系列为准
+2. **#13 app 内点击无 UI 反馈**:chips 渲染+API 契约均证,点击后 approvalMsg 未上屏(疑坐标漂移或 onClick 未触发);服务端不可观测该次点击(config 值未变)——留待复测
+3. **#11 最终发送**:选中文件后恰逢会话 busy(按钮变"注入运行中任务"),新会话发送链未走完;搜索/选文件/弹层已证
+4. **#19 通知真机触发**:需 mode:ask+工具调用任务产生 approvalReq;本棒 runtime 在跑长任务未便注入——代码+单测就绪
+5. **#10 相册**:VM 无真实相册图片,PhotoViewPicker 链路无法端到端;代码就绪(≤3/≤6MB/base64/images)
+
 ### 真机操作备注
 - 6 Tab 布局 TabBar y≈641:总览(282) 会话(410) 工作区(538) 文件(666) 日志(852) 设置(996)
 - app 内点击需 aa start 拉回前台(多窗口抢焦点)

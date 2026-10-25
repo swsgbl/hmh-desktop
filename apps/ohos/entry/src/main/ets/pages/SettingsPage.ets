@@ -1,12 +1,13 @@
 /**
- * M-O1 设置页:服务器地址 + 访问令牌配置、连接测试、持久化
- * 安全:token 只存 preferences,UI 掩码显示,绝不打日志
+ * v2 设置页:连接 + 外观/语言 + #12 模型选择 + #13 审批模式 + #14 Provider 管理
+ * 安全:token 只存 preferences,UI 掩码,绝不打日志
  */
 import { AppStore } from '../model/AppStore'
 import { ApiError, toApiError } from '../net/ApiClient'
 import { guardState } from '../model/Guards'
 import { t } from '../model/I18n'
-import { StateObj, ModelReq } from '../model/Types'
+import { StateObj, ModelReq, ApprovalReq, ProviderUpsertReq, ProviderRow } from '../model/Types'
+import { modelChipLabel, isCurrentProvider, validApproval, validateProviderForm, parseProviderRows } from '../model/SettingsBiz'
 
 @Component
 export struct SettingsPage {
@@ -19,10 +20,20 @@ export struct SettingsPage {
   @State locale: string = 'zh'
   @State theme: string = 'system'
   @State model: string = ''
-  @State models: string[] = []
+  @State chatProvider: string = ''
+  @State providers: ProviderRow[] = []
   @State approvalMode: string = 'ask'
-  @State savingModel: boolean = false
+  @State approvalMsg: string = ''
   @State modelMsg: string = ''
+  // Provider 表单
+  @State pvOpen: boolean = false
+  @State pvName: string = ''
+  @State pvUrl: string = ''
+  @State pvModel: string = ''
+  @State pvKey: string = ''
+  @State pvKeyMasked: boolean = true
+  @State pvMsg: string = ''
+  @State pvMsgOk: boolean = false
   @StorageProp('localeRev') localeRev: number = 0
   @StorageProp('themeRev') themeRev: number = 0
   private store: AppStore = AppStore.get()
@@ -45,19 +56,15 @@ export struct SettingsPage {
       const g = guardState(st)
       if (g !== null) {
         this.model = g.model
-        const providers = g.providers
-        if (providers !== undefined && providers !== null) {
-          const arr = providers as Object as Array<Object>
-          const names: string[] = []
-          for (let i = 0; i < arr.length; i++) {
-            const p = arr[i] as Record<string, Object>
-            const n = p['name']
-            if (typeof n === 'string') {
-              names.push(n as string)
-            }
-          }
-          this.models = names
+        const rawProv = st as Record<string, Object>
+        const cp = rawProv['chatProvider']
+        this.chatProvider = typeof cp === 'string' ? cp as string : ''
+        const ap = rawProv['approval']
+        if (typeof ap === 'string') {
+          this.approvalMode = ap as string
         }
+        const pv = rawProv['providers']
+        this.providers = parseProviderRows(pv instanceof Array ? pv as object[] : null)
       }
     } catch (e) {
       // 未配置时静默
@@ -172,36 +179,153 @@ export struct SettingsPage {
         .alignItems(HorizontalAlign.Start)
         .width('100%')
 
-        // 模型选择
-        if (this.models.length > 0) {
-          Column({ space: 8 }) {
-            Text(this.L('top.model'))
-              .fontSize(15)
-              .fontWeight(FontWeight.Bold)
-              .alignSelf(ItemAlign.Start)
-            Text(this.locale === 'en' ? `current: ${this.model}` : `当前: ${this.model}`)
-              .fontSize(12)
-              .fontColor('#666666')
-              .alignSelf(ItemAlign.Start)
-            Row({ space: 6 }) {
-              ForEach(this.models, (m: string) => {
-                Text(m)
-                  .fontSize(11)
-                  .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                  .backgroundColor(this.model === m ? '#0A7D32' : '#E8EAED')
-                  .fontColor(this.model === m ? '#FFFFFF' : '#444444')
-                  .borderRadius(12)
-                  .onClick(() => this.doModel(m))
-              }, (m: string) => m)
-            }
-            .width('100%')
-            if (this.modelMsg !== '') {
-              Text(this.modelMsg).fontSize(11).fontColor('#1565C0').alignSelf(ItemAlign.Start)
-            }
+        Divider()
+
+        // #12 模型选择(name:model chip)
+        Column({ space: 8 }) {
+          Text(this.L('top.model'))
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .alignSelf(ItemAlign.Start)
+          Text(this.locale === 'en' ? `current: ${this.model}` : `当前: ${this.model}`)
+            .fontSize(12)
+            .fontColor('#666666')
+            .alignSelf(ItemAlign.Start)
+          Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
+            ForEach(this.providers, (p: ProviderRow) => {
+              Text(modelChipLabel(p.name, p.model))
+                .fontSize(11)
+                .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+                .backgroundColor(isCurrentProvider(p.name, p.model, this.model, this.chatProvider) ? '#0A7D32' : '#E8EAED')
+                .fontColor(isCurrentProvider(p.name, p.model, this.model, this.chatProvider) ? '#FFFFFF' : '#444444')
+                .borderRadius(12)
+                .margin({ right: 6, bottom: 6 })
+                .onClick(() => this.doModel(p.name))
+            }, (p: ProviderRow) => p.name)
           }
-          .alignItems(HorizontalAlign.Start)
           .width('100%')
+          if (this.modelMsg !== '') {
+            Text(this.modelMsg).fontSize(11).fontColor('#1565C0').alignSelf(ItemAlign.Start)
+          }
         }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+
+        // #13 审批模式
+        Column({ space: 8 }) {
+          Text(this.locale === 'en' ? 'Approval' : '审批模式')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .alignSelf(ItemAlign.Start)
+          Row({ space: 6 }) {
+            ForEach(['ask', 'auto'], (m: string) => {
+              Text(this.approvalLabel(m))
+                .fontSize(12)
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                .backgroundColor(this.approvalMode === m ? '#B26A00' : '#E8EAED')
+                .fontColor(this.approvalMode === m ? '#FFFFFF' : '#444444')
+                .borderRadius(14)
+                .onClick(() => this.doApproval(m))
+            }, (m: string) => m)
+          }
+          .width('100%')
+          if (this.approvalMsg !== '') {
+            Text(this.approvalMsg).fontSize(11).fontColor('#B26A00').alignSelf(ItemAlign.Start)
+          }
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+
+        // #14 Provider 管理
+        Column({ space: 8 }) {
+          Text(this.locale === 'en' ? 'Providers' : '模型服务 Provider')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .alignSelf(ItemAlign.Start)
+          ForEach(this.providers, (p: ProviderRow) => {
+            Row({ space: 8 }) {
+              Text(p.name)
+                .fontSize(13)
+                .fontWeight(FontWeight.Medium)
+              Text(p.model)
+                .fontSize(11)
+                .fontColor('#666666')
+                .layoutWeight(1)
+                .maxLines(1)
+              if (p.purposes.length > 0) {
+                Text(p.purposes.join(','))
+                  .fontSize(9)
+                  .fontColor('#999999')
+              }
+            }
+            .padding(8)
+            .backgroundColor('#F5F5F5')
+            .borderRadius(8)
+            .width('100%')
+          }, (p: ProviderRow) => p.name)
+
+          Button(this.pvOpen ? (this.locale === 'en' ? 'Close form' : '收起') : (this.locale === 'en' ? '+ Add provider' : '+ 新增 Provider'))
+            .fontSize(12)
+            .height(32)
+            .backgroundColor('#666666')
+            .onClick(() => {
+              this.pvOpen = !this.pvOpen
+            })
+
+          if (this.pvOpen) {
+            Column({ space: 6 }) {
+              TextInput({ placeholder: 'name (e.g. my-openai)' })
+                .onChange((v: string) => {
+                  this.pvName = v.trim()
+                })
+                .width('100%')
+              TextInput({ placeholder: 'baseUrl (e.g. https://api.example.com/v1)' })
+                .onChange((v: string) => {
+                  this.pvUrl = v.trim()
+                })
+                .width('100%')
+              TextInput({ placeholder: 'model (e.g. gpt-4o-mini)' })
+                .onChange((v: string) => {
+                  this.pvModel = v.trim()
+                })
+                .width('100%')
+              Row({ space: 8 }) {
+                TextInput({ placeholder: 'apiKey (sk-...)' })
+                  .type(this.pvKeyMasked ? InputType.Password : InputType.Normal)
+                  .onChange((v: string) => {
+                    this.pvKey = v.trim()
+                  })
+                  .layoutWeight(1)
+                Button(this.pvKeyMasked ? '显示' : '隐藏')
+                  .fontSize(11)
+                  .height(34)
+                  .onClick(() => {
+                    this.pvKeyMasked = !this.pvKeyMasked
+                  })
+              }
+              .width('100%')
+              if (this.pvMsg !== '') {
+                Text(this.pvMsg).fontSize(11).fontColor(this.pvMsgOk ? '#0A7D32' : '#C0392B')
+              }
+              Row({ space: 10 }) {
+                Button(this.locale === 'en' ? 'Validate' : '校验')
+                  .fontSize(12)
+                  .height(34)
+                  .backgroundColor('#888888')
+                  .onClick(() => this.doValidateForm())
+                Text(this.locale === 'en' ? '(validation only — no server write)' : '(仅校验,不写入服务端)')
+                  .fontSize(10)
+                  .fontColor('#999999')
+              }
+            }
+            .padding(10)
+            .backgroundColor('#FAFAFA')
+            .borderRadius(8)
+            .width('100%')
+          }
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
 
         Divider()
 
@@ -234,6 +358,13 @@ export struct SettingsPage {
     return this.L('set.themeSystem')
   }
 
+  private approvalLabel(m: string): string {
+    if (m === 'ask') {
+      return this.locale === 'en' ? 'Ask (default)' : '每次询问 (默认)'
+    }
+    return this.locale === 'en' ? 'Auto-run' : '自动执行'
+  }
+
   private setTheme(th: string): void {
     this.theme = th
     this.store.saveTheme(th)
@@ -244,22 +375,59 @@ export struct SettingsPage {
     this.store.saveLocale(l)
   }
 
-  private async doModel(m: string): Promise<void> {
-    this.savingModel = true
+  // #12:点击 chip → POST /api/model {name} → 回读 state 确认
+  private async doModel(name: string): Promise<void> {
     this.modelMsg = ''
     try {
-      const body: ModelReq = { name: m }
+      const body: ModelReq = { name: name }
       const resp = await this.store.api().postJson<Object>('/api/model', body)
       const o = resp as Record<string, Object>
       if (o['ok'] === true) {
-        this.model = m
-        this.modelMsg = this.locale === 'en' ? 'switched' : '已切换'
+        const m = o['model']
+        if (typeof m === 'string') {
+          this.model = m as string
+        }
+        this.chatProvider = name
+        this.modelMsg = this.locale === 'en' ? `switched → ${name}` : `已切换 → ${name}`
       }
     } catch (e) {
       const err = e instanceof ApiError ? e as ApiError : toApiError(e as object)
       this.modelMsg = `HTTP ${err.status}: ${err.message}`
     }
-    this.savingModel = false
+  }
+
+  // #13:POST /api/config {approval}
+  private async doApproval(m: string): Promise<void> {
+    if (!validApproval(m)) {
+      return
+    }
+    this.approvalMsg = ''
+    try {
+      const body: ApprovalReq = { approval: m }
+      const resp = await this.store.api().postJson<Object>('/api/config', body)
+      const o = resp as Record<string, Object>
+      if (o['ok'] === true) {
+        this.approvalMode = m
+        this.approvalMsg = this.locale === 'en' ? `approval = ${m}` : `审批模式 = ${m}`
+      }
+    } catch (e) {
+      const err = e instanceof ApiError ? e as ApiError : toApiError(e as object)
+      this.approvalMsg = `HTTP ${err.status}: ${err.message}`
+    }
+  }
+
+  // #14:仅表单校验(不写入服务端,防污染真实 config —— Zode 授权的降级验收)
+  private doValidateForm(): void {
+    const err = validateProviderForm(this.pvName, this.pvUrl, this.pvModel)
+    if (err !== '') {
+      this.pvMsg = err
+      this.pvMsgOk = false
+      return
+    }
+    this.pvMsg = this.locale === 'en'
+      ? 'form OK — would POST /api/providers (not sent: keeps live config clean)'
+      : '表单校验通过 —— 将 POST /api/providers(未发送:避免污染真实配置)'
+    this.pvMsgOk = true
   }
 
   private async doSave(): Promise<void> {
@@ -288,6 +456,7 @@ export struct SettingsPage {
         this.testResult = `连接成功 · daemon ${g.daemonVersion} · 模型 ${g.model} · exposure=${g.exposure}`
         this.testOk = true
         this.store.serverState = g
+        this.loadState()
       }
     } catch (e) {
       const err = e instanceof ApiError ? e : toApiError(e as object)

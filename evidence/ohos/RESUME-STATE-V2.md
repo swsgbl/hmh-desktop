@@ -1,6 +1,43 @@
-# RESUME-STATE-V2 · 鸿蒙版 v2 · 棒 V2-4 收棒(ArkTS 装配)
+# RESUME-STATE-V2 · 鸿蒙版 v2 · 棒 V2-6 收棒(收尾批)
 
-> 前棒:V2-3(纯逻辑 52/52,commit 由 Zode 验收)。本棒=矩阵 ArkTS 装配(第一批 10 项)。
+> 前棒:V2-5(52/52,providers 数据源打通)。本棒=矩阵收尾批 6 项(#12/#13/#14/#11/#19/#10)+ P0 事件还原。
+
+## 本棒完成 ✅
+
+**代码层(全部编译通过+61/61 单测+deploy 全链装机成功)**
+1. `model/SettingsBiz.ets`:modelChipLabel/isCurrentProvider/validApproval/validateProviderForm/parseProviderRows/relChipText/addAttachment(同构 tests/settings-biz.test.ts 7/7)
+2. `model/Notify.ets`:notifyIdFor(hash 稳定 id)/shouldNotify(10s 去重窗)(同构 notify.test.ts 2/2)
+3. `model/Types.ets`:TaskReq+attachments/images;ApprovalReq/ProviderUpsertReq/ProviderRow/FsSearchHit/FsSearchResp
+4. `SettingsPage.ets` 重写:#12 模型 chips(name:model+当前高亮+点击 POST /api/model)+#13 审批 chips(ask/auto→POST /api/config)+#14 Provider 列表(purposes 徽标)+新增表单(掩码+校验,不写入服务端)
+5. `SessionsPage.ets`:@ 按钮→/api/fs/search 弹层→选中塞 attachments(≤5);📷 按钮→PhotoViewPicker(≤3张≤6MB→base64)→images;doSend 带两字段
+6. `AppStore.ets`:approval.required→publishApprovalNotify(notificationManager+wantAgent 拉起 com.hmh.desktop.ohos)
+
+**真机实证**
+- #12 E2E:点 deepseek → `当前: deepseek-flash` 回读 ✓;PC 侧 /api/model 200 {"ok":true,"model":"glm-5.3"}
+- #13:chips 上屏 ✓;PC 侧 /api/config ask/auto 均 200
+- #14:15 provider 行+purposes 徽标+表单 ✓
+- #11 半程:@弹层→搜"23"→**真实命中 5 文件**(docx 报告+entry-api23*.hap)
+- P0 真相:deploy.mjs BUNDLE 被误改 com.hmharvest.ohos ≠ profile.p7b(com.hmh.desktop.ohos)→BMS 装后静默清除;已改回+ALIVE 16334B 复验
+
+**构建链不变量(血泪新增)**
+- **bundleName 三处一致铁律**:app.json5 == deploy.mjs BUNDLE == AppStore want.bundleName == VM profile.p7b bundle-name;任一漂移=BMS 静默清除(装成功但 3s 后消失)
+- ArkTS Want 类型:`import { Want } from '@kit.AbilityKit'`(不是 wantAgent.Want)
+- edit_file 大插入后必须验证目标文件无重复碎块(Types.ets 尾部曾双 newChatState)
+- ArkTS interface 字面量 `{x} as X` 必须配 interface(不能内联类型)
+
+## 未完成(下棒)
+1. **#13 app 内点击复测**:chips 渲染+API 契约均通,app 点击无反馈(疑坐标漂移);复测路径:设置页→滚到审批区→最新 dump 坐标点击→看 approvalMsg
+2. **#11 最终发送**:选中文件后恰逢 busy;复测:新会话(PC 无任务时)→@→搜索→选文件→IME-safe 数字任务→发送→PC /api/sessions 验新会话 attachments 生效
+3. **#19 通知触发**:PC 侧 inject mode:ask 任务带工具调用→approvalReq→看通知栏;点击通知→app 拉起到会话页
+4. **#10 相册**:VM 无相册;若 Zode 有真机/模拟器带相册,或 VM 侧 adb push 图片到相册目录后复测
+5. ACCEPTANCE 矩阵 #12/#13 行(旧编号归档/加载更多)与新增三行需 Zode 汇总终态
+
+## 环境快照(下棒直接用)
+- VM:hdc -t 192.168.161.137:10178(多窗口抢焦点,操作前必 aa start)
+- 7788:http://192.168.161.1:7788,x-hmh-key=config.json web.token
+- dump 链:hmm-dump.cjs(窗口过滤)/hmm-tap.cjs(tap)/at-e2e.cjs(@引用)/probe2.cjs(node http 直发免引号)
+- 滚动:uinput -T -m x y1 x y2 ms(uitest swipe 无效)
+- app 六 Tab y≈642:总览 283 会话 425 工作区 568 文件 711 日志 853 设置 997
 
 ## 本棒完成 ✅(全部真机构建+装机+dump/截图举证)
 
@@ -29,6 +66,31 @@
 ✅ 装配+真机:#1 工具卡 #8 分组/收藏/过滤/折叠 #12 归档/删除(UI) #13 加载更多 #16 总览 #17 日志 #18 主题(选择器+持久) #19 i18n #14 运行点(逻辑装配)
 ◐ #2 交付物卡 #3 回合汇总(代码装配完,真机待 write 类任务/final 带 usage) #15 模型选择(交互就绪,/api/state LAN 无 providers 数组——数据源需改 /api/providers 或蓝本对齐)
 ⬜ 未装配:#4 搜索 #5 相册附件 #6 @文件引用 #7 审批模式 #9 导出 md #10 重命名 #11 Provider #20 通知
+
+# ============ V2 棒 5 侦查增补(2026-10-25 棒5·上下文耗尽于侦查,代码零写入) ============
+
+## 棒 5 新实测事实(推翻/修正棒 4 断点)
+
+1. **【推翻】`/api/state` LAN 模式实测返回完整 `providers[]` 数组(20 项:name/model/purposes)** — 棒 4 断点"LAN 无 providers 数组,数据源需换 /api/providers"是**错的**。SettingsPage.ets 现有模型 chips 数据源(/api/state→providers→names)**本来就是通的**。#12 模型选择只差:E2E 点一次 chip→POST /api/model {name}→回读 /api/state 确认 model 字段变化。注意:当前 SettingsPage 只显示 provider **name**(agnes/deepseek/...),蓝本语义是"provider+model"对,建议 chip 显示 `${name}:${model}`(数据里都有)。
+2. `/api/providers` **GET 不存在**(实测空响应)——Provider 列表数据源用 `/api/state` 的 providers(含 hasKey 判断?**无 hasKey 字段**,蓝本的 hasKey/末四位在 LAN state 里没有;如实降级:只显示 name/model/purposes)。POST /api/providers(新增)与 POST /api/providers/delete 存在(routes/settings.ts L150/L184)——**E2E 只验列表渲染+表单校验,不真写入**(避免污染真实 config,Zode 已授权此降级)。
+3. `POST /api/config` 存在(routes/settings.ts L204)— #13 审批模式走它,body 形状未读(下棒读 L204-230 确认字段名,大概率 {approval:'ask'|'auto'} 或 {mode})。
+4. **POST /api/task 完整契约(server.ts L964-1097 实读)**:body `{text, sessionId?, mode, yes?, fresh?, attachments?: string[](工作区相对路径数组,L977 过滤非字符串), images?: string[](base64, ≤3 张)}`。服务端组合顺序:**references(attachments) first, then images, then user text**(L1088 注释)。→ #6 @文件引用=fs/search 选择→路径塞 attachments;#10 相册=base64 塞 images。
+5. `GET /api/fs/search` 存在(filesystem.ts L204)— @文件引用的搜索后端就绪。
+6. Guards.ets 已有 guardState 不解析 providers(棒 4 在 SettingsPage 里手工解析,可用)。
+
+## 棒 5 原任务(6 项)全部未动,下棒执行序(按投入产出重排)
+
+1. **#12 模型选择**(最便宜:数据源已通,只差 E2E 切换+回读+chip 文案改 name:model)
+2. **#13 审批模式**(读 settings.ts L204 确认 body 字段→SettingsPage 加 ask/auto chips→E2E 切一次回读)
+3. **#14 Provider 管理**(降级版:state.providers 列表渲染+新增表单校验,不真写入,如实记录)
+4. **#11 @文件引用**(SessionsPage 输入区加 @ 钮→fs/search 弹层→选中塞 attachments 随 task POST)
+5. **#19 通知**(approvalReq→notificationManager,Reducer 已有 approval.required 事件,需在 AppStore SSE 回调处调 @ohos.notificationManager.publish;点击拉起=wantAgent;dump 实证一次)
+6. **#10 相册附件**(@ohos.file.picker PhotoViewPicker→base64→images;注意 ArkTS buffer→base64 用 util.Base64Helper;E2E 发一张实证 runtime 收到)
+
+## 本棒(棒5)如实申报
+- 代码 **零写入**(上下文耗尽于契约侦查:server.ts/routes/settings.ts/filesystem.ts/SettingsPage/Types/Guards 实读)
+- 无构建/装机/截图
+- 唯一产出=本增补段(修正棒 4 错误结论,6 项任务的实施契约全部落到字段级)
 
 ## 下棒序(建议)
 1. 主题深浅色板全局映射(当前仅选择器;建议 AppStorage themeRev→Index/页面色板函数)

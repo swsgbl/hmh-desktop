@@ -9,6 +9,11 @@ import { ApprovalCardView } from '../components/ApprovalCard'
 import { SessionRow, SessionGroup, applyFilter, groupByWorkspace, toggleGroup, wsGroupLabel } from '../model/SessionList'
 import { ToolItem, TurnSumItem, DeliverableItem, turnSumText } from '../model/TurnItems'
 import { t, Locale } from '../model/I18n'
+import { relChipText, addAttachment } from '../model/SettingsBiz'
+import { FsSearchResp } from '../model/Types'
+import { photoAccessHelper } from '@kit.MediaLibraryKit'
+import { fileIo } from '@kit.CoreFileKit'
+import { util } from '@kit.ArkTS'
 
 @Component
 export struct SessionsPage {
@@ -26,6 +31,16 @@ export struct SessionsPage {
   @State nextCursor: string = ''
   @State locale: string = 'zh'
   @State expandedTool: string = ''
+  // #11 @文件引用
+  @State atOpen: boolean = false
+  @State atQuery: string = ''
+  @State atHits: string[] = []       // rel 列表(渲染用)
+  @State atSearching: boolean = false
+  @State atErr: string = ''
+  @State attachments: string[] = []  // 已选 rel(随任务 POST)
+  // #10 相册附件
+  @State images: string[] = []       // base64(≤3 张,≤6MB/张)
+  @State imgMsg: string = ''
   @StorageProp('chatRev') chatRev: number = 0
   @StorageProp('sseConnected') sseConnected: boolean = false
   @StorageProp('localeRev') localeRev: number = 0
@@ -334,7 +349,118 @@ export struct SessionsPage {
         })
       }
 
+      // #11 已选附件 chips
+      if (this.attachments.length > 0) {
+        Flex({ wrap: FlexWrap.Wrap }) {
+          ForEach(this.attachments, (rel: string) => {
+            Row({ space: 4 }) {
+              Text('@' + relChipText(rel))
+                .fontSize(11)
+                .fontColor('#1565C0')
+                .maxLines(1)
+              Text('×')
+                .fontSize(11)
+                .fontColor('#999999')
+                .onClick(() => {
+                  const kept: string[] = []
+                  for (let i = 0; i < this.attachments.length; i++) {
+                    if (this.attachments[i] !== rel) {
+                      kept.push(this.attachments[i])
+                    }
+                  }
+                  this.attachments = kept
+                })
+            }
+            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .backgroundColor('#E3F2FD')
+            .borderRadius(10)
+            .margin({ right: 6, bottom: 6 })
+          }, (rel: string) => rel)
+        }
+        .width('100%')
+      }
+
+      // #11 @引用搜索弹层
+      if (this.atOpen) {
+        Column({ space: 8 }) {
+          Text(this.locale === 'en' ? 'Reference a workspace file' : '引用工作区文件')
+            .fontSize(14)
+            .fontWeight(FontWeight.Bold)
+            .width('100%')
+          Row({ space: 8 }) {
+            TextInput({ placeholder: this.locale === 'en' ? 'search files…' : '搜索文件名…' })
+              .onChange((v: string) => {
+                this.atQuery = v
+              })
+              .layoutWeight(1)
+            Button(this.locale === 'en' ? 'Search' : '搜索')
+              .fontSize(12)
+              .height(36)
+              .enabled(!this.atSearching)
+              .onClick(() => this.doAtSearch())
+            Button('×')
+              .fontSize(12)
+              .height(36)
+              .width(36)
+              .backgroundColor('#888888')
+              .onClick(() => {
+                this.atOpen = false
+                this.atHits = []
+                this.atErr = ''
+              })
+          }
+          .width('100%')
+          if (this.atErr !== '') {
+            Text(this.atErr).fontSize(11).fontColor('#C0392B').width('100%')
+          }
+          if (this.atSearching) {
+            LoadingProgress().width(20).height(20)
+          }
+          if (this.atHits.length > 0) {
+            Scroll() {
+              Column({ space: 4 }) {
+                ForEach(this.atHits, (rel: string) => {
+                  Text(rel)
+                    .fontSize(12)
+                    .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+                    .backgroundColor(this.attachments.indexOf(rel) >= 0 ? '#BBDEFB' : '#F5F5F5')
+                    .borderRadius(8)
+                    .width('100%')
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .onClick(() => {
+                      this.attachments = addAttachment(this.attachments, rel)
+                    })
+                }, (rel: string) => rel)
+              }
+              .width('100%')
+            }
+            .height(180)
+            .width('100%')
+          }
+        }
+        .padding(10)
+        .backgroundColor('#FFFFFF')
+        .borderRadius(10)
+        .border({ width: 1, color: '#D0D0D0' })
+        .width('100%')
+      }
+
       Row({ space: 8 }) {
+        Button('@')
+          .fontSize(14)
+          .height(38)
+          .width(38)
+          .backgroundColor('#455A64')
+          .onClick(() => {
+            this.atOpen = !this.atOpen
+          })
+        Button('📷' + (this.images.length > 0 ? `${this.images.length}` : ''))
+          .fontSize(13)
+          .height(38)
+          .width(44)
+          .backgroundColor('#6A4C93')
+          .onClick(() => this.pickImages())
         TextInput({ text: this.input, placeholder: this.L('comp.phEnter') })
           .onChange((v: string) => {
             this.input = v
@@ -515,6 +641,77 @@ export struct SessionsPage {
     this.inChat = false
   }
 
+  // #11:GET /api/fs/search?q= → rel 列表
+  private async doAtSearch(): Promise<void> {
+    const q = this.atQuery.trim()
+    if (q === '') {
+      this.atErr = this.locale === 'en' ? 'type a keyword first' : '请先输入关键词'
+      return
+    }
+    this.atSearching = true
+    this.atErr = ''
+    this.atHits = []
+    try {
+      const resp = await this.store.api().getJson<Object>(`/api/fs/search?q=${encodeURIComponent(q)}`)
+      const o = resp as Record<string, Object>
+      const res = o['results']
+      if (res instanceof Array) {
+        const hits: string[] = []
+        const arr = res as Object[]
+        for (let i = 0; i < arr.length; i++) {
+          const h = arr[i] as Record<string, Object>
+          const rel = h['rel']
+          if (typeof rel === 'string' && rel !== '') {
+            hits.push(rel as string)
+          }
+        }
+        this.atHits = hits
+        if (hits.length === 0) {
+          this.atErr = this.locale === 'en' ? 'no matches' : '无匹配文件'
+        }
+      }
+    } catch (e) {
+      this.atErr = this.errText(e)
+    }
+    this.atSearching = false
+  }
+
+  // #10:PhotoViewPicker ≤3 张 → base64(≤6MB/张)
+  private async pickImages(): Promise<void> {
+    this.imgMsg = ''
+    try {
+      const picker = new photoAccessHelper.PhotoViewPicker()
+      const res = await picker.select({
+        MIMEType: photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE,
+        maxSelectNumber: 3
+      } as photoAccessHelper.PhotoSelectOptions)
+      if (res.photoUris.length === 0) {
+        return
+      }
+      const b64: string[] = []
+      for (let i = 0; i < res.photoUris.length; i++) {
+        const uri = res.photoUris[i]
+        const src = fileIo.openSync(uri, fileIo.OpenMode.READ_ONLY)
+        try {
+          const stat = fileIo.statSync(src.fd)
+          if (stat.size > 6 * 1024 * 1024) {
+            this.imgMsg = `第${i + 1}张超过 6MB,已跳过`
+            continue
+          }
+          const buf = new ArrayBuffer(stat.size)
+          fileIo.readSync(src.fd, buf)
+          const helper = new util.Base64Helper()
+          b64.push(helper.encodeToStringSync(new Uint8Array(buf)))
+        } finally {
+          fileIo.closeSync(src)
+        }
+      }
+      this.images = b64
+    } catch (e) {
+      this.imgMsg = '选择图片失败(模拟器可能无相册)'
+    }
+  }
+
   private async doSend(): Promise<void> {
     const text = this.input
     if (text === '') {
@@ -525,11 +722,20 @@ export struct SessionsPage {
     if (this.activeId !== '') {
       body.sessionId = this.activeId
     }
+    if (this.attachments.length > 0) {
+      body.attachments = this.attachments.slice()
+    }
+    if (this.images.length > 0) {
+      body.images = this.images.slice()
+    }
     try {
       const resp = await this.store.api().postJson<Object>('/api/task', body)
       const o = resp as Record<string, Object>
       if (o['ok'] === true) {
         this.input = ''
+        this.attachments = []
+        this.images = []
+        this.atOpen = false
         const sid = typeof o['sessionId'] === 'string' ? o['sessionId'] as string : ''
         if (sid !== '' && this.activeId === '') {
           this.activeId = sid

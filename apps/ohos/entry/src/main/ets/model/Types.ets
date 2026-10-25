@@ -105,10 +105,13 @@ export interface TaskReq {
   text: string
   sessionId?: string
   mode: TaskMode
+  attachments?: string[]   // 工作区相对路径(@文件引用),服务端 references-first
+  images?: string[]        // base64 图片(≤3 张,相册附件)
 }
 
 export interface TaskResp {
   ok: boolean
+  sessionId?: string
   queued?: boolean
   position?: number
 }
@@ -200,6 +203,38 @@ export interface LocaleReq {
 
 export interface ModelReq {
   name: string
+}
+
+// #13 审批模式 POST /api/config
+export interface ApprovalReq {
+  approval: string   // 'ask' | 'auto'
+}
+
+// #14 Provider POST /api/providers (apiKey 省略=保留原值,不回传密钥)
+export interface ProviderUpsertReq {
+  name: string
+  baseUrl: string
+  model: string
+  apiKey?: string
+}
+
+export interface ProviderRow {
+  name: string
+  model: string
+  purposes: string[]
+}
+
+// #11 @文件引用 GET /api/fs/search 响应
+export interface FsSearchHit {
+  rel: string
+  path: string
+  kind: string
+}
+
+export interface FsSearchResp {
+  results: FsSearchHit[]
+  total: number
+  truncated: boolean
 }
 
 export function newChatState(sessionId: string): ChatState {

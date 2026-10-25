@@ -1,15 +1,18 @@
 /**
  * 全局单例中枢:配置(preferences 持久化)+ ApiClient/SseClient 生命周期 + 事件分发
  * 页面通过 AppUtil 订阅回调刷新(AppStorage 驱动 @State)
+ * #19:approval.required → notificationManager 本地通知(点击拉起会话页)
  */
 import { preferences } from '@kit.ArkData'
-import { Context } from '@kit.AbilityKit'
+import { Context, Want, wantAgent } from '@kit.AbilityKit'
 import { ApiClient } from '../net/ApiClient'
 import { SseClient, SseFrame } from '../net/SseClient'
 import { toRunEvent, reduce } from '../core/Reducer'
 import { ChatState, newChatState, StateObj, RawEvent } from '../model/Types'
 import { guardState } from '../model/Guards'
 import { normalizeBaseUrl } from '../model/UrlNorm'
+import { notifyIdFor, shouldNotify } from '../model/Notify'
+import { notificationManager } from '@kit.NotificationKit'
 
 export interface StoreListener {
   onChatState: (st: ChatState) => void
@@ -41,6 +44,7 @@ export class AppStore {
   private sse: SseClient | null = null
   private listener: StoreListener | null = null
   private seq: number = 0
+  private lastNotify: Map<number, number> = new Map<number, number>()
 
   static get(): AppStore {
     if (AppStore.instance === null) {
@@ -150,6 +154,10 @@ export class AppStore {
           }
           this.chat = reduce(this.chat, ev)
           this.notifyChat()
+          // #19 审批通知(去重窗口内只发一次)
+          if (ev.kind === 'approval.required') {
+            this.publishApprovalNotify(ev.name)
+          }
         }
       },
       onError: (msg: string) => {
@@ -190,6 +198,44 @@ export class AppStore {
     AppStorage.setOrCreate('sseConnected', connected)
     if (this.listener !== null) {
       this.listener.onSseStatus(connected, msg)
+    }
+  }
+
+  /** #19 发布审批通知(点击拉起 EntryAbility → Index 路由到会话 Tab) */
+  private publishApprovalNotify(toolName: string): void {
+    const id = notifyIdFor(toolName)
+    const decision = shouldNotify(id, Date.now(), this.lastNotify)
+    if (!decision.shouldPublish) {
+      return
+    }
+    try {
+      const want: Want = {
+        bundleName: 'com.hmh.desktop.ohos',
+        abilityName: 'EntryAbility'
+      }
+      const agent = wantAgent.getWantAgent({
+        wants: [want],
+        operationType: wantAgent.OperationType.START_ABILITY,
+        requestCode: 0
+      } as wantAgent.WantAgentInfo)
+      const req: notificationManager.NotificationRequest = {
+        id: id,
+        content: {
+          notificationContentType: notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
+          normal: {
+            title: 'HMH 审批请求',
+            text: `工具 ${toolName === '' ? '(unnamed)' : toolName} 等待批准`,
+            additionalText: '点击打开会话页处理'
+          } as notificationManager.NotificationBasicContent
+        } as notificationManager.NotificationContent,
+        notificationSlotType: notificationManager.SlotType.SOCIAL_COMMUNICATION,
+        wantAgent: agent
+      } as notificationManager.NotificationRequest
+      notificationManager.publish(req).catch((_err: object) => {
+        // 通知失败不影响业务流(未授权/无slot 时静默)
+      })
+    } catch (e) {
+      // 容错:notificationManager 不可用时不阻塞 SSE 流
     }
   }
 }
