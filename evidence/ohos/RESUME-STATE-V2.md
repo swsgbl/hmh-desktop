@@ -1,24 +1,38 @@
-# RESUME-STATE-V2 · 鸿蒙版 v2 · 棒 V2-2 收棒(P0 收口)
+# RESUME-STATE-V2 · 鸿蒙版 v2 · 棒 V2-3 收棒(矩阵纯逻辑层)
 
-> 上一棒断点:RESUME-STATE-V2.md(V2-1 侦查)。本棒 = P0 全收口 + 空壳会话根因闭环。
+> 前棒:V2-2(P0 三件套,commit 22fc379)。本棒=矩阵 20 项之纯逻辑地基,ArkTS 侧未动。
 
-## 本棒完成 ✅
-1. **空壳卡死会话根因闭环(Zode 实锤症状)**:
-   - PC 等价复现(curl 同 body):mode=ask + 触发工具的任务 → SSE 全链正常(busy→delta(kind:reasoning/text)→tool→**auto-approvalDone**→toolResult→final→busy:false),**无卡死**。
-   - **在机复现验证**:VM 冷启动(无 want)→会话页自动"已连接"→发送"112233"→"运行中/打断"→**回复完整上屏**("收到「112233」…✅")。当前 v6b+bootstrap 版本不复现"发送→卡 busy→无回复"。
-   - 旁证:t0 dump 抓到 app 实时渲染本智能体自己会话的流式输出——全局 SSE 订阅(sessionId='')工作正常。
-   - 结论:Zode 抓到的 web-mvnwl06d/web-mvny1uxd 空壳(0 消息永久 busy)系**旧版(v6b 之前)发送链 bug 或 uitest 误触**所致;Zode 已 interrupt 清理;新链路三轮验证(2 PC curl + 1 在机)未复现。留观:若用户再报,抓 hilog SSE diag 帧。
-2. **P0 持久性定性(受控重启)**:
-   - reboot 前:app 在(bm dump 16334B,installTime=棒3);reboot 后(uptime 110s):**app 仍在**。/data=ext4 物理持久。**正常重启不丢 app**;Zode 观察到的"消失"=非重启因素(VM 还原点回滚/DevEco 侧操作),定性为"环境事件,非 app 缺陷"。已交付 deploy.mjs 兜底(下条)。
-3. **P0 交付物**:
-   - `apps/ohos/scripts/deploy.mjs`(一键:build→patch api23→send→VM签→install→launch;--skip-build 可跳;自动落盘 patch-api23.cjs/vm-sign.sh 到 scripts/;**全程无 token**;hdc target 可用 HMH_HDC_TARGET 覆盖)。已实测两轮 SUCCESS。
-   - `model/Bootstrap.ets` + EntryAbility 接线:启动即 initPrefs→GET /api/state 健康检查→**自动连全局 SSE**;want 参数路径也接了。**VM 冷启动实测自动"已连接"**。
-4. **VM 重启后环境变化(下棒注意)**:锁屏改 PIN("登录"按钮→点进是应用中心!unlock 用 uinput -T -m 上滑无效,须点"登录"进系统);重启后 UI 坐标整体左移约 150px(会话tab 367→319,输入行 628→580,**操作前必须重新 dump 定位**);桌面 dock 常驻(应用中心/浏览器/组件管理/设置/文件管理器)。
+## 本棒完成 ✅(代码层,未装机)
+**矩阵纯逻辑三模块 + 单测,全量 52/52 绿**(`node --import tsx --test tests/*.test.ts`):
+1. `tests/turn-items.ts`(+test 9/9)——矩阵#1 工具折叠卡/#2 交付物卡/#3 回合汇总的归约:
+   - tool→running 卡;toolResult 回填 ok/error;同名聚合;迟到 result 补终态卡
+   - final→turnSum 卡(`N 回合 · N 次工具 · N tokens`,tokens null 不显示)+write 类工具出交付物卡
+   - busy:true(run 开始)清空条目
+2. `tests/session-list.ts`(+test 5/5)——矩阵#5 工作区分组/#6 收藏置顶/#7 状态过滤:
+   - groupByWorkspace(组内 pin 置顶+时间降序;组间含 pin 组优先);applyFilter(all/running/done/failed);toggleGroup 折叠
+3. `tests/i18n-dict.ts`(+test 4/4)——矩阵#18 i18n:zh/en 双语 ~70 键(语义 1:1 抄 desktop i18n.ts 子集);pickLocale(zh*→zh);dictKeysMatch 键集一致性校验
 
-## 待办(下棒,按 RESUME-STATE-V2.md 矩阵序)⬜
-1. 矩阵 20 项(从#1 工具卡开始,纯逻辑 tests/ 先行)
-2. ACCEPTANCE-V2.md 开档(门 A 已有 P0 证据:重启前后 bm dump 对比+deploy.mjs+自动重连在机截图可补)
-3. 截图补:冷启动自动连接+回复上屏(t21 dump 即证据,可重跑存 jpeg)
+## 本棒新增的关键契约事实(server.ts 实读,下棒直接用)
+- LAN broadcast 字段:L547-558/584:
+  - `tool {name,args,sessionId}`;`toolResult {name,isError,preview(300 截断),full,sessionId}`
+  - `delta {kind,chunk,sessionId}`;`final {text,sessionId,runId,turns,toolUses,usage,turnsInThread}`
+  - `approvalReq {name,args,sessionId}`(**无 approvalId**,LAN 模式 approve 按 session 定位 pending——V1 已实现)
+  - `error {message,sessionId}`;`busy {busy,task,mode,sessionId,cwd,runId}`
+- **artifact 事件仅 desktop 桥**(L589 if(desktop)),LAN 无 → 交付物卡=write 类工具近似(方案 B 已批,turn-items 已实现)
+- desktop i18n.ts 共 576 行,已抄子集入 i18n-dict.ts;蓝本余下词条(dock.remote*/settings.provider 细项)按需再抄
 
-## 纪律提醒
-token 零落盘(本棒 hilog 复查 clean);坐标每轮 dump 现取;禁改 hmharness/apps-desktop。
+## 下棒(按 Zode 棒3令序,ArkTS 同构)⬜
+1. **ArkTS 同构三件**:`model/TurnItems.ets`(抄 turn-items.ts,Map→ArkTS 兼容写法)、`model/I18n.ets`(抄 i18n-dict.ts + @ohos.i18n 系统语言)、`model/SessionList.ets`(抄 session-list.ts)
+2. **Reducer.ets 扩展**:tool/toolResult/final/busy 事件喂入 TurnItemsState;ChatMessage 增条目渲染(工具折叠卡=默认折叠行+展开;交付物卡=relPath+tool;turnSum=汇总行)
+3. **SessionsPage.ets 重构列表**:分组组头(wsGroupLabel)+收藏★+过滤条(四 Segment)+加载更多(#8);pin/archive/delete/export 按钮调 /api/session/*(V1 ApiClient 已有部分)
+4. 每批:build→deploy.mjs(--skip-build 可选)→dump/截图→ACCEPTANCE-V2.md 该行更新
+5. 后续序:总览/日志页签(WorkspacesPage 扩展)→主题(#17,@ohos.app.ability ConfigurationConstant)→模型选择/审批模式/Provider(设置页扩展,调 /api/state 的 models+config)→@文件引用(#16)→通知(#19 approvalReq→notificationManager,点击拉起)→相册图片(#20)
+6. **ACCEPTANCE-V2.md 开档**(V2-2 遗留):门 A 证据已有(重启对比+deploy.mjs+自动重连);本棒纯逻辑 52/52 记入门 B 首行
+
+## 环境事实(承 V2-2,仍有效)
+- VM 重启后坐标整体左移 ~150px,**操作前必重新 dump**;锁屏 PIN 后 unlock 须点"登录"
+- deploy.mjs 全链可用(HMH_HDC_TARGET 覆盖;全程无 token)
+- token 零落盘纪律:hilog 复查在每棒装机后
+
+## 纪律
+禁改 hmharness/apps-desktop;测试先行;每项举证;诚实条款。
