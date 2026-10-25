@@ -3,7 +3,7 @@
  */
 import { AppStore } from '../model/AppStore'
 import { guardSessionsResp } from '../model/Guards'
-import { SessionInfo, ChatState, ChatMessage, TaskReq, SimpleSidReq, ApproveReq } from '../model/Types'
+import { SessionInfo, ChatState, ChatMessage, TaskReq, SimpleSidReq, ApproveReq, StateObj } from '../model/Types'
 import { ApiError, toApiError } from '../net/ApiClient'
 import { ApprovalCardView } from '../components/ApprovalCard'
 
