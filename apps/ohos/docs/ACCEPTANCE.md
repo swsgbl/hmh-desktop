@@ -178,3 +178,31 @@
 | D6 用户实测 | **待用户**(最终标准) |
 
 **结论:鸿蒙版 v4 交付(commit 99d4bb4)。附:连接故障根因=PC LAN IP 漂移(161.1→8.3,非代码 bug),已修+运维通道建立。**
+
+---
+
+## v6/v6.1 设备本地内核共享 + 首启智能检测(收官棒终验 · 2026-10-26)
+
+### 门 L1-L5
+
+| 门 | 结论 | 证据(evidence/ohos/v6/) |
+|---|---|---|
+| L1 设备 hmh 可跑 | **PASS** | hmharness 0.23.39 十五包(/data/local/home/.local/hmharness);jitless 启动器补丁(VM 禁 RWX,V8 JIT 必崩——root hdc shell 亦禁) |
+| L2 设备 web 起 | **PASS** | 0.0.0.0:7788 LISTEN(netstat);/api/state 200 ver=0.23.39 model=glm-5.3 home=/data/local/home/.hmharness |
+| L3 应用连本地 | **PASS** | --ps hmhUrl 127.0.0.1:7788 → 已连接·0.23.39;netstat: app↔127.0.0.1:7788 ESTABLISHED;冷启动自动连(preferences 持久,l3-coldboot.json) |
+| L4 三端同核 | **PASS(app+内核+宿主浏览器协议层;VM 内浏览器 UI 层部分——如实)** | 同屏 dump(l4-browser-vm*.json):VM 浏览器+kaihong.browser 拉起+app 会话流("/·4 个会话"+"回复四个字:同核成功"历史);宿主带 key 200+HTML(l4-browser-host.jpeg);边界:VM 浏览器地址栏 IME 全角冒号挡道,协议层已证,UI 层留输入法旁路 |
+| L5 一键复装 | **PASS** | 归档设备 hmh(等效未装)→ deploy-local-kernel.mjs 一条命令:15 包复装+jitless 补丁(patched 1)+自检+web 起 LISTEN+探针 OK ver=0.23.39 model=glm-5.3;修复脚本 L102 模板串 ${} 未转义 |
+
+### 门 SW1-SW4(v6.1)
+
+| 门 | 结论 | 证据 |
+|---|---|---|
+| SW1 无配置首启向导 | **PASS** | web stop+卸载重装→冷启动→sw1-wizard2.json+sw1-wizard.jpeg:完整向导(三选一①本机安装(推荐)/②连接电脑/③演示+PC 命令+复制+全局配置文案+上一步/跳过) |
+| SW2 自动连本地共享 | **PASS** | 设备 web 在跑+纯净冷启动→自动"已连接 · 0.23.39"+glm-5.3(sw2-coldboot2.json);firstRunProbe→local-share 全链;横幅加 aboutToAppear 竞速兜底 |
+| SW3 向导选远程→连 PC | **PASS** | 三选一实证(sw3-choose.json)→选②→--ps hmhUrl 192.168.8.3:7788+token→已连接(sw3-pc.json+sw3-pc-connected.jpeg);选择持久 |
+| SW4 文案+README 双模式 | **PASS** | README-ohos.md 新建(双模式表/首启智能检测/一键部署/已知边界);全局配置文案与设备真身一致(ls 实体) |
+
+### 收官增量与纪律
+- Index.ets 首启探测竞速兜底;deploy-local-kernel.mjs L102 转义修复;README-ohos.md 新建
+- token 纪律:设备 config 经 hdc 直推、--ps 注入、零泄漏(宿主仅内存拼接);hilog/文件复审 0 泄漏
+- 边界如实:PC 侧 /api/state 无 daemonVersion→SW3 版本号空(非缺陷);空壳卡死会话未复现留观

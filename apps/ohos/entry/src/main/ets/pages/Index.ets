@@ -40,6 +40,15 @@ struct Index {
     AppStorage.setOrCreate('wizardOpen', false)
     // v6.1: 进页面时若探测结果已就绪,立即判定一次(firstRunRev @Watch 覆盖后续变化)
     this.onFirstRun()
+    // v6.1 收尾:冷启动竞速兜底——若探测已完成(Index 构造晚于广播),
+    // @Watch 不会触发,这里主动补判一次横幅/向导
+    const oc0 = AppStorage.get<ProbeOutcome>('firstRunOutcome')
+    if (oc0 !== undefined) {
+      this.showBanner = oc0 === 'local-share' && this.store.baseUrl === 'http://127.0.0.1:7788'
+      if (shouldShowWizard(this.store.wizardDone, this.store.baseUrl !== '', oc0)) {
+        AppStorage.setOrCreate('wizardOpen', true)
+      }
+    }
   }
 
   /** v6.1: 首启探测结果变化 → 决定向导/横幅 */

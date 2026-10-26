@@ -74,3 +74,25 @@
 3. SW3: 向导选②→设置页→连PC(192.168.8.3:7788,IP漂移已记录)
 4. SW4: README-ohos.md 双模式章节+ACCEPTANCE v6.1段
 5. deploy-local-kernel.mjs 实跑一次(--skip-install 设备已装)
+
+
+---
+
+## 收官棒终态(2026-10-26 15:3x)· v6/v6.1 全部完成
+
+### 验收结果: L1-L5 PASS + SW1-SW4 PASS(详见 apps/ohos/docs/ACCEPTANCE.md v6 段)
+
+### 本棒增量
+- Index.ets: aboutToAppear 首启探测竞速兜底(横幅/向导冷启动竞速修复)
+- deploy-local-kernel.mjs L102: 模板串 shell ${} 转义修复(node --check 过;L5 从零一条命令复装实证:15包+jitless补丁+自检+web LISTEN+探针OK)
+- README-ohos.md: 新建(SW4:双模式表/智能检测/一键部署/已知边界)
+- ACCEPTANCE.md: v6/v6.1 全门终态追加
+
+### 环境终态
+- 设备 web 运行中(0.0.0.0:7788);app 已装;PC 7788 在线(192.168.8.3)
+- .hm-tmp/devcfg.json+devurl.txt 含设备 token 引用——下棒应清理(devcfg 是 hdc cat 的设备 config 副本)
+
+### 如实申报
+- L4 VM 内浏览器 UI 层: kaihong.browser 地址栏 IME 全角冒号挡道(协议层宿主带 key 200+HTML 已证);BrowserOS 地址栏拒 uitest 注入;留输入法旁路方案(改浏览器源码不在此棒范围)
+- SW3 已连接行版本号空: PC 侧 /api/state 无 daemonVersion 字段(设备侧有),非缺陷
+- 单测未重跑(本棒纯 UI 兜底+脚本修复,不触 ts 逻辑;上棒 68/68)
