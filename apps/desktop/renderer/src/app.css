@@ -564,9 +564,13 @@ body {
   opacity: 1;
 }
 .session-export {
-  min-height: 30px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
 }
 /* Focus should be visible without forcing a large outline around every control. */
 :focus-visible {
