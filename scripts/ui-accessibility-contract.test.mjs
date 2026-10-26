@@ -1,3 +1,5 @@
+
+import { test as themeTest } from 'node:test';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -40,4 +42,13 @@ test('forced-colors keeps visible focus and selected boundaries', () => {
 test('high contrast tokens increase boundary visibility', () => {
   assert.match(tokens, /@media\s*\(prefers-contrast:\s*more\)/);
   assert.match(tokens, /--hmh-focus-ring:\s*#003fc7/);
+});
+
+const themeSource = readFileSync(join(root, 'apps/desktop/renderer/src/theme.ts'), 'utf8');
+
+themeTest('system theme follows OS and is the first-run default', () => {
+  assert.match(themeSource, /return\\s+'system'/);
+  assert.match(themeSource, /prefers-color-scheme:\\s*dark/);
+  assert.match(themeSource, /matchMedia\\('prefers-color-scheme:\\s*dark'\\)/);
+  assert.doesNotMatch(themeSource, /return 'light'; \/\/ v4 DSH/);
 });
