@@ -146,8 +146,9 @@ if (!app.requestSingleInstanceLock()) {
      不跟主题;菜单与设置重复) ---- 方案:隐藏式标题栏 + titleBarOverlay
      (颜色随主题),菜单栏 autoHide(Alt 呼出)且精简为系统级能力;
      常用动作走 renderer 标题栏 ☰ 主菜单(唯一入口)。 */
+  // v4 DSH 设计语言:overlay 色跟随 titlebar 的 bg-layer-1(浅 #fff/深 #16181d)
   const chromeFor = (dark: boolean): { color: string; symbolColor: string } =>
-    dark ? { color: '#1b1d21', symbolColor: '#f5f5f6' } : { color: '#f6f7f9', symbolColor: '#1f2328' };
+    dark ? { color: '#16181d', symbolColor: '#f5f6f8' } : { color: '#ffffff', symbolColor: '#0f1115' };
   function applyChrome(dark: boolean): void {
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) {
@@ -799,7 +800,7 @@ if (!app.requestSingleInstanceLock()) {
       minWidth: 960,
       minHeight: 600,
       show: false,
-      backgroundColor: '#141416',
+      backgroundColor: '#f9fafb', // v4 DSH:浅色默认(bg-base),避免深色闪屏
       title: 'HMH Desktop',
       // 隐藏式标题栏:原生窗口控制(overlay 提供)+颜色随主题(renderer 经
       // chrome-theme 同步)——根治亮色模式顶部黑条;菜单栏 autoHide(Alt 呼出)。

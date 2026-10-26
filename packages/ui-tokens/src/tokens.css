@@ -1,53 +1,145 @@
-/* HMH Desktop 设计 token — 暗色为默认(与 web 一致的深色工作台气质) */
+/* HMH Desktop v4 设计 token — DSH 设计语言(docs/prompts/design-language-dsh.md)
+   alias 语义变量:浅色默认(:root)+ 深色([data-theme='dark'])同 alias 换值。
+   色值锚点:蓝本 §1/§5 + evidence/dsh(dsh-web-frontend dist CSS 实值换算)。
+   token 纪律:新代码一律用语义 token;文件尾的旧 --hmh-* 别名仅作兼容兜底。 */
 :root {
-  --hmh-bg: #141416;
-  --hmh-bg-raised: #1b1d21;
-  --hmh-bg-panel: #1e2024;
-  --hmh-border: #2b2e33;
-  --hmh-text: #f5f5f6;
-  --hmh-text-dim: #95979d;
-  --hmh-accent: #2f81f7;
-  --hmh-accent-hover: #4a90f9;
-  --hmh-danger: #f85149;
-  --hmh-warn: #d29922;
-  --hmh-user-turn-bg: #1c2a3d;
+  /* ---- 表面分层 ---- */
+  --hmh-bg-base: #f9fafb;      /* 全局底色 */
+  --hmh-bg-layer-1: #ffffff;   /* 卡片/输入/标题栏底 */
+  --hmh-bg-layer-2: #f2f3f5;   /* pill/次级面板底 */
+  --hmh-bg-menu: #ffffff;      /* 菜单/浮层底 */
+  --hmh-bg-mask: rgb(15 17 21 / 32%);        /* 命令面板遮罩 */
+  --hmh-bg-mask-strong: rgb(15 17 21 / 55%); /* 阻断式引导遮罩 */
 
-  --hmh-status-planning: #a371f7;
-  --hmh-status-running: #2f81f7;
-  --hmh-status-waiting: #d29922;
-  --hmh-status-verifying: #2f81f7;
-  --hmh-status-recovering: #db6d28;
-  --hmh-status-completed: #3fb950;
-  --hmh-status-failed: #f85149;
-  --hmh-status-cancelled: #95979d;
+  /* ---- 文字四级 ---- */
+  --hmh-label-primary: #0f1115;
+  --hmh-label-secondary: #61666b;
+  --hmh-label-tertiary: #81858c;
+  --hmh-label-dimmed: #adb0b6; /* 占位符 */
 
-  --hmh-radius-sm: 6px;
-  --hmh-radius-md: 10px;
-  --hmh-radius-lg: 14px;
-  --hmh-font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  --hmh-font-mono: 'Cascadia Code', Consolas, 'JetBrains Mono', monospace;
+  /* ---- 品牌与主按钮 ---- */
+  --hmh-brand-primary: #3964fe;
+  --hmh-button-primary-fill: var(--hmh-brand-primary);
+  --hmh-button-primary-hover: #2f52e0;
+  --hmh-button-primary-fg: #ffffff;
+
+  /* ---- 边框 ---- */
+  --hmh-border-l1: rgb(0 0 0 / 5%);   /* 极细分隔 */
+  --hmh-border-l2: rgb(0 0 0 / 10%);  /* 输入框/卡片常规边 */
+  --hmh-border-inverted: rgb(0 0 0 / 8%); /* 浮层菜单边 */
+
+  /* ---- 交互底色 ---- */
+  --hmh-interactive-bg-hover: rgb(0 0 0 / 4%);
+  --hmh-interactive-bg-active: rgb(0 0 0 / 8%);
+  --hmh-list-active-bg: #ebeef2;      /* 列表选中项实底(DSH ghost-active) */
+
+  /* ---- 状态色(浅色下兼顾小字可读,深色换亮档) ---- */
+  --hmh-state-success: #16a34a;
+  --hmh-state-warn: #dd8629;
+  --hmh-state-error: #ec1313;
+
+  /* ---- 八态运行状态(会话点/状态章) ---- */
+  --hmh-status-planning: #7c3aed;
+  --hmh-status-running: #3964fe;
+  --hmh-status-waiting: #dd8629;
+  --hmh-status-verifying: #3964fe;
+  --hmh-status-recovering: #c2410c;
+  --hmh-status-completed: #16a34a;
+  --hmh-status-failed: #ec1313;
+  --hmh-status-cancelled: #61666b;
+
+  /* ---- 用户消息气泡底(品牌浅染) ---- */
+  --hmh-user-turn-bg: #e9eefe;
+
+  /* ---- 阴影(DSH lv1/2/3 实值;深色加重) ---- */
+  --hmh-shadow-lv1: 0 2px 4px 0 rgb(0 0 0 / 5%);
+  --hmh-shadow-lv2: 0 4px 12px 0 rgb(0 0 0 / 2%), 0 2px 8px 0 rgb(0 0 0 / 4%);
+  --hmh-shadow-lv3: 0 0 1px 0 rgb(0 0 0 / 20%), 0 0 4px 0 rgb(0 0 0 / 2%), 0 12px 32px 0 rgb(0 0 0 / 8%);
+
+  /* ---- 滚动条(细 thumb + hover 加深;DSH neutral 系实值) ---- */
+  --hmh-scrollbar-thumb: #e5e5e5;
+  --hmh-scrollbar-thumb-hover: #d4d4d4;
+
+  /* ---- 字体(蓝本 §2) ---- */
+  --hmh-font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --hmh-font-mono: 'SF Mono', 'JetBrains Mono', Consolas, Menlo, monospace;
+
+  /* 字号/行高三档:12/18 · 14/22 · 16/24 */
+  --hmh-font-size-xs: 12px;  --hmh-line-height-xs: 18px;
+  --hmh-font-size-sm: 14px;  --hmh-line-height-sm: 22px;
+  --hmh-font-size-md: 16px;  --hmh-line-height-md: 24px;
+
+  /* ---- 圆角(8 输入/12 卡片菜单/18 按钮) ---- */
+  --hmh-radius-sm: 8px;
+  --hmh-radius-md: 12px;
+  --hmh-radius-lg: 18px;
+  --hmh-radius-pill: 999px; /* 任意高度下的纯胶囊(视觉等同 18px@h32) */
+
+  /* ---- 动效三档 ---- */
+  --hmh-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --hmh-dur-fast: 0.1s;
+  --hmh-dur: 0.2s;
+  --hmh-dur-slow: 0.3s;
+
+  /* ---- 旧 token 别名(v3 及更早;兼容兜底,新代码禁用) ---- */
+  --hmh-bg: var(--hmh-bg-base);
+  --hmh-bg-raised: var(--hmh-bg-layer-1);
+  --hmh-bg-panel: var(--hmh-bg-layer-2);
+  --hmh-border: var(--hmh-border-l2);
+  --hmh-text: var(--hmh-label-primary);
+  --hmh-text-dim: var(--hmh-label-secondary);
+  --hmh-accent: var(--hmh-brand-primary);
+  --hmh-accent-hover: var(--hmh-button-primary-hover);
+  --hmh-danger: var(--hmh-state-error);
+  --hmh-warn: var(--hmh-state-warn);
 }
 
-/* 亮色主题(2026-10-11 对标 DSH:设置-外观-浅色;<html data-theme="light">) */
-:root[data-theme='light'] {
-  --hmh-bg: #f6f7f9;
-  --hmh-bg-raised: #ffffff;
-  --hmh-bg-panel: #eef0f3;
-  --hmh-border: #d5d8de;
-  --hmh-text: #1f2328;
-  --hmh-text-dim: #5b616b;
-  --hmh-accent: #0969da;
-  --hmh-accent-hover: #218bff;
-  --hmh-danger: #cf222e;
-  --hmh-warn: #9a6700;
-  --hmh-user-turn-bg: #dbeafe;
+/* 深色主题:同 alias 换深值(蓝本 §5:底 #101216 系,层 #16181d 系,label 反转) */
+:root[data-theme='dark'] {
+  --hmh-bg-base: #101216;
+  --hmh-bg-layer-1: #16181d;
+  --hmh-bg-layer-2: #1b1e24;
+  --hmh-bg-menu: #1f222a;
+  --hmh-bg-mask: rgb(0 0 0 / 45%);
+  --hmh-bg-mask-strong: rgb(0 0 0 / 68%);
 
-  --hmh-status-planning: #8250df;
-  --hmh-status-running: #0969da;
-  --hmh-status-waiting: #9a6700;
-  --hmh-status-verifying: #0969da;
-  --hmh-status-recovering: #bc4c00;
-  --hmh-status-completed: #1a7f37;
-  --hmh-status-failed: #cf222e;
-  --hmh-status-cancelled: #5b616b;
+  --hmh-label-primary: #f5f6f8;
+  --hmh-label-secondary: #c6cad0;
+  --hmh-label-tertiary: #a6abb3;
+  --hmh-label-dimmed: #5b5e66;
+
+  --hmh-brand-primary: #3964fe;
+  --hmh-button-primary-fill: var(--hmh-brand-primary);
+  --hmh-button-primary-hover: #5c85ff;
+  --hmh-button-primary-fg: #ffffff;
+
+  --hmh-border-l1: rgb(255 255 255 / 6%);
+  --hmh-border-l2: rgb(255 255 255 / 12%);
+  --hmh-border-inverted: rgb(255 255 255 / 8%);
+
+  --hmh-interactive-bg-hover: rgb(255 255 255 / 8%);
+  --hmh-interactive-bg-active: rgb(255 255 255 / 14%);
+  --hmh-list-active-bg: #33373f;
+
+  --hmh-state-success: #4ed17e;
+  --hmh-state-warn: #f7ad31;
+  --hmh-state-error: #f25a5a;
+
+  --hmh-status-planning: #a78bfa;
+  --hmh-status-running: #6f93ff;
+  --hmh-status-waiting: #f7ad31;
+  --hmh-status-verifying: #6f93ff;
+  --hmh-status-recovering: #fb923c;
+  --hmh-status-completed: #4ed17e;
+  --hmh-status-failed: #f25a5a;
+  --hmh-status-cancelled: #a6abb3;
+
+  --hmh-user-turn-bg: #20263d;
+
+  --hmh-shadow-lv1: 0 2px 4px 0 rgb(0 0 0 / 40%);
+  --hmh-shadow-lv2: 0 4px 12px 0 rgb(0 0 0 / 36%);
+  --hmh-shadow-lv3: 0 0 1px 0 rgb(0 0 0 / 60%), 0 12px 32px 0 rgb(0 0 0 / 50%);
+
+  --hmh-scrollbar-thumb: #545557;
+  --hmh-scrollbar-thumb-hover: #65676b;
 }
