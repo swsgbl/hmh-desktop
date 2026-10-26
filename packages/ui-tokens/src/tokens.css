@@ -143,3 +143,37 @@
   --hmh-scrollbar-thumb: #545557;
   --hmh-scrollbar-thumb-hover: #65676b;
 }
+
+
+/*
+ * Apple HIG-inspired interaction layer (2026-10-27).
+ * Retain the HMH blue identity and semantic status colors, but use quiet,
+ * system-like surfaces and explicit accessibility tokens. This is an
+ * interaction/layout adaptation, not a copy of Apple's proprietary UI.
+ */
+:root {
+  --hmh-sidebar-bg: #f4f5f7;
+  --hmh-toolbar-bg: #f9fafb;
+  --hmh-selection-bg: #e4e8ef;
+  --hmh-focus-ring: #2459d6;
+  --hmh-radius-control: 8px;
+}
+:root[data-theme='dark'] {
+  --hmh-sidebar-bg: #14171c;
+  --hmh-toolbar-bg: #16181d;
+  --hmh-selection-bg: #2b3444;
+  --hmh-focus-ring: #8ab4ff;
+  --hmh-radius-control: 8px;
+}
+@media (prefers-contrast: more) {
+  :root {
+    --hmh-border-l1: rgb(0 0 0 / 16%);
+    --hmh-border-l2: rgb(0 0 0 / 28%);
+    --hmh-focus-ring: #003fc7;
+  }
+  :root[data-theme='dark'] {
+    --hmh-border-l1: rgb(255 255 255 / 22%);
+    --hmh-border-l2: rgb(255 255 255 / 34%);
+    --hmh-focus-ring: #b9d3ff;
+  }
+}
