@@ -47,8 +47,8 @@ test('high contrast tokens increase boundary visibility', () => {
 const themeSource = readFileSync(join(root, 'apps/desktop/renderer/src/theme.ts'), 'utf8');
 
 themeTest('system theme follows OS and is the first-run default', () => {
-  assert.match(themeSource, /return\\s+'system'/);
-  assert.match(themeSource, /prefers-color-scheme:\\s*dark/);
-  assert.match(themeSource, /matchMedia\\('prefers-color-scheme:\\s*dark'\\)/);
+  assert.ok(themeSource.includes("return 'system'"));
+  assert.ok(themeSource.includes("prefers-color-scheme: dark"));
+  assert.ok(themeSource.includes("matchMedia('(prefers-color-scheme: dark)')"));
   assert.doesNotMatch(themeSource, /return 'light'; \/\/ v4 DSH/);
 });
