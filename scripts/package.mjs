@@ -16,6 +16,8 @@ const run = (cmd, args, opts = {}) =>
 
 // 1) fake host 自包含 bundle(resources/,asar 外)
 await run(process.execPath, ['scripts/bundle-fake-host.mjs']);
+// 1b) v5 内置 runtime bundle(hmharness desktop-host → resources/runtime/,asar 外)
+await run(process.execPath, ['scripts/bundle-runtime.mjs']);
 // 2) renderer + electron
 await run(process.execPath, ['scripts/build.mjs']);
 // 3) NSIS(electron-builder;二进制走镜像;config 用绝对路径——相对路径会被

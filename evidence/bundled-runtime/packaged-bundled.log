@@ -1,0 +1,5 @@
+
+[hmh-desktop:host] state=starting
+[hmh-desktop:host] state=ready
+[hmh-desktop:host] bridge ready on 127.0.0.1:52268 (runtime 0.23.39, mode real, entry=G:\hmh-desktop\apps\desktop\release\win-unpacked\resources\runtime\runtime.cjs [bundled])
+SNAPSHOT ok evidence/bundled-runtime/packaged-bundled.png 1440x900

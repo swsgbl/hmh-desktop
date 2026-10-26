@@ -326,7 +326,7 @@ if (!app.requestSingleInstanceLock()) {
             type: 'info',
             title: '关于 HMH Desktop',
             message: 'HMH Desktop',
-            detail: `本地优先的 HMH Agent 图形工作台 v${app.getVersion()}\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}\n模式: ${bridge.mode === 'real' ? '真实 hmharness' : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
+            detail: `本地优先的 HMH Agent 图形工作台 v${app.getVersion()}\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}${useBundledRuntime ? '(内置)' : ''}\n模式: ${bridge.mode === 'real' ? (useBundledRuntime ? '真实 hmharness(内置 runtime)' : '真实 hmharness(外部安装)') : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
           });
         },
       },
@@ -505,30 +505,61 @@ if (!app.requestSingleInstanceLock()) {
   }
 
   let runtimeEntry = ''; // 当前实际使用的真实 runtime 入口(''=未接)
+  let useBundledRuntime = false; // v5:是否在用内置 runtime(关于/面板标注)
 
-  /** dev 连仓库内 hmharness;打包产品自动发现(发现不到→演示模式+引导)。 */
+  /** 内置 runtime(v5 开箱即用):打包后随 extraResources 平铺在 resources/;
+     dev 用仓库内构建产物(scripts/bundle-runtime.mjs)。自包含单文件,无 tsx、
+     无 repo node_modules 依赖。 */
+  function bundledRuntimePath(repoRoot: string): string {
+    return join(app.isPackaged ? process.resourcesPath : join(repoRoot, 'apps', 'desktop', 'resources'), 'runtime', 'runtime.cjs');
+  }
+
+  /** 发现顺序:显式覆盖 > 内置开关(HMH_DESKTOP_BUNDLED=1)> 外部发现
+     (dev 相邻仓库 / where hmh / npm 全局 / 源码位置)> 内置兜底。
+     外部优先=老用户继续用自己装的版本;内置=新机器装完直连真实内核,
+     不再落演示模式。HMH_DESKTOP_FAKE=1 仍强制演示(测试/冒烟)。 */
   async function startHost(): Promise<void> {
     const repoRoot = join(here, '..', '..', '..', '..'); // apps/desktop/dist-electron/main → repo root
     const packaged = app.isPackaged;
-    // 真实入口解析:配置覆盖 > 自动发现(dev 直接用相邻仓库);
-    // HMH_DESKTOP_FAKE=1 强制演示模式(快速/确定性测试与冒烟)
     const forceFake = process.env.HMH_DESKTOP_FAKE === '1';
+    const forceBundled = process.env.HMH_DESKTOP_BUNDLED === '1';
     const override = await loadRuntimeEntryOverride();
-    runtimeEntry = forceFake
-      ? ''
-      : override !== ''
-        ? override
-        : packaged
-          ? detectRealEntry()
-          : join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts');
-    const useReal = runtimeEntry !== '' && existsSync(runtimeEntry);
-    bridge = { ...bridge, mode: useReal ? 'real' : 'fake', runtimeEntry: useReal ? runtimeEntry : null };
+    const adjacent = join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts');
+    const bundled = bundledRuntimePath(repoRoot);
+    const bundledReady = existsSync(bundled);
+    // 解析(结果归一:override/external=.ts 需 tsx;bundled=自包含 cjs 直跑)
+    let entry = '';
+    useBundledRuntime = false;
+    if (forceFake) {
+      // 演示模式
+    } else if (override !== '') {
+      entry = override;
+    } else if (forceBundled) {
+      if (bundledReady) { entry = bundled; useBundledRuntime = true; }
+      else logInfo('host', 'HMH_DESKTOP_BUNDLED=1 但内置 runtime 缺失(先跑 scripts/bundle-runtime.mjs)');
+    } else {
+      entry = packaged ? detectRealEntry() : (existsSync(adjacent) ? adjacent : detectRealEntry());
+      if (entry === '' && bundledReady) { entry = bundled; useBundledRuntime = true; }
+    }
+    runtimeEntry = entry;
+    const useReal = entry !== '' && (useBundledRuntime || existsSync(entry));
+    bridge = {
+      ...bridge,
+      mode: useReal ? 'real' : 'fake',
+      runtimeEntry: useReal ? (useBundledRuntime ? `${entry} (bundled)` : entry) : null,
+    };
     let spec: { command: string; args: string[]; env: Record<string, string>; cwd?: string };
-    if (useReal) {
-      const repo = repoRootOf(runtimeEntry);
+    if (useBundledRuntime) {
       spec = {
         command: process.execPath,
-        args: ['--import', 'tsx', runtimeEntry],
+        args: [entry], // 自包含单文件:electron-as-node 直跑,无 tsx 无 repo
+        env: { ELECTRON_RUN_AS_NODE: '1' },
+      };
+    } else if (useReal) {
+      const repo = repoRootOf(entry);
+      spec = {
+        command: process.execPath,
+        args: ['--import', 'tsx', entry],
         cwd: repo, // bare 'tsx' 与 workspace 依赖都从 repo 的 node_modules 解析
         env: { ELECTRON_RUN_AS_NODE: '1' },
       };
@@ -557,7 +588,7 @@ if (!app.requestSingleInstanceLock()) {
         sseAbort = new AbortController();
         lastEventId = '';
         void pumpEvents();
-        logInfo('host', `bridge ready on 127.0.0.1:${ep.port} (runtime ${ep.version}, mode ${bridge.mode}${useReal ? `, entry=${runtimeEntry}` : ''})`);
+        logInfo('host', `bridge ready on 127.0.0.1:${ep.port} (runtime ${ep.version}, mode ${bridge.mode}${useReal ? `, entry=${runtimeEntry}${useBundledRuntime ? ' [bundled]' : ''}` : ''})`);
       },
     });
     try {

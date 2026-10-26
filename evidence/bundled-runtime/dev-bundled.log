@@ -1,0 +1,6 @@
+
+{"hmhDesktopHostReady":true,"port":51977,"version":"fake-0.0.0"}
+[hmh-desktop:host] state=starting
+[hmh-desktop:host] state=ready
+[hmh-desktop:host] bridge ready on 127.0.0.1:62893 (runtime 0.23.39, mode real, entry=G:\hmh-desktop\apps\desktop\resources\runtime\runtime.cjs [bundled])
+SNAPSHOT ok evidence/bundled-runtime/dev-bundled.png 1440x900
