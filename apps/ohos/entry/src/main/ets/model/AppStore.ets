@@ -158,6 +158,7 @@ export class AppStore {
         if (ev !== null) {
           if (ev.kind === 'state') {
             this.serverState = guardState(data)
+            console.info('hmh state frame: guarded=' + (this.serverState !== null ? 'ok ver=' + this.serverState.daemonVersion : 'NULL') + ' ev=' + f.event)
             if (this.serverState !== null) {
               this.notifyServer()
             }
@@ -188,6 +189,13 @@ export class AppStore {
     }
   }
 
+  /** v3 棒3:页面拉到的 /api/state 也归仓+广播(与 SSE state 帧同一条路,
+   * 让总览/会话列表/顶栏全部即时吃到同一份状态) */
+  adoptServerState(s: StateObj): void {
+    this.serverState = s
+    this.notifyServer()
+  }
+
   private notifyChat(): void {
     const rev = AppStorage.get<number>('chatRev') ?? 0
     AppStorage.setOrCreate('chatRev', rev + 1)
@@ -197,6 +205,8 @@ export class AppStore {
   }
 
   private notifyServer(): void {
+    const rev = AppStorage.get<number>('serverRev') ?? 0
+    AppStorage.setOrCreate('serverRev', rev + 1)
     for (const l of this.listeners) {
       l.onServerState(this.serverState)
     }

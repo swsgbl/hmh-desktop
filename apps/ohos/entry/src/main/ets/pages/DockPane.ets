@@ -7,6 +7,7 @@ import { AppStore, StoreListener } from '../model/AppStore'
 import { t } from '../model/I18n'
 import { Theme } from '../theme/Theme'
 import { StateObj } from '../model/Types'
+import { guardState } from '../model/Guards'
 
 @Component
 export struct DockPane {
@@ -14,8 +15,11 @@ export struct DockPane {
   @State locale: string = 'zh'
   @State st: StateObj | null = null
   @State logs: string[] = []
+  @State sseOn: boolean = false
   @StorageProp('localeRev') localeRev: number = 0
   @StorageProp('chatRev') chatRev: number = 0
+  @StorageProp('sseConnected') sseConnected: boolean = false
+  @StorageProp('serverRev') @Watch('onServerRev') serverRev: number = 0
   private store: AppStore = AppStore.get()
   private storeL: StoreListener | null = null
 
@@ -23,6 +27,7 @@ export struct DockPane {
     this.locale = this.store.locale
     this.logs = AppStore.get().chat.logs
     this.st = AppStore.get().serverState
+    this.sseOn = AppStore.get().sseConnected
     this.refreshState()
     setTimeout(() => { this.refreshState() }, 1500)
     this.storeL = {
@@ -32,7 +37,8 @@ export struct DockPane {
       onServerState: (s: StateObj | null) => {
         this.st = s
       },
-      onSseStatus: (_c: boolean, _m: string) => {
+      onSseStatus: (c: boolean, _m: string) => {
+        this.sseOn = c
       }
       }
     if (this.storeL !== null) {
@@ -50,31 +56,25 @@ export struct DockPane {
     return t(key, this.locale === 'en' ? 'en' : 'zh')
   }
 
+  /** serverRev 变化(hello/state 帧/refreshState 归仓)时重读 store.serverState,
+   * 兜住 listener 注册晚于 hello 单发帧的竞态(v3 棒2 st=NULL 的另一半根因) */
+  onServerRev(): void {
+    const s = AppStore.get().serverState
+    if (s !== null) {
+      this.st = s
+    }
+  }
+
   private async refreshState(): Promise<void> {
     try {
       const resp = await this.store.api().getJson<Object>('/api/state')
-      const o = resp as Record<string, Object>
-      const model = typeof o['model'] === 'string' ? o['model'] as string : ''
-      const chatProvider = typeof o['chatProvider'] === 'string' ? o['chatProvider'] as string : ''
-      const home = typeof o['home'] === 'string' ? o['home'] as string : ''
-      const busy = o['busy'] === true
-      const exposure = typeof o['exposure'] === 'string' ? o['exposure'] as string : ''
-      const daemonVersion = typeof o['daemonVersion'] === 'string' ? o['daemonVersion'] as string : ''
-      const queueN = typeof o['queue'] === 'number' ? o['queue'] as number : 0
-      const wsRaw: Object | undefined = o['workspace']
-      let wsName = ''
-      let wsPath = ''
-      if (wsRaw !== undefined && typeof wsRaw === 'object') {
-        const w = wsRaw as Record<string, Object>
-        wsName = typeof w['name'] === 'string' ? w['name'] as string : ''
-        wsPath = typeof w['path'] === 'string' ? w['path'] as string : ''
+      // 与 SSE hello/state 帧同构:统一走 guardState(v3 棒2 "无数据"根修:
+      // 旧手搓映射漏 busySessions/queue(string[]→count)/activeSessionId 等)
+      const guarded = guardState(resp as Object)
+      if (guarded !== null) {
+        this.st = guarded
+        this.store.adoptServerState(guarded)
       }
-      this.st = {
-        model: model, chatProvider: chatProvider, home: home, locale: '', busy: busy,
-        busySessions: [], approvalPending: false, queue: queueN, activeSessionId: '',
-        activeThreadCwd: '', exposure: exposure, workspace: wsName !== '' ? { id: '', name: wsName, path: wsPath } as import('../model/Types').WorkspaceInfo : null,
-        daemonVersion: daemonVersion
-      } as StateObj
     } catch (e) {
       // Bootstrap token 就绪竞态: 3s 后重试一次
       hilog.info(0xD002200, 'hmh', 'refreshState failed: %{public}s', (e as Error).message)
@@ -176,20 +176,32 @@ export struct DockPane {
           .onClick(() => this.refreshState())
       }
       .width('100%')
-      this.kv('DIAG st', this.st !== null ? 'nonnull ' + this.st.daemonVersion : 'NULL')
-      this.kv('DIAG store.sse', AppStore.get().sseConnected ? 'conn' : 'down')
-      this.kv('DIAG baseUrl', AppStore.get().baseUrl !== '' ? 'set' : 'EMPTY')
-      this.kv(this.L('dock.rtVer'), this.st !== null && this.st.daemonVersion !== '' ? this.st.daemonVersion : this.L('dock.noData'))
-      this.kv(this.L('dock.mode'), this.st !== null ? this.st.exposure : '')
-      this.kv(this.L('top.model'), this.st !== null ? this.st.model : '')
-      this.kv('provider', this.st !== null ? this.st.chatProvider : '')
-      this.kv(this.L('dock.sessCount'), this.st !== null ? `${this.st.busySessions.length} 运行 / 队列 ${this.st.queue}` : '')
-      this.kv(this.L('dock.runState'), this.st !== null ? (this.st.busy ? this.L('status.running') : this.L('status.idle')) : '')
-      this.kv(this.L('dock.ws'), this.st !== null && this.st.workspace !== null ? this.st.workspace.name : this.L('dock.none'))
+      // v3 棒3:直读 store(由 serverRev/sseConnected @StorageProp 驱动重渲染),
+      // 不再走 this.st 陈旧快照——根治 v2 棒3 同款"组件构造时快照不更新"bug
+      if (this.serverRev >= 0) {
+        this.diagRows()
+      }
       Text(this.L('dock.overviewNote'))
         .fontSize(11)
         .fontColor(Theme.dim)
         .margin({ top: 8 })
+    }
+    .width('100%')
+  }
+
+  @Builder
+  diagRows() {
+    Column({ space: 6 }) {
+      this.kv('DIAG st', this.st !== null ? 'nonnull v' + this.st.daemonVersion : 'NULL')
+      this.kv('DIAG sse', this.sseOn ? 'conn' : 'down')
+      this.kv('DIAG rev', `srv=${this.serverRev} chat=${this.chatRev}`)
+      this.kv(this.L('dock.rtVer'), this.st !== null && this.st.daemonVersion !== '' ? this.st.daemonVersion : this.L('dock.noData'))
+      this.kv(this.L('dock.mode'), this.st !== null ? this.st.exposure : '')
+      this.kv(this.L('top.model'), this.st !== null ? this.st.model : '')
+      this.kv('provider', this.st !== null ? this.st.chatProvider : '')
+      this.kv(this.L('dock.sessCount'), this.st !== null ? `${this.st.busySessions.length} 运行 / 阶列 ${this.st.queue}` : '')
+      this.kv(this.L('dock.runState'), this.st !== null ? (this.st.busy ? this.L('status.running') : this.L('status.idle')) : '')
+      this.kv(this.L('dock.ws'), this.st !== null && this.st.workspace !== null ? this.st.workspace.name : this.L('dock.none'))
     }
     .width('100%')
   }

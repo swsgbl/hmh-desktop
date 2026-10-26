@@ -29,15 +29,33 @@ export function guardState(v: Object | undefined): StateObj | null {
       path: asString(w['path'], '')
     } as WorkspaceInfo
   }
+  const bs: string[] = []
+  const rawBs: Object | undefined = o['busySessions']
+  if (Array.isArray(rawBs)) {
+    const arr: Object[] = rawBs as Object[]
+    for (const s of arr) {
+      if (typeof s === 'string') {
+        bs.push(s as string)
+      }
+    }
+  }
+  // server sends queue as string[] (allQueued().map(t=>t.text)); count it
+  let qn = 0
+  const rawQ: Object | undefined = o['queue']
+  if (Array.isArray(rawQ)) {
+    qn = rawQ.length
+  } else if (typeof rawQ === 'number') {
+    qn = rawQ as number
+  }
   return {
     model: asString(o['model'], ''),
     chatProvider: asString(o['chatProvider'], ''),
     home: asString(o['home'], ''),
     locale: asString(o['locale'], ''),
     busy: asBool(o['busy'], false),
-    busySessions: [],
+    busySessions: bs,
     approvalPending: asBool(o['approvalPending'], false),
-    queue: asNumber(o['queue'], 0),
+    queue: qn,
     activeSessionId: asString(o['activeSessionId'], ''),
     activeThreadCwd: asString(o['activeThreadCwd'], ''),
     exposure: asString(o['exposure'], ''),
