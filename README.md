@@ -2,10 +2,20 @@
 
 **装完即用的 HMH 智能体图形工作台**(Windows 桌面版 + 深开鸿/HarmonyOS 版)。**[hmharness](https://github.com/swsgbl/hmharness) 是唯一 Agent/Cognitive Runtime,本仓库是双端桌面壳**——不实现第二份 agent loop、工具权限判定或认知模型(ADR-002)。
 
-## 安装与更新([Releases](https://github.com/swsgbl/hmh-desktop/releases))
+## 安装与更新([Releases](https://github.com/swsgbl/hmh-desktop/releases/latest))
 
-- **Windows**:`HMH-Desktop-Setup-x.y.z.exe`——**开箱即用**:安装包含内置 hmharness 内核(装完直连,新电脑无需另装 CLI);首启向导智能检测(机器上已装 hmh CLI → 默认共享使用;没有 → 三选一:下载安装完整 CLI(默认全局配置,与 CLI/TUI/网页版共享)/用内置内核/演示)。应用内 ☰ 菜单可检查更新(GitHub Releases 通道+镜像回退)。
-- **深开鸿/OpenHarmony**:`HMH-OHOS-x.y.z.hap`(侧载形态,`hdc install -r`;一键 `node apps/ohos/scripts/deploy.mjs`)——首启智能模式:设备上有 hmh(7788 在线)→**自动连本地共享**(与设备 CLI/TUI/浏览器四端同核);没有 → 安装向导(本机装内核(推荐)/连电脑/演示);`deploy-local-kernel.mjs` 一键把 hmharness 装进设备实现完全独立。
+**按你的操作系统选包**(详见每个 Release 页顶部的选包指南):
+
+| 操作系统 | 下载 | 说明 |
+|---|---|---|
+| Windows 10/11(64 位 Intel/AMD) | `HMH-Desktop-Setup-x.y.z.exe` | 双击安装,**开箱即用**(内置内核;已装 hmh CLI 则自动共享) |
+| 深开鸿 KaihongOS / OpenHarmony API 23+ | `HMH-OHOS-x.y.z.hap` | `hdc install -r` 侧载或一键 `deploy.mjs`;连电脑或本机独立双模式 |
+| macOS / Linux 桌面 | 暂未打包 | 任何系统可直接用 npm 版:`npm i -g @hmharness/cli` + `hmh web` 浏览器访问 7788 |
+
+> **什么是深开鸿?** OpenHarmony 是鸿蒙开源底座(类似 Linux 内核),华为 HarmonyOS NEXT、深开鸿 KaihongOS 等是它之上的发行版(类似 Ubuntu/Debian 之于 Linux)。HAP 包给这类设备用;HarmonyOS NEXT 手机上架需正式签名(测试签名阶段侧载可用)。
+
+- **Windows 版首启**:智能安装向导(欢迎→检测→选择→完成;机器上已装 hmh CLI → 默认共享;没有 → 下载安装完整 CLI(默认全局配置)/用内置内核/演示)。☰ 菜单可检查更新(GitHub Releases 通道+镜像回退)。
+- **深开鸿版首启**:设备上有 hmh(7788 在线)→自动连本地共享(与设备 CLI/TUI/浏览器四端同核);没有 → 安装向导(本机装内核(推荐)/连电脑/演示);`deploy-local-kernel.mjs` 一键把 hmharness 装进设备实现完全独立。
 - 两版**默认全局配置**(Windows `~/.hmharness` / 深开鸿 `/data/local/home/.hmharness`)——所有端共享同一份配置、密钥、会话历史。
 
 ## 与 hmharness 的关系(为什么是独立仓库)
