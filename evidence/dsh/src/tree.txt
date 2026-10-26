@@ -1,0 +1,124 @@
+package/
+  dist/
+    assets/
+      fonts/
+        KaTeX_AMS-Regular-BQhdFMY1.woff2 28076b
+        KaTeX_AMS-Regular-DMm9YOAa.woff 33516b
+        KaTeX_AMS-Regular-DRggAlZN.ttf 63632b
+        KaTeX_Caligraphic-Bold-ATXxdsX0.ttf 12368b
+        KaTeX_Caligraphic-Bold-BEiXGLvX.woff 7716b
+        KaTeX_Caligraphic-Bold-Dq_IR9rO.woff2 6912b
+        KaTeX_Caligraphic-Regular-CTRA-rTL.woff 7656b
+        KaTeX_Caligraphic-Regular-Di6jR-x-.woff2 6908b
+        KaTeX_Caligraphic-Regular-wX97UBjC.ttf 12344b
+        KaTeX_Fraktur-Bold-BdnERNNW.ttf 19584b
+        KaTeX_Fraktur-Bold-BsDP51OF.woff 13296b
+        KaTeX_Fraktur-Bold-CL6g_b3V.woff2 11348b
+        KaTeX_Fraktur-Regular-CB_wures.ttf 19572b
+        KaTeX_Fraktur-Regular-CTYiF6lA.woff2 11316b
+        KaTeX_Fraktur-Regular-Dxdc4cR9.woff 13208b
+        KaTeX_Main-Bold-Cx986IdX.woff2 25324b
+        KaTeX_Main-Bold-Jm3AIy58.woff 29912b
+        KaTeX_Main-Bold-waoOVXN0.ttf 51336b
+        KaTeX_Main-BoldItalic-DxDJ3AOS.woff2 16780b
+        KaTeX_Main-BoldItalic-DzxPMmG6.ttf 32968b
+        KaTeX_Main-BoldItalic-SpSLRI95.woff 19412b
+        KaTeX_Main-Italic-3WenGoN9.ttf 33580b
+        KaTeX_Main-Italic-BMLOBm91.woff 19676b
+        KaTeX_Main-Italic-NWA7e6Wa.woff2 16988b
+        KaTeX_Main-Regular-B22Nviop.woff2 26272b
+        KaTeX_Main-Regular-Dr94JaBh.woff 30772b
+        KaTeX_Main-Regular-ypZvNtVU.ttf 53580b
+        KaTeX_Math-BoldItalic-B3XSjfu4.ttf 31196b
+        KaTeX_Math-BoldItalic-CZnvNsCZ.woff2 16400b
+        KaTeX_Math-BoldItalic-iY-2wyZ7.woff 18668b
+        KaTeX_Math-Italic-DA0__PXp.woff 18748b
+        KaTeX_Math-Italic-flOr_0UB.ttf 31308b
+        KaTeX_Math-Italic-t53AETM-.woff2 16440b
+        KaTeX_SansSerif-Bold-CFMepnvq.ttf 24504b
+        KaTeX_SansSerif-Bold-D1sUS0GD.woff2 12216b
+        KaTeX_SansSerif-Bold-DbIhKOiC.woff 14408b
+        KaTeX_SansSerif-Italic-C3H0VqGB.woff2 12028b
+        KaTeX_SansSerif-Italic-DN2j7dab.woff 14112b
+        KaTeX_SansSerif-Italic-YYjJ1zSn.ttf 22364b
+        KaTeX_SansSerif-Regular-BNo7hRIc.ttf 19436b
+        KaTeX_SansSerif-Regular-CS6fqUqJ.woff 12316b
+        KaTeX_SansSerif-Regular-DDBCnlJ7.woff2 10344b
+        KaTeX_Script-Regular-C5JkGWo-.ttf 16648b
+        KaTeX_Script-Regular-D3wIWfF6.woff2 9644b
+        KaTeX_Script-Regular-D5yQViql.woff 10588b
+        KaTeX_Size1-Regular-C195tn64.woff 6496b
+        KaTeX_Size1-Regular-Dbsnue_I.ttf 12228b
+        KaTeX_Size1-Regular-mCD8mA8B.woff2 5468b
+        KaTeX_Size2-Regular-B7gKUWhC.ttf 11508b
+        KaTeX_Size2-Regular-Dy4dx90m.woff2 5208b
+        KaTeX_Size2-Regular-oD1tc_U0.woff 6188b
+        KaTeX_Size3-Regular-CTq5MqoE.woff 4420b
+        KaTeX_Size3-Regular-DgpXs0kz.ttf 7588b
+        KaTeX_Size4-Regular-BF-4gkZK.woff 5980b
+        KaTeX_Size4-Regular-Dl5lxZxV.woff2 4928b
+        KaTeX_Size4-Regular-DWFBv043.ttf 10364b
+        KaTeX_Typewriter-Regular-C0xS9mPB.woff 16028b
+        KaTeX_Typewriter-Regular-CO6r4hn1.woff2 13568b
+        KaTeX_Typewriter-Regular-D3Ib7_Hf.ttf 27556b
+      index-Dc36OJbd.css 67771b
+      index-DYtepzMn.js 442711b
+      langs/
+        c-BIGW1oBm.js 72152b
+        cpp-DIPi6g--.js 637594b
+        csharp-DSvCPggb.js 90233b
+        css-CLj8gQPS.js 49082b
+        go-C27-OAKa.js 46858b
+        html-CfGypltT.js 232159b
+        ini-BEwlwnbL.js 1566b
+        java-CylS5w8V.js 27261b
+        kotlin-BdnUsdx6.js 8829b
+        less-B1dDrJ26.js 97675b
+        lua-BaeVxFsk.js 15576b
+        markdown-Cvjx9yec.js 59381b
+        mdx-Cmh6b_Ma.js 136155b
+        php-D-uCvoST.js 113111b
+        python-B6aJPvgy.js 69996b
+        ruby-DEItuUFs.js 425791b
+        rust-B1yitclQ.js 15111b
+        scss-D5BDwBP9.js 27246b
+        sql-CRqJ_cUM.js 23469b
+        swift-D82vCrfD.js 86730b
+        toml-vGWfd6FD.js 6468b
+        xml-sdJ4AIDG.js 5425b
+        yaml-Buea-lGh.js 10548b
+      vendor-Cjbwl5VI.js 744872b
+      vendor-CjyC-hUb.css 29642b
+    favicon.svg 3721b
+    index.html 676b
+    manifest.webmanifest 267b
+  LICENSE 1495b
+  package.json 1484b
+=== chat ===
+package/
+  lib/
+    client.js 336619b
+    index.js 1302b
+    invariant.js 693b
+    types/
+      chat-settings.d.ts 1176b
+      client/
+        apply.d.ts 426b
+        chat/
+        contract/
+        conversation-nodes/
+        details/
+        index.d.ts 3215b
+        locale.d.ts 8650b
+        markdown-labels.d.ts 493b
+        model/
+        settings/
+        stores.d.ts 1119b
+        transcript-view.d.ts 1015b
+      index.d.ts 450b
+      invariant.d.ts 598b
+  LICENSE 1065b
+  package.json 3413b
+  README.i18n.yaml 433b
+  README.md 6004b
+  README.zh.md 5659b
