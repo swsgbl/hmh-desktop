@@ -1,6 +1,6 @@
 {
   "name": "@hmh-desktop/app",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "description": "HMH Desktop 桌面应用(Electron 壳)。renderer 无 Node;IPC 白名单;host token 只存在于主进程。",
   "type": "module",
