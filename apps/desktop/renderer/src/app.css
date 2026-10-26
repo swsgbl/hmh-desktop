@@ -513,3 +513,101 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   height: 32px; padding: 0 10px; border-radius: var(--hmh-radius-sm);
   border: 1px solid var(--hmh-border-l2); background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
 }
+
+
+/* Apple HIG interaction pass (2026-10-27): keyboard discoverability, quiet controls, reduced motion. */
+/*
+ * Keep the three-pane HMH workbench and existing semantic palette. Refine
+ * controls away from repeated capsule buttons toward the quieter, compact
+ * macOS toolbar/sidebar language. No workflow logic or API contract changes.
+ */
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.titlebar {
+  background: color-mix(in srgb, var(--hmh-toolbar-bg) 94%, transparent);
+  -webkit-backdrop-filter: saturate(140%) blur(12px);
+  backdrop-filter: saturate(140%) blur(12px);
+}
+.sidebar {
+  background: var(--hmh-sidebar-bg);
+}
+.btn {
+  border-radius: var(--hmh-radius-control);
+}
+.btn.primary,
+.btn.danger {
+  border-radius: var(--hmh-radius-control);
+}
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 15px;
+}
+.session-item.active {
+  background: var(--hmh-selection-bg);
+  box-shadow: none;
+}
+.dock-tab.active {
+  background: var(--hmh-selection-bg);
+  box-shadow: none;
+}
+.session-row:focus-within .session-export,
+.session-export:focus-visible {
+  opacity: 1;
+}
+.session-export {
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+}
+/* Focus should be visible without forcing a large outline around every control. */
+:focus-visible {
+  outline: 2px solid var(--hmh-focus-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .session-running-dot {
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  .btn,
+  .icon-btn,
+  .session-item,
+  .dock-tab,
+  input,
+  select,
+  textarea {
+    border-color: ButtonText;
+  }
+  .session-item.active,
+  .dock-tab.active {
+    outline: 1px solid Highlight;
+  }
+}
+/* 32px minimum applies to toolbar targets; row actions stay visible on keyboard focus. */
+@media (hover: none) {
+  .session-export {
+    opacity: 1;
+  }
+}
