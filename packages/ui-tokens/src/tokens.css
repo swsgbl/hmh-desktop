@@ -8,6 +8,7 @@
   --hmh-bg-layer-1: #ffffff;   /* 卡片/输入/标题栏底 */
   --hmh-bg-layer-2: #f2f3f5;   /* pill/次级面板底 */
   --hmh-bg-menu: #ffffff;      /* 菜单/浮层底 */
+  --hmh-sidebar-bg: #f2f3f5;   /* restrained navigation surface */
   --hmh-bg-mask: rgb(15 17 21 / 32%);        /* 命令面板遮罩 */
   --hmh-bg-mask-strong: rgb(15 17 21 / 55%); /* 阻断式引导遮罩 */
 
@@ -100,6 +101,7 @@
   --hmh-bg-layer-1: #16181d;
   --hmh-bg-layer-2: #1b1e24;
   --hmh-bg-menu: #1f222a;
+  --hmh-sidebar-bg: #17191f;
   --hmh-bg-mask: rgb(0 0 0 / 45%);
   --hmh-bg-mask-strong: rgb(0 0 0 / 68%);
 
