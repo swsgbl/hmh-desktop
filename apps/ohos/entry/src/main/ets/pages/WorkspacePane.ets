@@ -5,7 +5,7 @@
  *       composer(附件条/@/textarea/发送)
  * 逻辑全部复用 v2 SessionsPage chatBody(搬运)
  */
-import { AppStore } from '../model/AppStore'
+import { AppStore, StoreListener } from '../model/AppStore'
 import { ChatState, ChatMessage, TaskReq, SimpleSidReq, ApproveReq, StateObj, ProviderRow, ModelReq } from '../model/Types'
 import { ApiError, toApiError } from '../net/ApiClient'
 import { ApprovalCardView } from '../components/ApprovalCard'
@@ -39,12 +39,13 @@ export struct WorkspacePane {
   @StorageProp('localeRev') localeRev: number = 0
   @StorageProp('settingsOpen') settingsOpen: boolean = false
   private store: AppStore = AppStore.get()
+  private storeL: StoreListener | null = null
   private scroller: Scroller = new Scroller()
 
   aboutToAppear(): void {
     this.locale = this.store.locale
     this.loadState()
-    AppStore.get().setListener({
+    this.storeL = {
       onChatState: (st: ChatState) => {
         this.chat = st
       },
@@ -55,11 +56,16 @@ export struct WorkspacePane {
       },
       onSseStatus: (_c: boolean, _m: string) => {
       }
-    })
+      }
+    if (this.storeL !== null) {
+      AppStore.get().setListener(this.storeL)
+    }
   }
 
   aboutToDisappear(): void {
-    AppStore.get().setListener(null)
+    if (this.storeL !== null) {
+      AppStore.get().removeListener(this.storeL)
+    }
   }
 
   private L(key: string): string {

@@ -2,7 +2,8 @@
  * v3 右栏 Dock(360px,1:1 复刻 .dock):六页签(总览/文件/变更/证据/日志/远程)
  * 页签内容复用 v2 页面(Overview/Files/Logs 迁移为 @Builder 组件渲染)
  */
-import { AppStore } from '../model/AppStore'
+import { hilog } from '@kit.PerformanceAnalysisKit'
+import { AppStore, StoreListener } from '../model/AppStore'
 import { t } from '../model/I18n'
 import { Theme } from '../theme/Theme'
 import { StateObj } from '../model/Types'
@@ -16,12 +17,15 @@ export struct DockPane {
   @StorageProp('localeRev') localeRev: number = 0
   @StorageProp('chatRev') chatRev: number = 0
   private store: AppStore = AppStore.get()
+  private storeL: StoreListener | null = null
 
   aboutToAppear(): void {
     this.locale = this.store.locale
     this.logs = AppStore.get().chat.logs
+    this.st = AppStore.get().serverState
     this.refreshState()
-    AppStore.get().setListener({
+    setTimeout(() => { this.refreshState() }, 1500)
+    this.storeL = {
       onChatState: (st2: import('../model/Types').ChatState) => {
         this.logs = st2.logs
       },
@@ -30,11 +34,16 @@ export struct DockPane {
       },
       onSseStatus: (_c: boolean, _m: string) => {
       }
-    })
+      }
+    if (this.storeL !== null) {
+      AppStore.get().setListener(this.storeL)
+    }
   }
 
   aboutToDisappear(): void {
-    AppStore.get().setListener(null)
+    if (this.storeL !== null) {
+      AppStore.get().removeListener(this.storeL)
+    }
   }
 
   private L(key: string): string {
@@ -67,6 +76,9 @@ export struct DockPane {
         daemonVersion: daemonVersion
       } as StateObj
     } catch (e) {
+      // Bootstrap token 就绪竞态: 3s 后重试一次
+      hilog.info(0xD002200, 'hmh', 'refreshState failed: %{public}s', (e as Error).message)
+      setTimeout(() => { this.refreshState() }, 3000)
     }
   }
 
@@ -151,6 +163,22 @@ export struct DockPane {
   @Builder
   overviewBody() {
     Column({ space: 6 }) {
+      Row({ space: 8 }) {
+        Text(this.L('dock.overview'))
+          .fontSize(13)
+          .fontWeight(FontWeight.Bold)
+          .layoutWeight(1)
+        Button(this.locale === 'en' ? 'Refresh' : '刷新')
+          .fontSize(12)
+          .height(28)
+          .backgroundColor(Theme.panel)
+          .fontColor(Theme.text)
+          .onClick(() => this.refreshState())
+      }
+      .width('100%')
+      this.kv('DIAG st', this.st !== null ? 'nonnull ' + this.st.daemonVersion : 'NULL')
+      this.kv('DIAG store.sse', AppStore.get().sseConnected ? 'conn' : 'down')
+      this.kv('DIAG baseUrl', AppStore.get().baseUrl !== '' ? 'set' : 'EMPTY')
       this.kv(this.L('dock.rtVer'), this.st !== null && this.st.daemonVersion !== '' ? this.st.daemonVersion : this.L('dock.noData'))
       this.kv(this.L('dock.mode'), this.st !== null ? this.st.exposure : '')
       this.kv(this.L('top.model'), this.st !== null ? this.st.model : '')

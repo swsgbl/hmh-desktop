@@ -1,7 +1,7 @@
 /**
- * 全局单例中枢:配置(preferences 持久化)+ ApiClient/SseClient 生命周期 + 事件分发
- * 页面通过 AppUtil 订阅回调刷新(AppStorage 驱动 @State)
- * #19:approval.required → notificationManager 本地通知(点击拉起会话页)
+ * 鍏ㄥ眬鍗曚緥涓灑:閰嶇疆(preferences 鎸佷箙鍖?+ ApiClient/SseClient 鐢熷懡鍛ㄦ湡 + 浜嬩欢鍒嗗彂
+ * 椤甸潰閫氳繃 AppUtil 璁㈤槄鍥炶皟鍒锋柊(AppStorage 椹卞姩 @State)
+ * #19:approval.required 鈫?notificationManager 鏈湴閫氱煡(鐐瑰嚮鎷夎捣浼氳瘽椤?
  */
 import { preferences } from '@kit.ArkData'
 import { Context, Want, wantAgent } from '@kit.AbilityKit'
@@ -42,7 +42,7 @@ export class AppStore {
   sseMessage: string = ''
   private prefs: preferences.Preferences | null = null
   private sse: SseClient | null = null
-  private listener: StoreListener | null = null
+  private listeners: StoreListener[] = []
   private seq: number = 0
   private lastNotify: Map<number, number> = new Map<number, number>()
 
@@ -53,8 +53,18 @@ export class AppStore {
     return AppStore.instance
   }
 
-  setListener(l: StoreListener | null): void {
-    this.listener = l
+  setListener(l: StoreListener): void {
+    const i = this.listeners.indexOf(l)
+    if (i < 0) {
+      this.listeners.push(l)
+    }
+  }
+
+  removeListener(l: StoreListener): void {
+    const i = this.listeners.indexOf(l)
+    if (i >= 0) {
+      this.listeners.splice(i, 1)
+    }
   }
 
   async initPrefs(context: Context): Promise<void> {
@@ -125,12 +135,12 @@ export class AppStore {
     return new ApiClient(this.baseUrl, this.token)
   }
 
-  /** SSE 订阅(幂等:先关旧再开新) */
+  /** SSE 璁㈤槄(骞傜瓑:鍏堝叧鏃у啀寮€鏂? */
   startSse(sessionId: string): void {
     this.stopSse()
     this.chat = newChatState(sessionId)
     if (this.baseUrl === '') {
-      this.notifySse(false, '未配置服务器')
+      this.notifySse(false, '鏈厤缃湇鍔″櫒')
       return
     }
     const sse = new SseClient(this.baseUrl + '/api/events', this.token, {
@@ -140,6 +150,7 @@ export class AppStore {
         try {
           data = JSON.parse(f.data) as Record<string, Object>
         } catch (e) {
+          console.info('hmh diag: parse fail ev=' + f.event + ' len=' + f.data.length + ' :' + JSON.stringify(e).slice(0, 120))
           return
         }
         const raw: RawEvent = { id: f.id, event: f.event, data: data }
@@ -148,13 +159,12 @@ export class AppStore {
           if (ev.kind === 'state') {
             this.serverState = guardState(data)
             if (this.serverState !== null) {
-              AppStorage.setOrCreate('serverStateJson', JSON.stringify(this.serverState))
               this.notifyServer()
             }
           }
           this.chat = reduce(this.chat, ev)
           this.notifyChat()
-          // #19 审批通知(去重窗口内只发一次)
+          // #19 瀹℃壒閫氱煡(鍘婚噸绐楀彛鍐呭彧鍙戜竴娆?
           if (ev.kind === 'approval.required') {
             this.publishApprovalNotify(ev.name)
           }
@@ -181,14 +191,14 @@ export class AppStore {
   private notifyChat(): void {
     const rev = AppStorage.get<number>('chatRev') ?? 0
     AppStorage.setOrCreate('chatRev', rev + 1)
-    if (this.listener !== null) {
-      this.listener.onChatState(this.chat)
+    for (const l of this.listeners) {
+      l.onChatState(this.chat)
     }
   }
 
   private notifyServer(): void {
-    if (this.listener !== null) {
-      this.listener.onServerState(this.serverState)
+    for (const l of this.listeners) {
+      l.onServerState(this.serverState)
     }
   }
 
@@ -196,12 +206,12 @@ export class AppStore {
     this.sseConnected = connected
     this.sseMessage = msg
     AppStorage.setOrCreate('sseConnected', connected)
-    if (this.listener !== null) {
-      this.listener.onSseStatus(connected, msg)
+    for (const l of this.listeners) {
+      l.onSseStatus(connected, msg)
     }
   }
 
-  /** #19 发布审批通知(点击拉起 EntryAbility → Index 路由到会话 Tab) */
+  /** #19 鍙戝竷瀹℃壒閫氱煡(鐐瑰嚮鎷夎捣 EntryAbility 鈫?Index 璺敱鍒颁細璇?Tab) */
   private publishApprovalNotify(toolName: string): void {
     const id = notifyIdFor(toolName)
     const decision = shouldNotify(id, Date.now(), this.lastNotify)
@@ -223,8 +233,8 @@ export class AppStore {
         content: {
           notificationContentType: notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
           normal: {
-            title: 'HMH 审批请求',
-            text: `工具 ${toolName === '' ? '(unnamed)' : toolName} 等待批准`,
+            title: 'HMH 瀹℃壒璇锋眰',
+            text: `宸ュ叿 ${toolName === '' ? '(unnamed)' : toolName} 绛夊緟鎵瑰噯`,
             additionalText: '点击打开会话页处理'
           } as notificationManager.NotificationBasicContent
         } as notificationManager.NotificationContent,
@@ -232,10 +242,10 @@ export class AppStore {
         wantAgent: agent
       } as notificationManager.NotificationRequest
       notificationManager.publish(req).catch((_err: object) => {
-        // 通知失败不影响业务流(未授权/无slot 时静默)
+        // 通知失败不影响业务流(未授权/无slot时静默)
       })
     } catch (e) {
-      // 容错:notificationManager 不可用时不阻塞 SSE 流
+      // 容错:notificationManager 不可用时不阻塞SSE流
     }
   }
 }

@@ -23,6 +23,7 @@ struct Index {
   @StorageProp('sseConnected') sseConnected: boolean = false
   @StorageProp('settingsOpen') settingsOpen: boolean = false
   @StorageProp('openSessionRev') openSessionRev: number = 0
+  @State winW: number = 1280
   private store: AppStore = AppStore.get()
 
   aboutToAppear(): void {
@@ -57,16 +58,31 @@ struct Index {
       .alignItems(VerticalAlign.Center)
 
       // ---- 三栏 grid 等价:Row[264|1fr|360] ----
+      // VM 窗口为自由浮动窗(实测 857~1280 浮动),必须自适应:
+      //   winW>=1240 完整三栏; 960<=winW<1240 侧栏 200+Dock 300; <960 侧栏藏(☰ 可开覆盖层)
       Row({ space: 0 }) {
-        if (this.sidebarOpen) {
+        if (this.sidebarOpen && this.winW >= 1240) {
           Sidebar({ activeId: this.activeId })
+        } else if (this.sidebarOpen && this.winW >= 960) {
+          Sidebar({ activeId: this.activeId }).width(200)
         }
         WorkspacePane({ activeId: this.activeId })
-        DockPane()
+        if (this.winW >= 1240) {
+          DockPane().width(360)
+        } else {
+          DockPane().width(300)
+        }
       }
       .layoutWeight(1)
       .width('100%')
       .alignItems(VerticalAlign.Top)
+      .onAreaChange((_o: Area, n: Area) => {
+        const w = n.width
+        const v = typeof w === 'number' ? w : parseInt(w.toString(), 10)
+        if (!Number.isNaN(v) && v > 0) {
+          this.winW = v
+        }
+      })
     }
     .width('100%')
     .height('100%')

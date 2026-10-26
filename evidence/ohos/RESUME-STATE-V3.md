@@ -1,33 +1,63 @@
-# RESUME-STATE-V3 · 三栏 1:1 复刻 · 棒 V3-1 收棒
+# RESUME-STATE-V3 · 棒 V3-2 增补(A1 修复+A2 深挖中)
 
-> 任务书:docs/prompts/hmh-ohos-dev-prompt-v3.md。蓝本=apps/desktop App.tsx JSX + app.css 逐值 + tokens.css。
+## 本棒已完成 ✅
 
-## 本棒完成 ✅(BUILD OK + 装机成功 + dump 实证三栏同屏)
+### A1 composer 竖排 → 修复实证
+- **根因链**: VM app 窗口是浮动窗(实测 [211,132][1068,668]=857×536,非 1280 全屏!)
+  - 264+360 固定列吃掉 73% → 中栏 233px → textarea 34-89px 竖排
+  - 棒2 初还把 DockPane 根 .width(360)→'100%'(Row 里参照整行) 加剧挤压
+- **修法(Index.ets 主 Row)**: onAreaChange 测真宽 winW;
+  ≥1240: Sidebar 264+Dock 360; 960-1240: Sidebar 200+Dock 300; <960: 无侧栏+Dock 300(Dock 恒显!)
+- **实证**: textarea 宽 34→413→713px(三档窗口下), 占位符单行, 发送钮不挤(v3b7 dump)
+- DockPane 根恢复 .width(360) 但外层 Index 控宽(360/300)
 
-**代码(4 新文件,编译零错)**
-1. `theme/Theme.ets`:色板 17 值+尺寸 24 值逐项抄 tokens.css/app.css(bg#141416/raised#1B1D21/panel#1E2024/border#2B2E33/text/dim/accent#2F81F7/danger/warn/userTurn#1C2A3D/8 状态色;titlebar36/sidebar264/dock360/streamPad24/turnMaxW760/radius 6/10/14…)
-2. `pages/Sidebar.ets`(264px):sidebar-head(新建会话▾/搜索/状态过滤四chips)+workspace-bar(工作区名+▾下拉切换)+session-list(分组▸组头/★/运行点/⋯归档/加载更多);openSession 经 AppStorage(openSessionReq/openSessionRev)传中栏
-3. `pages/WorkspacePane.ets`(1fr):topbar(●已连接·daemonVer/工作区pill/模型pill+下拉15provider/审批:ask/⚙开设置弹层/中EN切换/Stop)+stream(user 右对齐#1C2A3D/assistant 卡/工具折叠卡mono名/交付物绿框卡/turnsum/审批卡/流式▍光标/760 maxW)+composer(附件chips/@弹层搜索/TextArea/发送)
-4. `pages/DockPane.ets`(360px):六页签横滚(总览/文件/变更/证据/日志/远程)+总览 kv 卡(runtime/模式/模型/provider/会话数/运行状态/工作区)+日志页(200 行 mono)
-5. `pages/Index.ets` 重写:titlebar 36(☰折叠侧栏)+Row[Sidebar|WorkspacePane|DockPane]+设置弹层(overlay 居中 480,复用 v2 SettingsPage 全量内容)
+### AppStore 单播→多播 ✅(A2 前置)
+- setListener 单槽 listeners[]; WorkspacePane/DockPane 用成员 storeL+removeListener
+- notifyChat/notifyServer/notifySse 三处 for 循环广播
+- **坑**: PS 正则补丁注入字面 `n/foreach 坏串→build 炸;已用 cjs 干净重写(L5922-6535 区)
+- **坑**: setListener(null) 清全部→改 removeListener; ArkTS 不允许 null 参数→setListener(l:StoreListener)
 
-**真机实证(VM 1280×800)**
-- shot-v3-threecol.jpeg(107KB)+v3d1.txt dump:**三栏同屏 x 带分离**(左 229-460 新建/过滤chips/工作区条/`G:\hmh-desktop·17 个会话`分组+17 会话行/中 460-760 topbar已连接·glm-5.3·审批:ask·⚙·中/空态提示/composer @+发送/右 761-1016 六页签+runtime kv 卡)
-- 视觉模型 3 次超时未出结论(dump 证据已足;下棒可补看图)
+### DockPane 增强 ✅
+- aboutToAppear: st=store.serverState seed + refreshState() + 1.5s 延迟二次拉取
+- 总览头加"刷新"按钮(@1059,320 实证)
+- refreshState catch→hilog+3s 重试
 
-## ArkTS 坑(本棒新增)
-- `Alignment.BottomRight` 不存在→用 Column 布局替代 Stack 对齐
-- `{name:x} as Record` 仍算 untyped literal→必须 `const b: ModelReq={...}` 接口实义
-- overlay 弹层语法:`.overlay(this.builder(), {align: Alignment.Center})` 挂 build 链尾
+## A2 卡点(总览全"无数据") — 诊断到一半
 
-## 未完成(下棒)⬜
-1. **V3-2 逐区一致**:Dock 文件页签(现占位"对接中"——需接 v2 FilesPage 逻辑)/变更页签(接 /api/diff)/证据/远程页签内容
-2. **V3-3 交互 1:1**:侧栏会话点击→中栏切换(Sidebar→AppStorage→WorkspacePane 监听 openSessionRev 换 activeId+startSse **未接线**——现在点会话中栏不变,这是最大缺口)/模型下拉切换/设置弹层内交互复测
-3. **V3-4 响应式**:<1100 dock 落底、<820 隐侧栏(蓝本断点)
-4. **V3-5 单测回归**:61/61(布局代码不影响纯逻辑,跑一遍确认)
-5. **V3-6 用户实测**
-6. **空壳会话排查**(Zode 附任务):web-mvoerwi5 同款;本棒未动——下棒从 VM 侧 hilog 抓 POST /api/task 请求体(是否 sessionId 空/mode 异常)对照 runtime 日志
-7. titlebar 拖拽区/最小化最大化(蓝本 titlebar 有 window 控制,VM 全屏态可从简)
+**DIAG 三行实测(v3bg)**: st=NULL / store.sse=down / baseUrl=set
 
-## 环境快照
-同 V2-6(deploy.mjs 全链/hmm-dump.cjs 窗口过滤 dump/aa start 拉前台/uinput -T -m 滚动)
+**已排除**:
+- 服务端 /api/state 200 数据全(PC probe: daemonVersion 0.23.39/model glm-5.3/lan/busy)
+- hello 帧 SSE 事件解析(Reducer case 'hello'→kind='state' ✓)
+- guardState(逐字段 asString 兼容 ✓)
+- JSON.parse(补丁后无 parse fail 日志)
+- hello data 无包装(server.ts:943 sseSend('hello', await stateObject()) 直发)
+
+**诡异**:
+- hilog 见 hello 帧(08:08:22 pid24304)+tool 流持续——但 DIAG 说 sse down
+- **pid 线索**: 08:08:44 BrowserShell onPageShow(pid24674)=VM 里 BrowserOS 也在跑!
+  VM 有两个 app 都连 SSE? hello 帧 pid 是否=当前 hmh app pid 未验证
+- aa start 后 app pid 每次变化(23818→24304→24674),DIAG dump 的进程可能不是收 hello 的进程
+  → **下一步: aa start 后立即 hilog 抓本 pid 的 hello+state 链;或 onFrame 里打 pid/console 佐证**
+
+**未验证假设(下棒首查)**:
+1. app 进程里 startSse 究竟调没调(Bootstrap console 'bootstrap:' 在 hilog 找)
+2. hello 帧到达的 SseClient 是不是 hmh app 的(还是 BrowserOS 的)
+3. EntryAbility onCreate→initPrefs→bootstrapAfterPrefs 时序: preferences 读完 baseUrl 才 set?
+   (DIAG baseUrl=set 说明 prefs OK → bootstrap 应已跑 → health→startSse('') → hello→onFrame→
+    guardState→serverState→notifyServer→DockPane.onServerState→st 应非 null)
+4. 链上任何一环 console.info 都能在 hilog JSAPP 找到——逐环节补日志最快
+
+## 交互接线状态(B 组,棒2 未动)
+- 设置弹层/模型菜单/审批卡/@弹层/上传/⇤收缩: 全部未接(v3 棒1 只做了壳)
+- 右栏六页签: 结构在(总览/文件/变更/证据/日志/远程实证), 内容除总览外未接数据
+
+## 构建/装机链(本棒 6 轮全绿)
+node apps/ohos/scripts/deploy.mjs (build→patch23→VM签→install→launch)
+- 坑: cmd 直跑 node -e 中文引号必炸→一律 .cjs 文件
+- 坑: PS 正则改 ets 文件高风险(字面 `n 注入)→一律 node cjs replace
+
+## 下棒序
+1. A2: aa start 后抓本 pid hilog 全链(bootstrap→hello→state→notifyServer), 环节缺哪补哪
+2. B 组交互逐项接线(每项 dump 实证)
+3. 单测回归 61/61 + commit
