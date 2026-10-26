@@ -12,6 +12,25 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 input, select, textarea { font: inherit; color: var(--hmh-label-primary); }
 ::placeholder { color: var(--hmh-label-dimmed); }
 
+/* Keyboard-first focus treatment (macOS-like focus clarity without copying platform assets). */
+:where(button, a, [role="button"], input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--hmh-brand-primary);
+  outline-offset: 2px;
+}
+:where(button, a, input, select, textarea):focus:not(:focus-visible) { outline: none; }
+
+/* Respect the operating system's Reduce Motion preference; state must remain legible without animation. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .wizard-progress.indeterminate .wizard-progress-fill { animation: none !important; width: 100%; }
+  .cursor { animation: none !important; opacity: 1; }
+}
+
 /* 细滚动条(DSH:thumb 浅灰 + hover 加深;scrollbar-* 可继承,设一次即可) */
 body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
