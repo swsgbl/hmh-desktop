@@ -12,6 +12,8 @@ import { DockPane } from './DockPane'
 import { Th, Metrics } from '../theme/Theme'
 import { t } from '../model/I18n'
 import { SettingsPage } from './SettingsPage'
+import { Wizard } from './Wizard'
+import { shouldShowWizard, ProbeOutcome } from '../model/FirstRun'
 
 @Entry
 @Component
@@ -23,6 +25,11 @@ struct Index {
   @StorageProp('sseConnected') sseConnected: boolean = false
   @StorageProp('settingsOpen') settingsOpen: boolean = false
   @StorageProp('openSessionRev') openSessionRev: number = 0
+  // v6.1: 首启智能检测(向导+本地共享横幅)
+  @StorageProp('wizardOpen') wizardOpen: boolean = false
+  @StorageProp('firstRunOutcome') firstRunOutcome: string = 'keep'
+  @StorageProp('firstRunRev') @Watch('onFirstRun') firstRunRev: number = 0
+  @State showBanner: boolean = false
   @State winW: number = 1280
   private store: AppStore = AppStore.get()
 
@@ -30,6 +37,18 @@ struct Index {
     this.locale = this.store.locale
     // Sidebar 的 openSession 经 AppStorage 传递
     AppStorage.setOrCreate('settingsOpen', false)
+    AppStorage.setOrCreate('wizardOpen', false)
+    // v6.1: 进页面时若探测结果已就绪,立即判定一次(firstRunRev @Watch 覆盖后续变化)
+    this.onFirstRun()
+  }
+
+  /** v6.1: 首启探测结果变化 → 决定向导/横幅 */
+  private onFirstRun(): void {
+    const oc = this.firstRunOutcome as ProbeOutcome
+    this.showBanner = oc === 'local-share' && this.store.baseUrl === 'http://127.0.0.1:7788'
+    if (shouldShowWizard(this.store.wizardDone, this.store.baseUrl !== '', oc)) {
+      AppStorage.setOrCreate('wizardOpen', true)
+    }
   }
 
   private L(key: string): string {
@@ -38,6 +57,29 @@ struct Index {
 
   build() {
     Column({ space: 0 }) {
+      // v6.1: 本地共享横幅(仅 local-share 且当前连的就是本机)
+      if (this.showBanner) {
+        Row({ space: 8 }) {
+          Text('⌨')
+            .fontSize(12)
+            .fontColor(Th.c.brand)
+          Text('已连接本机 hmh 内核(与 TUI/浏览器共享 /data/local/home/.hmharness)')
+            .fontSize(11)
+            .fontColor(Th.c.text2)
+            .layoutWeight(1)
+          Text('×')
+            .fontSize(13)
+            .fontColor(Th.c.text3)
+            .padding({ left: 8, right: 8 })
+            .onClick(() => { this.showBanner = false })
+        }
+        .width('100%')
+        .height(26)
+        .padding({ left: 12, right: 12 })
+        .backgroundColor(Th.c.brandBg)
+        .alignItems(VerticalAlign.Center)
+      }
+
       // ---- titlebar 36px ----
       Row({ space: 8 }) {
         Text('☰')
@@ -90,6 +132,15 @@ struct Index {
 
     // ---- 设置弹层(居中 480px) ----
     .overlay(this.settingsLayer(), { align: Alignment.Center })
+    // v6.1: 安装向导(全屏遮罩,探测后弹出)
+    .overlay(this.wizardLayer(), { align: Alignment.Center })
+  }
+
+  @Builder
+  wizardLayer() {
+    if (this.wizardOpen) {
+      Wizard()
+    }
   }
 
   @Builder

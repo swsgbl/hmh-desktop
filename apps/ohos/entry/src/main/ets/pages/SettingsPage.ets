@@ -80,6 +80,32 @@ export struct SettingsPage {
           .fontWeight(FontWeight.Bold)
           .alignSelf(ItemAlign.Start)
 
+        // v6.1: 重新配置(向导可重入)+模式说明
+        Row({ space: 8 }) {
+          Column({ space: 2 }) {
+            Text('本机模式: CLI/TUI/桌面应用/浏览器共享 /data/local/home/.hmharness')
+              .fontSize(10)
+              .fontColor(Th.c.text3)
+            Text('远程模式: 共享电脑上 HMH_HOME 的配置、密钥与会话')
+              .fontSize(10)
+              .fontColor(Th.c.text3)
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+          Button('重新配置')
+            .fontSize(11)
+            .height(28)
+            .backgroundColor(Th.c.l2)
+            .fontColor(Th.c.text)
+            .onClick(() => {
+              this.store.resetWizard().then(() => {
+                AppStorage.setOrCreate('settingsOpen', false)
+                AppStorage.setOrCreate('wizardOpen', true)
+              })
+            })
+        }
+        .width('100%')
+
         Column({ space: 8 }) {
           Text('服务器地址 (LAN)')
             .fontSize(14)

@@ -51,3 +51,26 @@
 - API probe: HMHK=<token> /data/local/home/.ohos/node/bin/node /data/local/tmp/probe-dev.cjs
 - 任务脚本: /data/local/tmp/dev-task.cjs (POST /api/task)
 - dump: uitest dumpLayout -p /data/local/tmp/x.json → hdc file recv(本地路径必须反斜杠!)
+
+## v6.1 首启智能检测+安装向导(棒2 · 已装机未验)
+### 已完成(待commit)
+- tests/first-run.ts + .test.ts: 探测归约(local-share/local-guide/wizard/keep)+横幅键+向导显隐 7 用例(68/68 全绿)
+- model/FirstRun.ets: ArkTS 同构
+- Bootstrap.ets: baseUrl空→firstRunProbe(): 探127.0.0.1:7788/api/state(免token,LAN loopback免鉴权已从server.ts实读确认)→local-share自动saveConfig+startSse+横幅;否则firstRunRev广播
+- AppStore: localKernelSeen/wizardDone 持久化 + markLocalKernelSeen/markWizardDone/resetWizard
+- pages/Wizard.ets: 三选一(①本机安装(推荐):PC命令 node apps/ohos/scripts/deploy-local-kernel.mjs+复制按钮(pasteboard)+2s×60轮询自动连 ②远程:打开设置 ③演示)+每步上一步/跳过+全局配置文案(四端共享/data/local/home/.hmharness)
+- Index.ets: wizardOpen overlay+local-share横幅(brandBg)+@Watch('onFirstRun')
+- SettingsPage: 顶部双模式说明+重新配置按钮(resetWizard→弹向导)
+- scripts/deploy-local-kernel.mjs: 一键化(0连通/1安装/2jitless补丁/3hmh自检/4config推送token走env/5web start/6探针; --target/--arch arm需HMH_ARM_NODE/--skip-install)
+- hvigorw BUILD SUCCESSFUL; deploy 装机成功; 单测 68/68
+
+### 坑
+- Theme 无 l3,次级按钮底色用 l2(5处已修)
+- ArkTS 无 require,ApiClient 直接 import
+
+### 下棒(SW1-SW4 验证)
+1. SW2(最易): VM 设备 web 在跑(v6已起)→清 app 配置(卸载重装)→冷启动→应自动连127.0.0.1+横幅; dump 看「已连接本机 hmh 内核」
+2. SW1: hmh web stop → 卸载重装(清preferences)→冷启动→向导三选项截图; wizardDone=false+baseUrl空才弹
+3. SW3: 向导选②→设置页→连PC(192.168.8.3:7788,IP漂移已记录)
+4. SW4: README-ohos.md 双模式章节+ACCEPTANCE v6.1段
+5. deploy-local-kernel.mjs 实跑一次(--skip-install 设备已装)

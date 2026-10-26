@@ -27,6 +27,9 @@ const KEY_TOKEN = 'token'
 const KEY_LOCALE = 'locale'
 const KEY_PINNED = 'pinned'
 const KEY_COLLAPSED = 'collapsedGroups'
+// v6.1: 首启智能检测持久化
+const KEY_LOCAL_SEEN = 'localKernelSeen'
+const KEY_WIZARD_DONE = 'wizardDone'
 
 export class AppStore {
   private static instance: AppStore | null = null
@@ -35,6 +38,9 @@ export class AppStore {
   token: string = ''
   locale: string = 'zh'
   theme: string = 'system'
+  // v6.1: 首启智能检测状态(localKernelSeen=本机内核见过/装过;wizardDone=向导走过一遍)
+  localKernelSeen: boolean = false
+  wizardDone: boolean = false
   pinned: Set<string> = new Set<string>()
   collapsedGroups: Set<string> = new Set<string>()
   chat: ChatState = newChatState('')
@@ -77,6 +83,36 @@ export class AppStore {
     Th.apply(this.theme)
     this.pinned = this.parseSet(await this.prefs.get(KEY_PINNED, '[]') as string)
     this.collapsedGroups = this.parseSet(await this.prefs.get(KEY_COLLAPSED, '[]') as string)
+    this.localKernelSeen = (await this.prefs.get(KEY_LOCAL_SEEN, false)) as boolean
+    this.wizardDone = (await this.prefs.get(KEY_WIZARD_DONE, false)) as boolean
+  }
+
+  /** v6.1: 记住"见过本机内核"(本地共享连成或向导装过) */
+  async markLocalKernelSeen(): Promise<void> {
+    this.localKernelSeen = true
+    if (this.prefs !== null) {
+      await this.prefs.put(KEY_LOCAL_SEEN, true)
+      await this.prefs.flush()
+    }
+  }
+
+  /** v6.1: 向导完成标记(选择持久;设置页"重新配置"可清除重入) */
+  async markWizardDone(): Promise<void> {
+    this.wizardDone = true
+    if (this.prefs !== null) {
+      await this.prefs.put(KEY_WIZARD_DONE, true)
+      await this.prefs.flush()
+    }
+  }
+
+  /** v6.1: 设置页"重新配置"→清向导标记(下次启动重新探测/弹向导);
+   * 不清 baseUrl(用户可能只想重看指引) */
+  async resetWizard(): Promise<void> {
+    this.wizardDone = false
+    if (this.prefs !== null) {
+      await this.prefs.put(KEY_WIZARD_DONE, false)
+      await this.prefs.flush()
+    }
   }
 
   private parseSet(raw: string): Set<string> {
