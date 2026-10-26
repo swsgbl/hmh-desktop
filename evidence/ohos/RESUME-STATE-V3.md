@@ -1,63 +1,40 @@
-# RESUME-STATE-V3 · 棒 V3-2 增补(A1 修复+A2 深挖中)
+# RESUME-STATE-V3 · 棒 V3-2 续(图标修复+ A2 定位到最后一环)
 
 ## 本棒已完成 ✅
 
-### A1 composer 竖排 → 修复实证
-- **根因链**: VM app 窗口是浮动窗(实测 [211,132][1068,668]=857×536,非 1280 全屏!)
-  - 264+360 固定列吃掉 73% → 中栏 233px → textarea 34-89px 竖排
-  - 棒2 初还把 DockPane 根 .width(360)→'100%'(Row 里参照整行) 加剧挤压
-- **修法(Index.ets 主 Row)**: onAreaChange 测真宽 winW;
-  ≥1240: Sidebar 264+Dock 360; 960-1240: Sidebar 200+Dock 300; <960: 无侧栏+Dock 300(Dock 恒显!)
-- **实证**: textarea 宽 34→413→713px(三档窗口下), 占位符单行, 发送钮不挤(v3b7 dump)
-- DockPane 根恢复 .width(360) 但外层 Index 控宽(360/300)
+### 补充令:品牌图标修复 — **实证 PASS**
+- 源 `apps/desktop/build/icon.png`(256×256,sha1 bb092f3cd964)同名覆盖 AppScope+entry 两处 app_icon.png
+- hvigorw build→patch23→VM签→install→launch 全链绿
+- **视觉实证**(evidence/ohos/v3/dock-zoom.png + icon-fixed.jpeg):dock 栏倒数第2图标 = "dark rounded square with a **blue letter H**"——品牌图标替换成功,橙色 DevEco 模板已消失
+- 字节级佐证:deploy HAP 与 build HAP 均含源 icon PNG 头 64 字节(chkicon.cjs)
+- 坑:bm dump 的 "icon":"" 是显示习惯(二进制资源不显字串),不代表没图标;VM 无传统桌面(KaihongOS 窗口管理器),dock 栏 systemui dump 40×40 Image 节点+裁剪放大(PowerShell System.Drawing 3x)是图标验证正道
 
-### AppStore 单播→多播 ✅(A2 前置)
-- setListener 单槽 listeners[]; WorkspacePane/DockPane 用成员 storeL+removeListener
-- notifyChat/notifyServer/notifySse 三处 for 循环广播
-- **坑**: PS 正则补丁注入字面 `n/foreach 坏串→build 炸;已用 cjs 干净重写(L5922-6535 区)
-- **坑**: setListener(null) 清全部→改 removeListener; ArkTS 不允许 null 参数→setListener(l:StoreListener)
+### A2(总览全"无数据") — 断环定位到最后一环
+- AppStore/SseClient/ApiClient/Guards/DockPane 五文件全读,**静态链完整无破绽**
+- 运行时证据(a2diag3.cjs):当前 hilog 窗口 1726 delta+44 tool 帧在流(**SSE 数据面全通**),但 **hello/bootstrap/refreshState 三关键词 0 条**
+- **结论**:SSE 连接是上棒装机后的旧连接(连接时收过 hello 但当时 st 更新链没走通/DIAG 截图在更早);本轮 deploy 后 app 进程重启,**新进程未执行 bootstrap**(或 hello 已滚出窗口)
+- **未验证假设(下棒首查,10 分钟内可定)**:
+  1. EntryAbility.onCreate 是否调用了 bootstrapAfterPrefs(读 EntryAbility.ets 源码 grep bootstrap)
+  2. 若调了:aa start 后 30s 内抓 hilog(不延迟,hello 在连接头 1s 内)——当前抓晚了
+  3. DockPane.refreshState 的 catch 走 hilog 0xD002200 'refreshState failed'——本轮 0 条=**没进 catch 也没成功**?→ 疑 aboutToAppear 时 baseUrl 空(prefs 异步未完)→api() 打到 ''+path→catch→hilog tag 0xD002200 可能被过滤,下棒直接搜 'hmh' domain
+- DIAG 三行(在 overviewBody)可留作复验开关,定位后删除
 
-### DockPane 增强 ✅
-- aboutToAppear: st=store.serverState seed + refreshState() + 1.5s 延迟二次拉取
-- 总览头加"刷新"按钮(@1059,320 实证)
-- refreshState catch→hilog+3s 重试
+### 环境快照
+- hdc: `where hdc` = C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe(PATH 里直接用)
+- VM 在线 192.168.161.137:10178;bundle=com.hmh.desktop.ohos(**四处一致铁律**:app.json5/deploy.mjs/want/profile.p7b)
+- deploy: `cd apps\ohos && node scripts\deploy.mjs`(全链含 build)
+- 截图链: `hdc shell snapshot_display -f /data/local/tmp/x.jpeg`(无 -e 参数!)→ file recv(本地路径反斜杠)
+- VM 多窗口层叠(BrowserOS 抢屏):视觉验证用 dock 裁剪法;勿信 uinput HOME(非传统桌面)
+- 单测基线 61/61(本棒未跑,未动纯逻辑,零回归风险)
 
-## A2 卡点(总览全"无数据") — 诊断到一半
+## 棒 2 剩余(未动)
+- B 组交互接线:设置弹层/模型菜单/审批卡/@弹层/上传/⇤收缩——全部未接(v3 棒1 只做了壳)
+- 右栏六页签内容:除总览(数据链待修)外,文件/变更/证据/日志/远程均未接数据
+- composer 竖排已修(棒2 初),titlebar 只有 ☰ 无 logo(蓝本对齐)——本棒未验,图标修复占位
 
-**DIAG 三行实测(v3bg)**: st=NULL / store.sse=down / baseUrl=set
-
-**已排除**:
-- 服务端 /api/state 200 数据全(PC probe: daemonVersion 0.23.39/model glm-5.3/lan/busy)
-- hello 帧 SSE 事件解析(Reducer case 'hello'→kind='state' ✓)
-- guardState(逐字段 asString 兼容 ✓)
-- JSON.parse(补丁后无 parse fail 日志)
-- hello data 无包装(server.ts:943 sseSend('hello', await stateObject()) 直发)
-
-**诡异**:
-- hilog 见 hello 帧(08:08:22 pid24304)+tool 流持续——但 DIAG 说 sse down
-- **pid 线索**: 08:08:44 BrowserShell onPageShow(pid24674)=VM 里 BrowserOS 也在跑!
-  VM 有两个 app 都连 SSE? hello 帧 pid 是否=当前 hmh app pid 未验证
-- aa start 后 app pid 每次变化(23818→24304→24674),DIAG dump 的进程可能不是收 hello 的进程
-  → **下一步: aa start 后立即 hilog 抓本 pid 的 hello+state 链;或 onFrame 里打 pid/console 佐证**
-
-**未验证假设(下棒首查)**:
-1. app 进程里 startSse 究竟调没调(Bootstrap console 'bootstrap:' 在 hilog 找)
-2. hello 帧到达的 SseClient 是不是 hmh app 的(还是 BrowserOS 的)
-3. EntryAbility onCreate→initPrefs→bootstrapAfterPrefs 时序: preferences 读完 baseUrl 才 set?
-   (DIAG baseUrl=set 说明 prefs OK → bootstrap 应已跑 → health→startSse('') → hello→onFrame→
-    guardState→serverState→notifyServer→DockPane.onServerState→st 应非 null)
-4. 链上任何一环 console.info 都能在 hilog JSAPP 找到——逐环节补日志最快
-
-## 交互接线状态(B 组,棒2 未动)
-- 设置弹层/模型菜单/审批卡/@弹层/上传/⇤收缩: 全部未接(v3 棒1 只做了壳)
-- 右栏六页签: 结构在(总览/文件/变更/证据/日志/远程实证), 内容除总览外未接数据
-
-## 构建/装机链(本棒 6 轮全绿)
-node apps/ohos/scripts/deploy.mjs (build→patch23→VM签→install→launch)
-- 坑: cmd 直跑 node -e 中文引号必炸→一律 .cjs 文件
-- 坑: PS 正则改 ets 文件高风险(字面 `n 注入)→一律 node cjs replace
-
-## 下棒序
-1. A2: aa start 后抓本 pid hilog 全链(bootstrap→hello→state→notifyServer), 环节缺哪补哪
-2. B 组交互逐项接线(每项 dump 实证)
-3. 单测回归 61/61 + commit
+## 下棒序(优先级)
+1. A2 收口:EntryAbility grep bootstrap→aa start 后立即(<2s)抓 hilog 找 hello/bootstrap/refreshState 三词→缺哪补哪(预计 EntryAbility 没调或时序竞态)
+2. 定位后删 DIAG 三行,总览页真实数据截图(对照 ui-shot-lang.png)
+3. B 组交互逐项接线(每项 dump 实证)
+4. 单测 61/61 回归 + commit(本棒图标改动未 commit!尽快)
+5. ACCEPTANCE.md 图标行更新(证据已存)
