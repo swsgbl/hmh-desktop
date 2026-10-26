@@ -14,6 +14,11 @@ test-out.log
 
 # 鸿蒙 E2E 工具与构建暂存(hilog 抓包等,含敏感风险,永不入库)
 .hm-tmp/
+apps/ohos/.hm-tmp/
+.verify/
+# 本机 DevEco 工具链 junction(机器特定软链,由棒次脚本自建)
+apps/hvigor/
+apps/hvigor-ohos-plugin/
 
 # 私有开发文档提取物(用户文档全文,绝不入库)
 docx-*.txt
