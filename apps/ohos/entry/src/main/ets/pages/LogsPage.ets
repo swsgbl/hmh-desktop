@@ -1,6 +1,7 @@
 /**
  * v2 日志页:runtime line 流累积(chat.logs,最近 200 条)
  */
+import { Th } from '../theme/Theme'
 import { AppStore } from '../model/AppStore'
 import { ChatState, StateObj } from '../model/Types'
 import { t } from '../model/I18n'
@@ -39,12 +40,12 @@ export struct LogsPage {
     Column({ space: 8 }) {
       Text(this.L('dock.logsHead'))
         .fontSize(13)
-        .fontColor('#666666')
+        .fontColor(Th.c.text2)
         .width('100%')
       if (this.logs.length === 0) {
         Text(this.L('dock.logsEmpty'))
           .fontSize(12)
-          .fontColor('#999999')
+          .fontColor(Th.c.text3)
           .width('100%')
           .padding({ top: 20 })
       } else {
@@ -53,10 +54,10 @@ export struct LogsPage {
             ForEach(this.logs, (line: string, idx: number) => {
               Text(line)
                 .fontSize(10)
-                .fontColor('#444444')
+                .fontColor(Th.c.text)
                 .width('100%')
                 .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-                .backgroundColor(idx % 2 === 0 ? '#FFFFFF' : '#F7F7F7')
+                .backgroundColor(idx % 2 === 0 ? Th.c.l1 : Th.c.l2)
             }, (line: string, idx: number) => `${idx}`)
           }
           .width('100%')

@@ -1,30 +1,92 @@
 /**
- * v3 三栏工作台布局(1:1 复刻 apps/desktop app.css .app-shell)
- * 色板/尺寸逐值抄 tokens.css 与 app.css
+ * v4 设计语言:DSH 官方风格(蓝本 docs/prompts/design-language-dsh.md
+ * + evidence/dsh/src/alias-theme.css 实测静态值)
+ * 浅色明亮分层默认;深色同 alias 换值;结构与尺寸沿 v3 不回退。
  */
 
-// ---------- 色板(暗色默认) ----------
-export class Theme {
-  static readonly bg: string = '#141416'
-  static readonly raised: string = '#1B1D21'
-  static readonly panel: string = '#1E2024'
-  static readonly border: string = '#2B2E33'
-  static readonly text: string = '#F5F5F6'
-  static readonly dim: string = '#95979D'
-  static readonly accent: string = '#2F81F7'
-  static readonly accentHover: string = '#4A90F9'
-  static readonly danger: string = '#F85149'
-  static readonly warn: string = '#D29922'
-  static readonly userTurn: string = '#1C2A3D'
-  static readonly running: string = '#2F81F7'
-  static readonly completed: string = '#3FB950'
-  static readonly failed: string = '#F85149'
-  static readonly planning: string = '#A371F7'
-  static readonly waiting: string = '#D29922'
-  static readonly cancelled: string = '#95979D'
+// ---------- 双主题 token(逐值按蓝本 §1) ----------
+export class ThemeVals {
+  // 背景三级
+  bg: string = '#f9fafb'          // bg-base(=dsw bluish-50 rgb249,250,251)
+  l1: string = '#ffffff'          // bg-layer-1 卡片/输入底
+  l2: string = '#f2f3f5'          // bg-layer-2 pill/次级面板
+  // 文字四级
+  text: string = '#0f1115'        // label-primary(=bluish-1000)
+  text2: string = '#61666b'       // label-secondary(=bluish-700)
+  text3: string = '#81858c'       // label-tertiary(=bluish-600)
+  dim: string = '#adb0b6'         // label-dimmed(=bluish-400) 占位符
+  // 品牌
+  brand: string = '#3964fe'       // brand-primary(蓝本钦定)
+  brandHover: string = '#2c50d8'  // primary-hover(深一档)
+  onBrand: string = '#ffffff'     // 主按钮文字
+  // 边框两级(黑 alpha:5%/10%)
+  border: string = '#0D000000'    // border-l1 极细分隔
+  border2: string = '#1A000000'   // border-l2 常规边框(输入/卡)
+  // 交互底(4%/8%)
+  hover: string = '#0A000000'     // interactive-bg-hover
+  active: string = '#14000000'    // interactive-bg-active
+  // 状态
+  success: string = '#16a34a'
+  warn: string = '#dd8629'        // amber-600
+  danger: string = '#ec1313'      // red-600
+  successBg: string = '#e8f8ee'   // 成功提示底
+  dangerBg: string = '#fdecec'    // 错误提示底
+  warnBg: string = '#fdf3e3'      // 警告提示底
+  brandBg: string = '#e8edfe'     // 品牌浅底(选中气泡/hover 条)
+  // 业务
+  userTurn: string = '#eef2ff'    // 用户气泡底(品牌 4% 近似→浅靛)
+  running: string = '#3964fe'
+  completed: string = '#16a34a'
+  failed: string = '#ec1313'
+  planning: string = '#a371f7'
+  waiting: string = '#dd8629'
+  cancelled: string = '#81858c'
 }
 
-// ---------- 尺寸(蓝本逐值) ----------
+export function lightVals(): ThemeVals {
+  return new ThemeVals()
+}
+
+export function darkVals(): ThemeVals {
+  const v = new ThemeVals()
+  v.bg = '#101216'; v.l1 = '#16181d'; v.l2 = '#1e2126'
+  v.text = '#f5f6f7'; v.text2 = '#a6aab1'; v.text3 = '#81858c'; v.dim = '#5a5e66'
+  v.brand = '#3964fe'; v.brandHover = '#5a7ffe'; v.onBrand = '#ffffff'
+  v.border = '#0FFFFFFF'  // 白 6%
+  v.border2 = '#1FFFFFFF' // 白 12%
+  v.hover = '#0FFFFFFF'; v.active = '#1FFFFFFF'
+  v.success = '#4ade80'; v.warn = '#f5a623'; v.danger = '#f87171'
+  v.successBg = '#12291a'; v.dangerBg = '#2d1416'; v.warnBg = '#2b2114'; v.brandBg = '#1a2340'
+  v.userTurn = '#1c2433'
+  v.running = '#5a7ffe'; v.completed = '#4ade80'; v.failed = '#f87171'
+  v.planning = '#c084fc'; v.waiting = '#f5a623'; v.cancelled = '#81858c'
+  return v
+}
+
+// ---------- 全局主题单例:页面一律 Th.c.xxx 读当前值 ----------
+export class Th {
+  static c: ThemeVals = lightVals()
+  static isDark: boolean = false
+
+  static setDark(on: boolean): void {
+    Th.isDark = on
+    Th.c = on ? darkVals() : lightVals()
+    const rev = (AppStorage.get<number>('themeRev') ?? 0) + 1
+    AppStorage.setOrCreate('themeRev', rev)
+  }
+
+  // 'light' | 'dark' | 'system' → 应用(浅色默认:非法值也落浅色,任务书 §一.3)
+  static apply(pref: string): void {
+    if (pref === 'dark') {
+      Th.setDark(true)
+    } else {
+      // light 与 system 均落浅色(VM 无深色系统态;深色仅用户显式选择)
+      Th.setDark(false)
+    }
+  }
+}
+
+// ---------- 尺寸:v3 布局不回退 + DSH 组件规范(蓝本 §3) ----------
 export class Metrics {
   static readonly titlebarH: number = 36
   static readonly sidebarW: number = 264
@@ -51,4 +113,17 @@ export class Metrics {
   static readonly radiusLg: number = 14
   static readonly iconBtnMin: number = 36
   static readonly sendH: number = 44
+  // ---- DSH 组件规范 ----
+  static readonly btnH: number = 32        // 按钮高 32
+  static readonly btnRadius: number = 18   // 胶囊圆角
+  static readonly btnPadH: number = 14     // 按钮水平 padding
+  static readonly inputH: number = 32      // 输入框高
+  static readonly inputRadius: number = 8  // 输入圆角
+  static readonly pillH: number = 24       // pill 高
+  static readonly pillRadius: number = 12  // pill 圆角(全圆)
+  static readonly menuRadius: number = 12  // 菜单/浮层圆角
+  static readonly cardRadius: number = 12  // 卡片圆角
+  static readonly listItemH: number = 36   // 会话列表项高
+  static readonly listItemRadius: number = 8
+  static readonly spinnerSize: number = 20 // spinner 2px 环
 }

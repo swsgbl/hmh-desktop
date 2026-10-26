@@ -2,6 +2,7 @@
  * v2 设置页:连接 + 外观/语言 + #12 模型选择 + #13 审批模式 + #14 Provider 管理
  * 安全:token 只存 preferences,UI 掩码,绝不打日志
  */
+import { Th } from '../theme/Theme'
 import { AppStore } from '../model/AppStore'
 import { ApiError, toApiError } from '../net/ApiClient'
 import { guardState } from '../model/Guards'
@@ -82,7 +83,7 @@ export struct SettingsPage {
         Column({ space: 8 }) {
           Text('服务器地址 (LAN)')
             .fontSize(14)
-            .fontColor('#666666')
+            .fontColor(Th.c.text2)
             .alignSelf(ItemAlign.Start)
           TextInput({ text: this.baseUrl, placeholder: 'http://192.168.161.1:7788' })
             .onChange((v: string) => {
@@ -95,7 +96,7 @@ export struct SettingsPage {
         Column({ space: 8 }) {
           Text('访问令牌 (x-hmh-key)')
             .fontSize(14)
-            .fontColor('#666666')
+            .fontColor(Th.c.text2)
             .alignSelf(ItemAlign.Start)
           Row({ space: 8 }) {
             TextInput({ text: this.token, placeholder: 'web.token (config.json)' })
@@ -126,9 +127,9 @@ export struct SettingsPage {
         if (this.testResult !== '') {
           Text(this.testResult)
             .fontSize(14)
-            .fontColor(this.testOk ? '#0A7D32' : '#C0392B')
+            .fontColor(this.testOk ? Th.c.success : Th.c.danger)
             .padding(10)
-            .backgroundColor(this.testOk ? '#E8F5E9' : '#FDECEA')
+            .backgroundColor(this.testOk ? Th.c.successBg : Th.c.dangerBg)
             .borderRadius(8)
             .width('100%')
         }
@@ -146,8 +147,8 @@ export struct SettingsPage {
               Text(this.themeLabel(th))
                 .fontSize(12)
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                .backgroundColor(this.theme === th ? '#1565C0' : '#E8EAED')
-                .fontColor(this.theme === th ? '#FFFFFF' : '#444444')
+                .backgroundColor(this.theme === th ? Th.c.brand : Th.c.l2)
+                .fontColor(this.theme === th ? Th.c.l1 : Th.c.text)
                 .borderRadius(14)
                 .onClick(() => this.setTheme(th))
             }, (th: string) => th)
@@ -168,8 +169,8 @@ export struct SettingsPage {
               Text(l === 'zh' ? '中文' : 'English')
                 .fontSize(12)
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                .backgroundColor(this.locale === l ? '#1565C0' : '#E8EAED')
-                .fontColor(this.locale === l ? '#FFFFFF' : '#444444')
+                .backgroundColor(this.locale === l ? Th.c.brand : Th.c.l2)
+                .fontColor(this.locale === l ? Th.c.l1 : Th.c.text)
                 .borderRadius(14)
                 .onClick(() => this.setLocale(l))
             }, (l: string) => l)
@@ -189,15 +190,15 @@ export struct SettingsPage {
             .alignSelf(ItemAlign.Start)
           Text(this.locale === 'en' ? `current: ${this.model}` : `当前: ${this.model}`)
             .fontSize(12)
-            .fontColor('#666666')
+            .fontColor(Th.c.text2)
             .alignSelf(ItemAlign.Start)
           Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
             ForEach(this.providers, (p: ProviderRow) => {
               Text(modelChipLabel(p.name, p.model))
                 .fontSize(11)
                 .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-                .backgroundColor(isCurrentProvider(p.name, p.model, this.model, this.chatProvider) ? '#0A7D32' : '#E8EAED')
-                .fontColor(isCurrentProvider(p.name, p.model, this.model, this.chatProvider) ? '#FFFFFF' : '#444444')
+                .backgroundColor(isCurrentProvider(p.name, p.model, this.model, this.chatProvider) ? Th.c.success : Th.c.l2)
+                .fontColor(isCurrentProvider(p.name, p.model, this.model, this.chatProvider) ? Th.c.l1 : Th.c.text)
                 .borderRadius(12)
                 .margin({ right: 6, bottom: 6 })
                 .onClick(() => this.doModel(p.name))
@@ -205,7 +206,7 @@ export struct SettingsPage {
           }
           .width('100%')
           if (this.modelMsg !== '') {
-            Text(this.modelMsg).fontSize(11).fontColor('#1565C0').alignSelf(ItemAlign.Start)
+            Text(this.modelMsg).fontSize(11).fontColor(Th.c.brand).alignSelf(ItemAlign.Start)
           }
         }
         .alignItems(HorizontalAlign.Start)
@@ -222,15 +223,15 @@ export struct SettingsPage {
               Text(this.approvalLabel(m))
                 .fontSize(12)
                 .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-                .backgroundColor(this.approvalMode === m ? '#B26A00' : '#E8EAED')
-                .fontColor(this.approvalMode === m ? '#FFFFFF' : '#444444')
+                .backgroundColor(this.approvalMode === m ? Th.c.warn : Th.c.l2)
+                .fontColor(this.approvalMode === m ? Th.c.l1 : Th.c.text)
                 .borderRadius(14)
                 .onClick(() => this.doApproval(m))
             }, (m: string) => m)
           }
           .width('100%')
           if (this.approvalMsg !== '') {
-            Text(this.approvalMsg).fontSize(11).fontColor('#B26A00').alignSelf(ItemAlign.Start)
+            Text(this.approvalMsg).fontSize(11).fontColor(Th.c.warn).alignSelf(ItemAlign.Start)
           }
         }
         .alignItems(HorizontalAlign.Start)
@@ -249,17 +250,17 @@ export struct SettingsPage {
                 .fontWeight(FontWeight.Medium)
               Text(p.model)
                 .fontSize(11)
-                .fontColor('#666666')
+                .fontColor(Th.c.text2)
                 .layoutWeight(1)
                 .maxLines(1)
               if (p.purposes.length > 0) {
                 Text(p.purposes.join(','))
                   .fontSize(9)
-                  .fontColor('#999999')
+                  .fontColor(Th.c.text3)
               }
             }
             .padding(8)
-            .backgroundColor('#F5F5F5')
+            .backgroundColor(Th.c.l2)
             .borderRadius(8)
             .width('100%')
           }, (p: ProviderRow) => p.name)
@@ -267,7 +268,7 @@ export struct SettingsPage {
           Button(this.pvOpen ? (this.locale === 'en' ? 'Close form' : '收起') : (this.locale === 'en' ? '+ Add provider' : '+ 新增 Provider'))
             .fontSize(12)
             .height(32)
-            .backgroundColor('#666666')
+            .backgroundColor(Th.c.text2)
             .onClick(() => {
               this.pvOpen = !this.pvOpen
             })
@@ -305,21 +306,21 @@ export struct SettingsPage {
               }
               .width('100%')
               if (this.pvMsg !== '') {
-                Text(this.pvMsg).fontSize(11).fontColor(this.pvMsgOk ? '#0A7D32' : '#C0392B')
+                Text(this.pvMsg).fontSize(11).fontColor(this.pvMsgOk ? Th.c.success : Th.c.danger)
               }
               Row({ space: 10 }) {
                 Button(this.locale === 'en' ? 'Validate' : '校验')
                   .fontSize(12)
                   .height(34)
-                  .backgroundColor('#888888')
+                  .backgroundColor(Th.c.text3)
                   .onClick(() => this.doValidateForm())
                 Text(this.locale === 'en' ? '(validation only — no server write)' : '(仅校验,不写入服务端)')
                   .fontSize(10)
-                  .fontColor('#999999')
+                  .fontColor(Th.c.text3)
               }
             }
             .padding(10)
-            .backgroundColor('#FAFAFA')
+            .backgroundColor(Th.c.l2)
             .borderRadius(8)
             .width('100%')
           }
@@ -332,11 +333,11 @@ export struct SettingsPage {
         Column({ space: 4 }) {
           Text('说明').fontSize(14).fontWeight(FontWeight.Bold).alignSelf(ItemAlign.Start)
           Text('1. PC 端运行 hmh web --exposure=lan 启动 7788 服务')
-            .fontSize(13).fontColor('#888888').alignSelf(ItemAlign.Start)
+            .fontSize(13).fontColor(Th.c.text3).alignSelf(ItemAlign.Start)
           Text('2. 令牌在 PC 端 ~/.hmharness/config.json 的 web.token 字段')
-            .fontSize(13).fontColor('#888888').alignSelf(ItemAlign.Start)
+            .fontSize(13).fontColor(Th.c.text3).alignSelf(ItemAlign.Start)
           Text('3. 本应用只经 LAN 访问,令牌仅存本机,不会出现在任何日志')
-            .fontSize(13).fontColor('#888888').alignSelf(ItemAlign.Start)
+            .fontSize(13).fontColor(Th.c.text3).alignSelf(ItemAlign.Start)
         }
         .alignItems(HorizontalAlign.Start)
         .width('100%')

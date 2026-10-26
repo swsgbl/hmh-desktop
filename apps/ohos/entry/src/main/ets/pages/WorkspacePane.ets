@@ -11,7 +11,7 @@ import { ApiError, toApiError } from '../net/ApiClient'
 import { ApprovalCardView } from '../components/ApprovalCard'
 import { ToolItem, TurnSumItem, DeliverableItem, turnSumText } from '../model/TurnItems'
 import { t } from '../model/I18n'
-import { Theme } from '../theme/Theme'
+import { Th, Metrics } from '../theme/Theme'
 import { relChipText, addAttachment, modelChipLabel, isCurrentProvider } from '../model/SettingsBiz'
 
 @Component
@@ -114,7 +114,7 @@ export struct WorkspacePane {
     }
     .layoutWeight(1)
     .height('100%')
-    .backgroundColor(Theme.bg)
+    .backgroundColor(Th.c.bg)
   }
 
   // ---------- topbar ----------
@@ -122,15 +122,15 @@ export struct WorkspacePane {
   topbar() {
     Row({ space: 8 }) {
       Circle({ width: 8, height: 8 })
-        .fill(this.sseConnected ? Theme.completed : Theme.failed)
+        .fill(this.sseConnected ? Th.c.completed : Th.c.failed)
       Text(this.sseConnected ? `${this.L('status.connected')} · ${this.store.serverState?.daemonVersion ?? ''}` : this.L('status.failed'))
         .fontSize(12)
-        .fontColor(Theme.dim)
+        .fontColor(Th.c.text3)
       if (this.store.serverState?.workspace !== null && this.store.serverState?.workspace !== undefined) {
         Text(this.store.serverState.workspace.name)
           .fontSize(12)
-          .fontColor(Theme.dim)
-          .border({ width: 1, color: Theme.border })
+          .fontColor(Th.c.text3)
+          .border({ width: 1, color: Th.c.border2 })
           .borderRadius(999)
           .padding({ left: 10, right: 10, top: 2, bottom: 2 })
       }
@@ -139,8 +139,8 @@ export struct WorkspacePane {
       Column({ space: 0 }) {
         Text(this.model !== '' ? this.model : this.L('top.model'))
           .fontSize(12)
-          .fontColor(Theme.dim)
-          .border({ width: 1, color: Theme.border })
+          .fontColor(Th.c.text3)
+          .border({ width: 1, color: Th.c.border2 })
           .borderRadius(999)
           .padding({ left: 10, right: 10, top: 2, bottom: 2 })
           .onClick(() => {
@@ -154,10 +154,10 @@ export struct WorkspacePane {
                   Row({ space: 6 }) {
                     Text(isCurrentProvider(p.name, p.model, this.model, this.chatProvider) ? '✓' : ' ')
                       .fontSize(11)
-                      .fontColor(Theme.completed)
+                      .fontColor(Th.c.completed)
                     Text(modelChipLabel(p.name, p.model))
                       .fontSize(12)
-                      .fontColor(Theme.text)
+                      .fontColor(Th.c.text)
                       .layoutWeight(1)
                       .maxLines(1)
                   }
@@ -173,8 +173,8 @@ export struct WorkspacePane {
           }
           .width(260)
           .padding(4)
-          .backgroundColor(Theme.raised)
-          .border({ width: 1, color: Theme.border })
+          .backgroundColor(Th.c.l2)
+          .border({ width: 1, color: Th.c.border2 })
           .borderRadius(10)
         }
       }
@@ -182,18 +182,18 @@ export struct WorkspacePane {
 
       Text(`审批:${this.approvalMode}`)
         .fontSize(12)
-        .fontColor(Theme.waiting)
+        .fontColor(Th.c.waiting)
       Text('⚙')
         .fontSize(15)
-        .fontColor(Theme.dim)
+        .fontColor(Th.c.text3)
         .padding({ left: 6, right: 6 })
         .onClick(() => {
           this.settingsOpen = true
         })
       Text(this.locale === 'zh' ? '中' : 'EN')
         .fontSize(12)
-        .fontColor(Theme.dim)
-        .border({ width: 1, color: Theme.border })
+        .fontColor(Th.c.text3)
+        .border({ width: 1, color: Th.c.border2 })
         .borderRadius(999)
         .padding({ left: 8, right: 8, top: 2, bottom: 2 })
         .onClick(() => {
@@ -205,13 +205,13 @@ export struct WorkspacePane {
         Button(this.locale === 'en' ? 'Stop' : '停止')
           .fontSize(12)
           .height(28)
-          .backgroundColor(Theme.danger)
+          .backgroundColor(Th.c.danger)
           .onClick(() => this.doInterrupt())
       }
     }
     .padding({ left: 16, right: 16, top: 8, bottom: 8 })
     .width('100%')
-    .backgroundColor(Theme.raised)
+    .backgroundColor(Th.c.l2)
   }
 
   // ---------- stream ----------
@@ -222,17 +222,17 @@ export struct WorkspacePane {
         if (this.chat.messages.length === 0 && !this.chat.streaming) {
           Text(this.L('stream.emptyNo'))
             .fontSize(15)
-            .fontColor(Theme.dim)
+            .fontColor(Th.c.text3)
             .margin({ top: 80 })
         }
         ForEach(this.chat.messages, (m: ChatMessage, idx: number) => {
           Column({ space: 4 }) {
             Text(m.text)
               .fontSize(14)
-              .fontColor(Theme.text)
+              .fontColor(Th.c.text)
               .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-              .backgroundColor(m.role === 'user' ? Theme.userTurn : Theme.raised)
-              .border({ width: 1, color: m.role === 'user' ? Theme.userTurn : Theme.border })
+              .backgroundColor(m.role === 'user' ? Th.c.userTurn : Th.c.l2)
+              .border({ width: 1, color: m.role === 'user' ? Th.c.userTurn : Th.c.border2 })
               .borderRadius(10)
               .alignSelf(m.role === 'user' ? ItemAlign.End : ItemAlign.Start)
               .constraintSize({ maxWidth: 760 })
@@ -250,7 +250,7 @@ export struct WorkspacePane {
             } else if (it instanceof TurnSumItem) {
               Text(turnSumText((it as TurnSumItem).turns, (it as TurnSumItem).toolUses, (it as TurnSumItem).tokens))
                 .fontSize(11)
-                .fontColor(Theme.dim)
+                .fontColor(Th.c.text3)
                 .alignSelf(ItemAlign.End)
                 .padding(2)
             }
@@ -271,10 +271,10 @@ export struct WorkspacePane {
         if (this.chat.streaming && this.chat.streamBuf !== '') {
           Text(this.chat.streamBuf + '▍')
             .fontSize(14)
-            .fontColor(Theme.text)
+            .fontColor(Th.c.text)
             .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-            .backgroundColor(Theme.raised)
-            .border({ width: 1, color: Theme.accent })
+            .backgroundColor(Th.c.l2)
+            .border({ width: 1, color: Th.c.brand })
             .borderRadius(10)
             .alignSelf(ItemAlign.Start)
             .constraintSize({ maxWidth: 760 })
@@ -282,7 +282,7 @@ export struct WorkspacePane {
         if (this.chat.lastError !== '') {
           Text(`⚠ ${this.chat.lastError}`)
             .fontSize(12)
-            .fontColor(Theme.danger)
+            .fontColor(Th.c.danger)
             .width('100%')
         }
       }
@@ -302,16 +302,16 @@ export struct WorkspacePane {
       Row({ space: 8 }) {
         Text(it.status === 'running' ? '⟳' : (it.status === 'error' ? '✗' : '✓'))
           .fontSize(12)
-          .fontColor(it.status === 'running' ? Theme.running : (it.status === 'error' ? Theme.danger : Theme.completed))
+          .fontColor(it.status === 'running' ? Th.c.running : (it.status === 'error' ? Th.c.danger : Th.c.completed))
         Text(it.name)
           .fontSize(13)
-          .fontColor(Theme.text)
+          .fontColor(Th.c.text)
           .layoutWeight(1)
           .maxLines(1)
         if (it.status === 'running') {
           Text(this.L('stream.toolRunning'))
             .fontSize(11)
-            .fontColor(Theme.dim)
+            .fontColor(Th.c.text3)
         }
       }
       .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -324,7 +324,7 @@ export struct WorkspacePane {
           if (it.argsPreview !== '') {
             Text(it.argsPreview)
               .fontSize(12)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
               .fontFamily('monospace')
               .width('100%')
               .maxLines(4)
@@ -332,19 +332,19 @@ export struct WorkspacePane {
           if (it.resultPreview !== '') {
             Text(it.resultPreview)
               .fontSize(12)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
               .fontFamily('monospace')
               .width('100%')
               .maxLines(10)
           }
         }
         .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-        .border({ width: 1, color: Theme.border })
+        .border({ width: 1, color: Th.c.border2 })
         .width('100%')
       }
     }
-    .backgroundColor(Theme.panel)
-    .border({ width: 1, color: Theme.border })
+    .backgroundColor(Th.c.l1)
+    .border({ width: 1, color: Th.c.border2 })
     .borderRadius(6)
     .alignSelf(ItemAlign.Start)
     .constraintSize({ maxWidth: 760 })
@@ -358,18 +358,18 @@ export struct WorkspacePane {
         .fontSize(13)
       Text(d.relPath)
         .fontSize(13)
-        .fontColor(Theme.text)
+        .fontColor(Th.c.text)
         .fontFamily('monospace')
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       Text(this.L('stream.artifactHint').slice(0, 10))
         .fontSize(12)
-        .fontColor(Theme.dim)
+        .fontColor(Th.c.text3)
     }
     .padding({ left: 14, right: 14, top: 8, bottom: 8 })
     .backgroundColor('#15301F')
-    .border({ width: 1, color: Theme.completed })
+    .border({ width: 1, color: Th.c.completed })
     .borderRadius(6)
     .alignSelf(ItemAlign.Start)
     .constraintSize({ maxWidth: 760 })
@@ -386,12 +386,12 @@ export struct WorkspacePane {
             Row({ space: 6 }) {
               Text('@' + relChipText(rel))
                 .fontSize(12)
-                .fontColor(Theme.dim)
+                .fontColor(Th.c.text3)
                 .fontFamily('monospace')
                 .maxLines(1)
               Text('×')
                 .fontSize(11)
-                .fontColor(Theme.dim)
+                .fontColor(Th.c.text3)
                 .onClick(() => {
                   const kept: string[] = []
                   for (let i = 0; i < this.attachments.length; i++) {
@@ -403,8 +403,8 @@ export struct WorkspacePane {
                 })
             }
             .padding({ left: 10, right: 10, top: 3, bottom: 3 })
-            .backgroundColor(Theme.panel)
-            .border({ width: 1, color: Theme.border })
+            .backgroundColor(Th.c.l1)
+            .border({ width: 1, color: Th.c.border2 })
             .borderRadius(999)
             .margin({ right: 6, bottom: 6 })
           }, (rel: string) => rel)
@@ -417,13 +417,13 @@ export struct WorkspacePane {
         Column({ space: 6 }) {
           Text(this.locale === 'en' ? 'Reference a workspace file' : '引用工作区文件')
             .fontSize(13)
-            .fontColor(Theme.text)
+            .fontColor(Th.c.text)
             .width('100%')
           Row({ space: 8 }) {
             TextInput({ placeholder: this.locale === 'en' ? 'search…' : '搜索文件名…' })
               .fontSize(12)
-              .fontColor(Theme.text)
-              .backgroundColor(Theme.panel)
+              .fontColor(Th.c.text)
+              .backgroundColor(Th.c.l1)
               .borderRadius(6)
               .height(32)
               .onChange((v: string) => {
@@ -433,16 +433,16 @@ export struct WorkspacePane {
             Button(this.locale === 'en' ? 'Search' : '搜索')
               .fontSize(11)
               .height(32)
-              .backgroundColor(Theme.panel)
-              .fontColor(Theme.text)
+              .backgroundColor(Th.c.l1)
+              .fontColor(Th.c.text)
               .enabled(!this.atSearching)
               .onClick(() => this.doAtSearch())
             Button('×')
               .fontSize(11)
               .height(32)
               .width(32)
-              .backgroundColor(Theme.panel)
-              .fontColor(Theme.dim)
+              .backgroundColor(Th.c.l1)
+              .fontColor(Th.c.text3)
               .onClick(() => {
                 this.atOpen = false
                 this.atHits = []
@@ -450,7 +450,7 @@ export struct WorkspacePane {
           }
           .width('100%')
           if (this.atErr !== '') {
-            Text(this.atErr).fontSize(11).fontColor(Theme.danger).width('100%')
+            Text(this.atErr).fontSize(11).fontColor(Th.c.danger).width('100%')
           }
           if (this.atHits.length > 0) {
             Scroll() {
@@ -458,10 +458,10 @@ export struct WorkspacePane {
                 ForEach(this.atHits, (rel: string) => {
                   Text(rel)
                     .fontSize(12)
-                    .fontColor(Theme.text)
+                    .fontColor(Th.c.text)
                     .fontFamily('monospace')
                     .padding({ left: 8, right: 8, top: 6, bottom: 6 })
-                    .backgroundColor(this.attachments.indexOf(rel) >= 0 ? Theme.userTurn : Theme.panel)
+                    .backgroundColor(this.attachments.indexOf(rel) >= 0 ? Th.c.userTurn : Th.c.l1)
                     .borderRadius(6)
                     .width('100%')
                     .maxLines(1)
@@ -478,8 +478,8 @@ export struct WorkspacePane {
           }
         }
         .padding(10)
-        .backgroundColor(Theme.raised)
-        .border({ width: 1, color: Theme.border })
+        .backgroundColor(Th.c.l2)
+        .border({ width: 1, color: Th.c.border2 })
         .borderRadius(10)
         .width('100%')
       }
@@ -488,8 +488,8 @@ export struct WorkspacePane {
       Row({ space: 8 }) {
         Button('@')
           .fontSize(14)
-          .fontColor(Theme.dim)
-          .backgroundColor(Theme.panel)
+          .fontColor(Th.c.text3)
+          .backgroundColor(Th.c.l1)
           .borderRadius(6)
           .height(44)
           .width(36)
@@ -498,10 +498,10 @@ export struct WorkspacePane {
           })
         TextArea({ text: this.input, placeholder: this.chat.running ? this.L('comp.phBusy') : this.L('comp.phEnter') })
           .fontSize(14)
-          .fontColor(Theme.text)
-          .placeholderColor(Theme.dim)
-          .backgroundColor(Theme.panel)
-          .border({ width: 1, color: Theme.border })
+          .fontColor(Th.c.text)
+          .placeholderColor(Th.c.text3)
+          .backgroundColor(Th.c.l1)
+          .border({ width: 1, color: Th.c.border2 })
           .borderRadius(10)
           .constraintSize({ minHeight: 44, maxHeight: 120 })
           .onChange((v: string) => {
@@ -511,7 +511,7 @@ export struct WorkspacePane {
         Button(this.chat.running ? this.L('comp.inject') : this.L('comp.send'))
           .fontSize(14)
           .fontColor('#FFFFFF')
-          .backgroundColor(Theme.accent)
+          .backgroundColor(Th.c.brand)
           .borderRadius(6)
           .height(44)
           .enabled(this.input !== '' && !this.sending)
@@ -522,7 +522,7 @@ export struct WorkspacePane {
     }
     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
     .width('100%')
-    .backgroundColor(Theme.raised)
+    .backgroundColor(Th.c.l2)
   }
 
   // ---------- 动作 ----------

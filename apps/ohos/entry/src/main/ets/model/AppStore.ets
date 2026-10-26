@@ -4,6 +4,7 @@
  * #19:approval.required 鈫?notificationManager 鏈湴閫氱煡(鐐瑰嚮鎷夎捣浼氳瘽椤?
  */
 import { preferences } from '@kit.ArkData'
+import { Th } from '../theme/Theme'
 import { Context, Want, wantAgent } from '@kit.AbilityKit'
 import { ApiClient } from '../net/ApiClient'
 import { SseClient, SseFrame } from '../net/SseClient'
@@ -73,6 +74,7 @@ export class AppStore {
     this.token = await this.prefs.get(KEY_TOKEN, '') as string
     this.locale = await this.prefs.get(KEY_LOCALE, 'zh') as string
     this.theme = await this.prefs.get('theme', 'system') as string
+    Th.apply(this.theme)
     this.pinned = this.parseSet(await this.prefs.get(KEY_PINNED, '[]') as string)
     this.collapsedGroups = this.parseSet(await this.prefs.get(KEY_COLLAPSED, '[]') as string)
   }
@@ -118,7 +120,7 @@ export class AppStore {
       await this.prefs.put('theme', th)
       await this.prefs.flush()
     }
-    AppStorage.setOrCreate('themeRev', (AppStorage.get<number>('themeRev') ?? 0) + 1)
+    Th.apply(th)
   }
 
   async saveConfig(baseUrl: string, token: string): Promise<void> {

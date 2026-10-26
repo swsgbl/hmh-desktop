@@ -1,6 +1,7 @@
 /**
  * M-O5 文件:目录浏览(/api/fs) + 文件预览(/api/fs/read,64KB 截断提示)
  */
+import { Th } from '../theme/Theme'
 import { AppStore } from '../model/AppStore'
 import { guardFsDir, guardFsRead } from '../model/Guards'
 import { FsDirResp, FsReadResp, FsSegment, FsEntry } from '../model/Types'
@@ -41,7 +42,7 @@ export struct FilesPage {
             ForEach(this.dir.segments as FsSegment[], (seg: FsSegment) => {
               Text(seg.name + ' /')
                 .fontSize(12)
-                .fontColor('#1565C0')
+                .fontColor(Th.c.brand)
                 .onClick(() => this.open(seg.path))
             }, (seg: FsSegment) => seg.path)
           }
@@ -63,10 +64,10 @@ export struct FilesPage {
                   .layoutWeight(1)
                 Text('打开')
                   .fontSize(12)
-                  .fontColor('#1565C0')
+                  .fontColor(Th.c.brand)
               }
               .padding(10)
-              .backgroundColor('#FFFFFF')
+              .backgroundColor(Th.c.l1)
               .borderRadius(10)
               .width('100%')
               .onClick(() => this.open(d.path))
@@ -81,10 +82,10 @@ export struct FilesPage {
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                   Text('预览')
                     .fontSize(12)
-                    .fontColor('#1565C0')
+                    .fontColor(Th.c.brand)
                 }
                 .padding(10)
-                .backgroundColor('#FFFFFF')
+                .backgroundColor(Th.c.l1)
                 .borderRadius(10)
                 .width('100%')
                 .onClick(() => this.read(f.path, f.name))
@@ -100,7 +101,7 @@ export struct FilesPage {
           if (this.loading) {
             LoadingProgress().width(28).height(28)
           }
-          Text('输入绝对路径浏览(留空列盘符)').fontSize(12).fontColor('#888888')
+          Text('输入绝对路径浏览(留空列盘符)').fontSize(12).fontColor(Th.c.text3)
           Row({ space: 8 }) {
             TextInput({ text: this.pathInput, placeholder: '例如 G:\\hmh-desktop' })
               .onChange((v: string) => {
@@ -117,7 +118,7 @@ export struct FilesPage {
       }
 
       if (this.errMsg !== '') {
-        Text(this.errMsg).fontSize(13).fontColor('#C0392B').width('100%')
+        Text(this.errMsg).fontSize(13).fontColor(Th.c.danger).width('100%')
       }
     }
     .padding(16)
@@ -137,10 +138,10 @@ export struct FilesPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(`${(this.preview as FsReadResp).size} B`)
           .fontSize(11)
-          .fontColor('#999999')
+          .fontColor(Th.c.text3)
         Text('关闭')
           .fontSize(12)
-          .fontColor('#C0392B')
+          .fontColor(Th.c.danger)
           .onClick(() => {
             this.preview = null
           })
@@ -149,7 +150,7 @@ export struct FilesPage {
       if ((this.preview as FsReadResp).binary) {
         Text('(二进制文件,不预览)')
           .fontSize(13)
-          .fontColor('#888888')
+          .fontColor(Th.c.text3)
           .width('100%')
       } else {
         Scroll() {
@@ -161,18 +162,18 @@ export struct FilesPage {
         }
         .constraintSize({ maxHeight: 260 })
         .width('100%')
-        .backgroundColor('#FAFAFA')
+        .backgroundColor(Th.c.l2)
         .borderRadius(8)
       }
       if ((this.preview as FsReadResp).truncated === true) {
         Text('⚠ 超过 64KB 已截断,完整内容请在 PC 端查看')
           .fontSize(11)
-          .fontColor('#B26A00')
+          .fontColor(Th.c.warn)
           .width('100%')
       }
     }
     .padding(10)
-    .backgroundColor('#F5F5F5')
+    .backgroundColor(Th.c.l2)
     .borderRadius(10)
     .width('100%')
   }

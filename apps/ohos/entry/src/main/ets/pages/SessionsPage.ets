@@ -1,6 +1,7 @@
 /**
  * v2 会话页:分组列表(pin/过滤/折叠/加载更多/管理) + 聊天流(turn-items 卡片)
  */
+import { Th } from '../theme/Theme'
 import { AppStore } from '../model/AppStore'
 import { guardSessionsResp } from '../model/Guards'
 import { SessionInfo, ChatState, ChatMessage, TaskReq, SimpleSidReq, ApproveReq, StateObj } from '../model/Types'
@@ -122,8 +123,8 @@ export struct SessionsPage {
           Text(this.filterLabel(f))
             .fontSize(12)
             .padding({ left: 10, right: 10, top: 5, bottom: 5 })
-            .backgroundColor(this.filter === f ? '#1565C0' : '#E8EAED')
-            .fontColor(this.filter === f ? '#FFFFFF' : '#444444')
+            .backgroundColor(this.filter === f ? Th.c.brand : Th.c.l2)
+            .fontColor(this.filter === f ? Th.c.l1 : Th.c.text)
             .borderRadius(14)
             .onClick(() => {
               this.filter = f
@@ -136,7 +137,7 @@ export struct SessionsPage {
         LoadingProgress().width(24).height(24)
       }
       if (this.errMsg !== '') {
-        Text(this.errMsg).fontSize(12).fontColor('#C0392B')
+        Text(this.errMsg).fontSize(12).fontColor(Th.c.danger)
       }
 
       Scroll(this.scroller) {
@@ -147,11 +148,11 @@ export struct SessionsPage {
               Row({ space: 6 }) {
                 Text(g.collapsed ? '▸' : '▾')
                   .fontSize(14)
-                  .fontColor('#666666')
+                  .fontColor(Th.c.text2)
                 Text(wsGroupLabel(g.workspace, g.rows.length))
                   .fontSize(13)
                   .fontWeight(FontWeight.Medium)
-                  .fontColor('#555555')
+                  .fontColor(Th.c.text2)
                   .layoutWeight(1)
               }
               .width('100%')
@@ -192,7 +193,7 @@ export struct SessionsPage {
       Row({ space: 8 }) {
         Text(s.pinned ? '★' : '☆')
           .fontSize(16)
-          .fontColor(s.pinned ? '#F5A623' : '#BBBBBB')
+          .fontColor(s.pinned ? Th.c.warn : Th.c.dim)
           .onClick(() => this.togglePin(s.id))
         Column({ space: 2 }) {
           Text(s.title)
@@ -203,19 +204,19 @@ export struct SessionsPage {
           Row({ space: 6 }) {
             Text(`${s.turns} 轮 · ${s.toolUses} 工具`)
               .fontSize(10)
-              .fontColor('#999999')
+              .fontColor(Th.c.text3)
             if (s.running) {
               Text(this.L('status.running'))
                 .fontSize(10)
-                .fontColor('#1565C0')
+                .fontColor(Th.c.brand)
             } else if (s.outcome === 'error') {
               Text(this.L('status.failed'))
                 .fontSize(10)
-                .fontColor('#C0392B')
+                .fontColor(Th.c.danger)
             } else if (s.outcome === 'ok') {
               Text('✓')
                 .fontSize(10)
-                .fontColor('#0A7D32')
+                .fontColor(Th.c.success)
             }
           }
           .width('100%')
@@ -227,21 +228,21 @@ export struct SessionsPage {
       Row({ space: 10 }) {
         Text(s.updatedAt !== '' ? s.updatedAt.slice(0, 16).replace('T', ' ') : '')
           .fontSize(10)
-          .fontColor('#999999')
+          .fontColor(Th.c.text3)
           .layoutWeight(1)
         Text(this.L('side.archive'))
           .fontSize(10)
-          .fontColor('#1565C0')
+          .fontColor(Th.c.brand)
           .onClick(() => this.doOp(s.id, 'archive'))
         Text(this.L('side.delete'))
           .fontSize(10)
-          .fontColor('#C0392B')
+          .fontColor(Th.c.danger)
           .onClick(() => this.doOp(s.id, 'delete'))
       }
       .width('100%')
     }
     .padding(10)
-    .backgroundColor('#FFFFFF')
+    .backgroundColor(Th.c.l1)
     .borderRadius(10)
     .width('100%')
     .onClick(() => this.openSession(s.id))
@@ -264,10 +265,10 @@ export struct SessionsPage {
             .maxLines(1)
           Row({ space: 6 }) {
             Circle({ width: 7, height: 7 })
-              .fill(this.sseConnected ? '#0A7D32' : '#C0392B')
+              .fill(this.sseConnected ? Th.c.success : Th.c.danger)
             Text(this.sseConnected ? (this.chat.running ? this.L('status.running') : this.L('status.connected')) : '...')
               .fontSize(10)
-              .fontColor('#888888')
+              .fontColor(Th.c.text3)
           }
         }
         .alignItems(HorizontalAlign.Start)
@@ -276,7 +277,7 @@ export struct SessionsPage {
           Button(this.L('stream.taskFailed') === 'Task failed' ? 'Interrupt' : '打断')
             .fontSize(12)
             .height(32)
-            .backgroundColor('#C0392B')
+            .backgroundColor(Th.c.danger)
             .onClick(() => this.doInterrupt())
         }
       }
@@ -289,12 +290,12 @@ export struct SessionsPage {
               Column({ space: 3 }) {
                 Text(m.role === 'user' ? '我' : 'AI')
                   .fontSize(10)
-                  .fontColor(m.role === 'user' ? '#1565C0' : '#0A7D32')
+                  .fontColor(m.role === 'user' ? Th.c.brand : Th.c.success)
                   .alignSelf(m.role === 'user' ? ItemAlign.End : ItemAlign.Start)
                 Text(m.text)
                   .fontSize(13)
                   .padding(8)
-                  .backgroundColor(m.role === 'user' ? '#E3F2FD' : '#F1F8E9')
+                  .backgroundColor(m.role === 'user' ? Th.c.brandBg : Th.c.successBg)
                   .borderRadius(8)
                   .alignSelf(m.role === 'user' ? ItemAlign.End : ItemAlign.Start)
                   .constraintSize({ maxWidth: '85%' })
@@ -312,7 +313,7 @@ export struct SessionsPage {
                 } else if (it instanceof TurnSumItem) {
                   Text(turnSumText((it as TurnSumItem).turns, (it as TurnSumItem).toolUses, (it as TurnSumItem).tokens))
                     .fontSize(11)
-                    .fontColor('#888888')
+                    .fontColor(Th.c.text3)
                     .padding({ top: 4, bottom: 4 })
                 }
               }
@@ -323,7 +324,7 @@ export struct SessionsPage {
               Text(this.chat.streamBuf)
                 .fontSize(13)
                 .padding(8)
-                .backgroundColor('#F1F8E9')
+                .backgroundColor(Th.c.successBg)
                 .borderRadius(8)
                 .alignSelf(ItemAlign.Start)
                 .constraintSize({ maxWidth: '85%' })
@@ -331,7 +332,7 @@ export struct SessionsPage {
             if (this.chat.lastError !== '') {
               Text(`⚠ ${this.chat.lastError}`)
                 .fontSize(12)
-                .fontColor('#C0392B')
+                .fontColor(Th.c.danger)
                 .width('100%')
             }
           }
@@ -356,11 +357,11 @@ export struct SessionsPage {
             Row({ space: 4 }) {
               Text('@' + relChipText(rel))
                 .fontSize(11)
-                .fontColor('#1565C0')
+                .fontColor(Th.c.brand)
                 .maxLines(1)
               Text('×')
                 .fontSize(11)
-                .fontColor('#999999')
+                .fontColor(Th.c.text3)
                 .onClick(() => {
                   const kept: string[] = []
                   for (let i = 0; i < this.attachments.length; i++) {
@@ -372,7 +373,7 @@ export struct SessionsPage {
                 })
             }
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-            .backgroundColor('#E3F2FD')
+            .backgroundColor(Th.c.brandBg)
             .borderRadius(10)
             .margin({ right: 6, bottom: 6 })
           }, (rel: string) => rel)
@@ -402,7 +403,7 @@ export struct SessionsPage {
               .fontSize(12)
               .height(36)
               .width(36)
-              .backgroundColor('#888888')
+              .backgroundColor(Th.c.text3)
               .onClick(() => {
                 this.atOpen = false
                 this.atHits = []
@@ -411,7 +412,7 @@ export struct SessionsPage {
           }
           .width('100%')
           if (this.atErr !== '') {
-            Text(this.atErr).fontSize(11).fontColor('#C0392B').width('100%')
+            Text(this.atErr).fontSize(11).fontColor(Th.c.danger).width('100%')
           }
           if (this.atSearching) {
             LoadingProgress().width(20).height(20)
@@ -423,7 +424,7 @@ export struct SessionsPage {
                   Text(rel)
                     .fontSize(12)
                     .padding({ left: 8, right: 8, top: 6, bottom: 6 })
-                    .backgroundColor(this.attachments.indexOf(rel) >= 0 ? '#BBDEFB' : '#F5F5F5')
+                    .backgroundColor(this.attachments.indexOf(rel) >= 0 ? Th.c.brandBg : Th.c.l2)
                     .borderRadius(8)
                     .width('100%')
                     .maxLines(1)
@@ -440,9 +441,9 @@ export struct SessionsPage {
           }
         }
         .padding(10)
-        .backgroundColor('#FFFFFF')
+        .backgroundColor(Th.c.l1)
         .borderRadius(10)
-        .border({ width: 1, color: '#D0D0D0' })
+        .border({ width: 1, color: Th.c.dim })
         .width('100%')
       }
 
@@ -451,7 +452,7 @@ export struct SessionsPage {
           .fontSize(14)
           .height(38)
           .width(38)
-          .backgroundColor('#455A64')
+          .backgroundColor(Th.c.text2)
           .onClick(() => {
             this.atOpen = !this.atOpen
           })
@@ -459,7 +460,7 @@ export struct SessionsPage {
           .fontSize(13)
           .height(38)
           .width(44)
-          .backgroundColor('#6A4C93')
+          .backgroundColor(Th.c.planning)
           .onClick(() => this.pickImages())
         TextInput({ text: this.input, placeholder: this.L('comp.phEnter') })
           .onChange((v: string) => {
@@ -485,7 +486,7 @@ export struct SessionsPage {
       Row({ space: 6 }) {
         Text(it.status === 'running' ? '⟳' : (it.status === 'error' ? '✗' : '✓'))
           .fontSize(12)
-          .fontColor(it.status === 'running' ? '#1565C0' : (it.status === 'error' ? '#C0392B' : '#0A7D32'))
+          .fontColor(it.status === 'running' ? Th.c.brand : (it.status === 'error' ? Th.c.danger : Th.c.success))
         Text(it.name)
           .fontSize(11)
           .fontWeight(FontWeight.Medium)
@@ -494,7 +495,7 @@ export struct SessionsPage {
         if (it.status === 'running') {
           Text(this.L('stream.toolRunning'))
             .fontSize(10)
-            .fontColor('#1565C0')
+            .fontColor(Th.c.brand)
         }
       }
       .width('100%')
@@ -505,21 +506,21 @@ export struct SessionsPage {
         if (it.argsPreview !== '') {
           Text(it.argsPreview)
             .fontSize(10)
-            .fontColor('#666666')
+            .fontColor(Th.c.text2)
             .width('100%')
             .maxLines(3)
         }
         if (it.resultPreview !== '') {
           Text(it.resultPreview)
             .fontSize(10)
-            .fontColor('#444444')
+            .fontColor(Th.c.text)
             .width('100%')
             .maxLines(6)
         }
       }
     }
     .padding(8)
-    .backgroundColor('#F5F5F5')
+    .backgroundColor(Th.c.l2)
     .borderRadius(8)
     .width('100%')
     .alignSelf(ItemAlign.Start)
@@ -533,16 +534,16 @@ export struct SessionsPage {
         .fontSize(12)
       Text(d.relPath)
         .fontSize(11)
-        .fontColor('#0A7D32')
+        .fontColor(Th.c.success)
         .layoutWeight(1)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
       Text(d.tool)
         .fontSize(9)
-        .fontColor('#999999')
+        .fontColor(Th.c.text3)
     }
     .padding(8)
-    .backgroundColor('#E8F5E9')
+    .backgroundColor(Th.c.successBg)
     .borderRadius(8)
     .width('100%')
     .alignSelf(ItemAlign.Start)

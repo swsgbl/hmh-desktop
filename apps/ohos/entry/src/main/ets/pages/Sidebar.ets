@@ -10,7 +10,7 @@ import { guardSessionsResp } from '../model/Guards'
 import { SessionInfo, WorkspacesResp, WorkspaceInfo, WsUseReq } from '../model/Types'
 import { SessionRow, SessionGroup, applyFilter, groupByWorkspace, toggleGroup, wsGroupLabel } from '../model/SessionList'
 import { t } from '../model/I18n'
-import { Theme } from '../theme/Theme'
+import { Th, Metrics } from '../theme/Theme'
 import { ApiError, toApiError } from '../net/ApiClient'
 
 @Component
@@ -50,15 +50,15 @@ export struct Sidebar {
         Row({ space: 4 }) {
           Button(this.L('side.new'))
             .fontSize(13)
-            .fontColor(Theme.text)
-            .backgroundColor(Theme.panel)
+            .fontColor(Th.c.text)
+            .backgroundColor(Th.c.l1)
             .borderRadius(6)
             .height(32)
             .layoutWeight(1)
             .onClick(() => this.openSession(''))
           Text('▾')
             .fontSize(12)
-            .fontColor(Theme.dim)
+            .fontColor(Th.c.text3)
             .padding(4)
             .onClick(() => {
               this.openSession('', true)
@@ -68,10 +68,10 @@ export struct Sidebar {
 
         TextInput({ placeholder: this.L('side.search') })
           .fontSize(13)
-          .fontColor(Theme.text)
-          .placeholderColor(Theme.dim)
-          .backgroundColor(Theme.panel)
-          .border({ width: 1, color: Theme.border })
+          .fontColor(Th.c.text)
+          .placeholderColor(Th.c.text3)
+          .backgroundColor(Th.c.l1)
+          .border({ width: 1, color: Th.c.border2 })
           .borderRadius(6)
           .padding({ left: 10, right: 10 })
           .height(32)
@@ -86,8 +86,8 @@ export struct Sidebar {
             Text(this.filterLabel(f))
               .fontSize(12)
               .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-              .backgroundColor(this.filter === f ? Theme.accent : Theme.panel)
-              .fontColor(this.filter === f ? '#FFFFFF' : Theme.dim)
+              .backgroundColor(this.filter === f ? Th.c.brand : Th.c.l1)
+              .fontColor(this.filter === f ? '#FFFFFF' : Th.c.text3)
               .borderRadius(6)
               .onClick(() => {
                 this.filter = f
@@ -104,21 +104,21 @@ export struct Sidebar {
       Row({ space: 8 }) {
         Text('工作区')
           .fontSize(11)
-          .fontColor(Theme.dim)
+          .fontColor(Th.c.text3)
         Text(this.currentWsName())
           .fontSize(13)
-          .fontColor(Theme.text)
+          .fontColor(Th.c.text)
           .layoutWeight(1)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text('▾')
           .fontSize(12)
-          .fontColor(Theme.dim)
+          .fontColor(Th.c.text3)
       }
       .padding({ left: 12, right: 12, top: 8, bottom: 8 })
       .width('100%')
-      .backgroundColor(Theme.raised)
-      .border({ width: 1, color: Theme.border })
+      .backgroundColor(Th.c.l2)
+      .border({ width: 1, color: Th.c.border2 })
       .onClick(() => {
         this.wsMenuOpen = !this.wsMenuOpen
       })
@@ -130,14 +130,14 @@ export struct Sidebar {
             Row({ space: 6 }) {
               Text(w.id === this.wsData.current ? '✓' : ' ')
                 .fontSize(11)
-                .fontColor(Theme.completed)
+                .fontColor(Th.c.completed)
               Column({ space: 2 }) {
                 Text(w.name)
                   .fontSize(13)
-                  .fontColor(w.id === this.wsData.current ? Theme.text : Theme.dim)
+                  .fontColor(w.id === this.wsData.current ? Th.c.text : Th.c.text3)
                 Text(w.path)
                   .fontSize(11)
-                  .fontColor(Theme.dim)
+                  .fontColor(Th.c.text3)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
               }
@@ -151,8 +151,8 @@ export struct Sidebar {
           }, (w: WorkspaceInfo) => w.id)
         }
         .padding(4)
-        .backgroundColor(Theme.raised)
-        .border({ width: 1, color: Theme.border })
+        .backgroundColor(Th.c.l2)
+        .border({ width: 1, color: Th.c.border2 })
         .borderRadius(10)
         .width('94%')
       }
@@ -164,17 +164,17 @@ export struct Sidebar {
             LoadingProgress().width(22).height(22).margin(10)
           }
           if (this.errMsg !== '') {
-            Text(this.errMsg).fontSize(11).fontColor(Theme.danger).padding(8)
+            Text(this.errMsg).fontSize(11).fontColor(Th.c.danger).padding(8)
           }
           ForEach(this.groups(), (g: SessionGroup) => {
             Column({ space: 4 }) {
               Row({ space: 6 }) {
                 Text(g.collapsed ? '▸' : '▾')
                   .fontSize(12)
-                  .fontColor(Theme.dim)
+                  .fontColor(Th.c.text3)
                 Text(wsGroupLabel(g.workspace, g.rows.length))
                   .fontSize(12)
-                  .fontColor(Theme.dim)
+                  .fontColor(Th.c.text3)
                   .layoutWeight(1)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -197,7 +197,7 @@ export struct Sidebar {
           if (this.nextCursor !== '') {
             Text(this.L('side.loadMore'))
               .fontSize(12)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
               .margin({ top: 6, bottom: 6 })
               .onClick(() => this.loadMore())
           }
@@ -210,7 +210,7 @@ export struct Sidebar {
     }
     .width(264)
     .height('100%')
-    .backgroundColor(Theme.raised)
+    .backgroundColor(Th.c.l2)
     .alignItems(HorizontalAlign.Start)
   }
 
@@ -220,40 +220,40 @@ export struct Sidebar {
       Row({ space: 5 }) {
         if (s.running) {
           Circle({ width: 7, height: 7 })
-            .fill(Theme.running)
+            .fill(Th.c.running)
             .margin({ right: 2 })
         }
         Text(s.title)
           .fontSize(13)
-          .fontColor(s.id === this.activeId ? Theme.text : Theme.dim)
+          .fontColor(s.id === this.activeId ? Th.c.text : Th.c.text3)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
         Text(s.pinned ? '★' : '')
           .fontSize(12)
-          .fontColor(Theme.warn)
+          .fontColor(Th.c.warn)
       }
       .width('100%')
       Row({ space: 6 }) {
         Text(s.updatedAt !== '' ? s.updatedAt.slice(5, 16).replace('T', ' ') : '')
           .fontSize(11)
-          .fontColor(Theme.dim)
+          .fontColor(Th.c.text3)
           .layoutWeight(1)
         if (s.outcome === 'error') {
-          Text(this.L('status.failed')).fontSize(10).fontColor(Theme.danger)
+          Text(this.L('status.failed')).fontSize(10).fontColor(Th.c.danger)
         } else if (s.outcome === 'ok') {
-          Text('✓').fontSize(10).fontColor(Theme.completed)
+          Text('✓').fontSize(10).fontColor(Th.c.completed)
         }
         Text('⋯')
           .fontSize(14)
-          .fontColor(Theme.dim)
+          .fontColor(Th.c.text3)
           .onClick(() => this.itemMenu(s.id))
       }
       .width('100%')
     }
     .padding({ left: 10, right: 10, top: 8, bottom: 8 })
     .borderRadius(6)
-    .backgroundColor(s.id === this.activeId ? Theme.panel : Theme.raised)
+    .backgroundColor(s.id === this.activeId ? Th.c.l1 : Th.c.l2)
     .width('100%')
     .onClick(() => this.openSession(s.id))
   }

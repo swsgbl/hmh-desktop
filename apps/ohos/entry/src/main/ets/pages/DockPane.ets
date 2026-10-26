@@ -5,7 +5,7 @@
 import { hilog } from '@kit.PerformanceAnalysisKit'
 import { AppStore, StoreListener } from '../model/AppStore'
 import { t } from '../model/I18n'
-import { Theme } from '../theme/Theme'
+import { Th, Metrics } from '../theme/Theme'
 import { StateObj } from '../model/Types'
 import { guardState } from '../model/Guards'
 
@@ -22,6 +22,7 @@ export struct DockPane {
   @StorageProp('serverRev') @Watch('onServerRev') serverRev: number = 0
   private store: AppStore = AppStore.get()
   private storeL: StoreListener | null = null
+  private pollTimer: number | null = null
 
   aboutToAppear(): void {
     this.locale = this.store.locale
@@ -44,9 +45,20 @@ export struct DockPane {
     if (this.storeL !== null) {
       AppStore.get().setListener(this.storeL)
     }
+    // v4 收尾:AppStorage 跨线程嫌疑绕行——2s 轮询直读 store(与 @StorageProp 双保险)
+    this.pollTimer = setInterval(() => {
+      const s = AppStore.get().serverState
+      const c = AppStore.get().sseConnected
+      if (s !== this.st) { this.st = s }
+      if (c !== this.sseOn) { this.sseOn = c }
+    }, 2000)
   }
 
   aboutToDisappear(): void {
+    if (this.pollTimer !== null) {
+      clearInterval(this.pollTimer)
+      this.pollTimer = null
+    }
     if (this.storeL !== null) {
       AppStore.get().removeListener(this.storeL)
     }
@@ -90,8 +102,8 @@ export struct DockPane {
           ForEach(this.tabNames(), (name: string, idx: number) => {
             Text(name)
               .fontSize(13)
-              .fontColor(this.tab === idx ? Theme.text : Theme.dim)
-              .backgroundColor(this.tab === idx ? Theme.panel : Theme.raised)
+              .fontColor(this.tab === idx ? Th.c.text : Th.c.text3)
+              .backgroundColor(this.tab === idx ? Th.c.l1 : Th.c.l2)
               .padding({ left: 10, right: 10, top: 6, bottom: 6 })
               .borderRadius(6)
               .onClick(() => {
@@ -103,8 +115,8 @@ export struct DockPane {
       }
       .scrollable(ScrollDirection.Horizontal)
       .width('100%')
-      .backgroundColor(Theme.raised)
-      .border({ width: 1, color: Theme.border })
+      .backgroundColor(Th.c.l2)
+      .border({ width: 1, color: Th.c.border2 })
 
       // dock-body
       Scroll() {
@@ -114,30 +126,30 @@ export struct DockPane {
           } else if (this.tab === 1) {
             Text(this.L('dock.files'))
               .fontSize(13)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
             Text('(v3:文件页签对接中——见 RESUME)')
               .fontSize(11)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
           } else if (this.tab === 2) {
             Text(this.locale === 'en' ? 'git changes' : this.L('dock.gitChanges'))
               .fontSize(13)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
             Text(this.L('dock.notGit') + ' / ' + this.L('dock.noChanges'))
               .fontSize(11)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
           } else if (this.tab === 3) {
             Text(this.L('dock.evidence') === 'Evidence' ? 'Evidence' : '证据')
               .fontSize(13)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
             Text(this.L('dock.noData'))
               .fontSize(11)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
           } else if (this.tab === 4) {
             this.logsBody()
           } else {
             Text(this.L('dock.overview'))
               .fontSize(13)
-              .fontColor(Theme.dim)
+              .fontColor(Th.c.text3)
           }
         }
         .padding(12)
@@ -149,7 +161,7 @@ export struct DockPane {
     }
     .width(360)
     .height('100%')
-    .backgroundColor(Theme.raised)
+    .backgroundColor(Th.c.l2)
     .alignItems(HorizontalAlign.Start)
   }
 
@@ -171,8 +183,8 @@ export struct DockPane {
         Button(this.locale === 'en' ? 'Refresh' : '刷新')
           .fontSize(12)
           .height(28)
-          .backgroundColor(Theme.panel)
-          .fontColor(Theme.text)
+          .backgroundColor(Th.c.l1)
+          .fontColor(Th.c.text)
           .onClick(() => this.refreshState())
       }
       .width('100%')
@@ -183,7 +195,7 @@ export struct DockPane {
       }
       Text(this.L('dock.overviewNote'))
         .fontSize(11)
-        .fontColor(Theme.dim)
+        .fontColor(Th.c.text3)
         .margin({ top: 8 })
     }
     .width('100%')
@@ -211,18 +223,18 @@ export struct DockPane {
     Column({ space: 2 }) {
       Text(this.L('dock.logsHead'))
         .fontSize(12)
-        .fontColor(Theme.dim)
+        .fontColor(Th.c.text3)
         .width('100%')
       if (this.logs.length === 0) {
         Text(this.L('dock.logsEmpty'))
           .fontSize(11)
-          .fontColor(Theme.dim)
+          .fontColor(Th.c.text3)
           .padding({ top: 12 })
       } else {
         ForEach(this.logs, (line: string, idx: number) => {
           Text(line)
             .fontSize(11)
-            .fontColor(Theme.dim)
+            .fontColor(Th.c.text3)
             .fontFamily('monospace')
             .width('100%')
             .padding({ left: 4, right: 4, top: 2, bottom: 2 })
@@ -237,11 +249,11 @@ export struct DockPane {
     Row({ space: 8 }) {
       Text(k)
         .fontSize(12)
-        .fontColor(Theme.dim)
+        .fontColor(Th.c.text3)
         .width(96)
       Text(v)
         .fontSize(12)
-        .fontColor(Theme.text)
+        .fontColor(Th.c.text)
         .layoutWeight(1)
         .maxLines(2)
         .textOverflow({ overflow: TextOverflow.Ellipsis })

@@ -1,6 +1,7 @@
 /**
  * M-O4 工作区:列表 + 当前标记 + 切换(POST /api/workspaces/use;busy 409 提示)
  */
+import { Th } from '../theme/Theme'
 import { AppStore } from '../model/AppStore'
 import { guardWorkspacesResp } from '../model/Guards'
 import { WorkspacesResp, WorkspaceInfo, WsUseReq } from '../model/Types'
@@ -35,14 +36,14 @@ export struct WorkspacesPage {
       if (this.data.current !== '') {
         Text(`当前: ${this.data.current}`)
           .fontSize(14)
-          .fontColor('#0A7D32')
+          .fontColor(Th.c.success)
           .width('100%')
       }
       if (this.notice !== '') {
-        Text(this.notice).fontSize(13).fontColor('#1565C0').width('100%')
+        Text(this.notice).fontSize(13).fontColor(Th.c.brand).width('100%')
       }
       if (this.errMsg !== '') {
-        Text(this.errMsg).fontSize(13).fontColor('#C0392B').width('100%')
+        Text(this.errMsg).fontSize(13).fontColor(Th.c.danger).width('100%')
       }
       if (this.loading) {
         LoadingProgress().width(28).height(28)
@@ -60,7 +61,7 @@ export struct WorkspacesPage {
                 if (w.id === this.data.current) {
                   Text('● 当前')
                     .fontSize(12)
-                    .fontColor('#0A7D32')
+                    .fontColor(Th.c.success)
                 } else {
                   Button('切换')
                     .fontSize(12)
@@ -71,13 +72,13 @@ export struct WorkspacesPage {
               .width('100%')
               Text(w.path)
                 .fontSize(11)
-                .fontColor('#999999')
+                .fontColor(Th.c.text3)
                 .width('100%')
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .padding(12)
-            .backgroundColor('#FFFFFF')
+            .backgroundColor(Th.c.l1)
             .borderRadius(12)
             .width('100%')
           }, (w: WorkspaceInfo) => w.id)

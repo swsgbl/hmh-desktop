@@ -2,6 +2,7 @@
  * v2 总览页:runtime/host 状态卡(接 /api/state + SSE state 事件)
  * 蓝本:desktop dock 总览——daemon 版本/模式/会话数/运行状态/provider
  */
+import { Th } from '../theme/Theme'
 import { AppStore } from '../model/AppStore'
 import { StateObj } from '../model/Types'
 import { t } from '../model/I18n'
@@ -51,7 +52,7 @@ export struct OverviewPage {
       .width('100%')
 
       if (this.errMsg !== '') {
-        Text(this.errMsg).fontSize(12).fontColor('#C0392B')
+        Text(this.errMsg).fontSize(12).fontColor(Th.c.danger)
       }
       if (this.st === null) {
         if (this.errMsg === '') {
@@ -72,7 +73,7 @@ export struct OverviewPage {
             }
             Text(this.L('dock.overviewNote'))
               .fontSize(10)
-              .fontColor('#999999')
+              .fontColor(Th.c.text3)
               .width('100%')
               .padding({ top: 6 })
           }
@@ -92,7 +93,7 @@ export struct OverviewPage {
     Row({ space: 8 }) {
       Text(k)
         .fontSize(12)
-        .fontColor('#888888')
+        .fontColor(Th.c.text3)
         .width(110)
       Text(v)
         .fontSize(13)
@@ -101,7 +102,7 @@ export struct OverviewPage {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .padding(10)
-    .backgroundColor('#FFFFFF')
+    .backgroundColor(Th.c.l1)
     .borderRadius(8)
     .width('100%')
   }

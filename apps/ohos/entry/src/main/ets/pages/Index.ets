@@ -9,7 +9,7 @@ import { AppStore } from '../model/AppStore'
 import { Sidebar } from './Sidebar'
 import { WorkspacePane } from './WorkspacePane'
 import { DockPane } from './DockPane'
-import { Theme } from '../theme/Theme'
+import { Th, Metrics } from '../theme/Theme'
 import { t } from '../model/I18n'
 import { SettingsPage } from './SettingsPage'
 
@@ -42,19 +42,19 @@ struct Index {
       Row({ space: 8 }) {
         Text('☰')
           .fontSize(17)
-          .fontColor(Theme.dim)
+          .fontColor(Th.c.text3)
           .padding({ left: 10, right: 10 })
           .onClick(() => {
             this.sidebarOpen = !this.sidebarOpen
           })
         Text('HMH Desktop')
           .fontSize(13)
-          .fontColor(Theme.dim)
+          .fontColor(Th.c.text3)
         Blank()
       }
       .height(36)
       .width('100%')
-      .backgroundColor(Theme.raised)
+      .backgroundColor(Th.c.l2)
       .alignItems(VerticalAlign.Center)
 
       // ---- 三栏 grid 等价:Row[264|1fr|360] ----
@@ -86,7 +86,7 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(Theme.bg)
+    .backgroundColor(Th.c.bg)
 
     // ---- 设置弹层(居中 480px) ----
     .overlay(this.settingsLayer(), { align: Alignment.Center })
@@ -100,11 +100,11 @@ struct Index {
         Row({ space: 8 }) {
           Text(this.L('set.title'))
             .fontSize(14)
-            .fontColor(Theme.text)
+            .fontColor(Th.c.text)
             .layoutWeight(1)
           Text('×')
             .fontSize(18)
-            .fontColor(Theme.dim)
+            .fontColor(Th.c.text3)
             .padding(6)
             .onClick(() => {
               this.settingsOpen = false
@@ -118,8 +118,8 @@ struct Index {
       }
       .width(480)
       .constraintSize({ maxHeight: '80%' })
-      .backgroundColor(Theme.raised)
-      .border({ width: 1, color: Theme.border })
+      .backgroundColor(Th.c.l2)
+      .border({ width: 1, color: Th.c.border2 })
       .borderRadius(14)
       .padding({ bottom: 12 })
     }

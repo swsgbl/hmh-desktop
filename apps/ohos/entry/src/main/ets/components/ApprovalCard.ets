@@ -2,6 +2,7 @@
  * M-O3 审批卡:approvalReq 到达 → 展示工具名+参数 → 批准/拒绝 → POST /api/approve
  * 审批权威在 runtime:本组件只发请求,状态由 approvalDone 事件回收
  */
+import { Th } from '../theme/Theme'
 import { ApprovalCard } from '../model/Types'
 
 @Component
@@ -18,13 +19,13 @@ export struct ApprovalCardView {
           Text('⏸ 审批请求')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#B26A00')
+            .fontColor(Th.c.warn)
             .layoutWeight(1)
           Text('等待决定')
             .fontSize(12)
-            .fontColor('#B26A00')
+            .fontColor(Th.c.warn)
             .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-            .backgroundColor('#FFF3E0')
+            .backgroundColor(Th.c.warnBg)
             .borderRadius(10)
         }
         .width('100%')
@@ -36,8 +37,8 @@ export struct ApprovalCardView {
         if (this.argsText() !== '') {
           Text(this.argsText())
             .fontSize(12)
-            .fontColor('#555555')
-            .backgroundColor('#FAFAFA')
+            .fontColor(Th.c.text2)
+            .backgroundColor(Th.c.l2)
             .borderRadius(8)
             .padding(8)
             .width('100%')
@@ -47,11 +48,11 @@ export struct ApprovalCardView {
 
         Row({ space: 12 }) {
           Button('拒绝')
-            .backgroundColor('#C0392B')
+            .backgroundColor(Th.c.danger)
             .enabled(!this.sending)
             .onClick(() => this.onDecision(false))
           Button('批准')
-            .backgroundColor('#0A7D32')
+            .backgroundColor(Th.c.success)
             .enabled(!this.sending)
             .onClick(() => this.onDecision(true))
         }
@@ -59,9 +60,9 @@ export struct ApprovalCardView {
         .justifyContent(FlexAlign.End)
       }
       .padding(14)
-      .backgroundColor('#FFF8E1')
+      .backgroundColor(Th.c.warnBg)
       .borderRadius(12)
-      .border({ width: 1, color: '#FFD54F' })
+      .border({ width: 1, color: Th.c.warn })
       .width('100%')
     }
   }
