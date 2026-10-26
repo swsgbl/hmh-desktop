@@ -16,7 +16,36 @@ export interface RuntimeInfoDto {
   mode: 'fake' | 'real';
   runtimeEntry: string | null;
   override: string;
+  demo?: boolean;
   detected: string;
+  detectedVersion?: string;
+  detectedSource?: string;
+}
+
+export interface DetectRuntimeDto {
+  found: boolean;
+  version: string;
+  entry: string;
+  source: string;
+  bundled: { ready: boolean; version: string };
+  npm: boolean;
+}
+
+export interface InstallProgressDto {
+  phase: 'check' | 'meta' | 'download' | 'extract' | 'npm' | 'done' | 'error';
+  pct?: number;
+  text: string;
+  mirror?: string;
+  entry?: string;
+  error?: string;
+}
+
+export interface WizardStateDto {
+  done: boolean;
+  choice: string;
+  suppressed: boolean;
+  /** 验收构造(UIVERIFY_WIZARD)下附带的真实落盘状态(持久化断言用)。 */
+  persisted?: { done: boolean; choice: string };
 }
 
 export interface SessionRowDto {
@@ -91,6 +120,11 @@ export interface DiffDto {
 export interface HmhBridge {
   getState(): Promise<BridgeState>;
   runtimeInfo(): Promise<RuntimeInfoDto | { error: string; code: string }>;
+  detectRuntime(): Promise<DetectRuntimeDto | { error: string; code: string }>;
+  installCli(opts?: { forceTgz?: boolean; mirrorFirst?: 'npmjs' | 'npmmirror' }): Promise<{ ok: boolean; error?: string } | { error: string; code: string }>;
+  onInstallProgress(cb: (p: InstallProgressDto) => void): () => void;
+  getWizard(): Promise<WizardStateDto | { error: string; code: string }>;
+  wizardComplete(choice: 'external' | 'install' | 'bundled' | 'demo', entry?: string): Promise<{ ok: boolean; mode?: string; test?: boolean } | { error: string; code: string }>;
   browseRuntime(title?: string): Promise<{ ok: boolean; entry?: string; canceled?: boolean } | { error: string; code: string }>;
   setRuntime(entry: string): Promise<{ ok: boolean; mode?: string } | { error: string; code: string }>;
   sessions(): Promise<{ sessions: SessionRowDto[]; nextCursor: string | null } | { error: string; code: string }>;

@@ -23,6 +23,27 @@ const bridge = {
   runtimeInfo(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:runtime-info');
   },
+  /** v5.1 安装向导:本机 hmh CLI 检测(发现链复用)。 */
+  detectRuntime(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:detect-runtime');
+  },
+  /** v5.1 安装向导:启动 @hmharness/cli 安装(进度经 onInstallProgress 回流)。 */
+  installCli(opts?: { forceTgz?: boolean; mirrorFirst?: 'npmjs' | 'npmmirror' }): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:install-cli', opts ?? {});
+  },
+  onInstallProgress(cb: (p: { phase: string; pct?: number; text: string; mirror?: string; entry?: string; error?: string }) => void): () => void {
+    const listener = (_e: Electron.IpcRendererEvent, p: { phase: string; pct?: number; text: string; mirror?: string; entry?: string; error?: string }): void => cb(p);
+    ipcRenderer.on('install:progress', listener);
+    return () => ipcRenderer.removeListener('install:progress', listener);
+  },
+  /** v5.1 安装向导:首启状态(done/choice/suppressed)。 */
+  getWizard(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:get-wizard');
+  },
+  /** v5.1 安装向导:完成收尾(选择持久 + runtime 应用)。 */
+  wizardComplete(choice: 'external' | 'install' | 'bundled' | 'demo', entry?: string): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:wizard-complete', choice, entry ?? '');
+  },
   browseRuntime(title?: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:browse-runtime', title);
   },

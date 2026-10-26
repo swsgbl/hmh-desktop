@@ -11,6 +11,7 @@ import type { EventEnvelope, RunStatus } from '@hmh-desktop/contracts';
 import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type ProviderDetailDto, type SessionPreviewDto, type WorkspaceDto } from './bridge.ts';
 import { useLocale } from './i18n.ts';
 import { useTheme, type Theme } from './theme.ts';
+import { SetupWizard } from './SetupWizard.tsx';
 
 interface SessionRow {
   id: string;
@@ -62,6 +63,8 @@ export function App(): React.ReactElement {
   // Ctrl+K 命令面板 / 设置弹层 / 分页游标 / 本地偏好
   const [cmdOpen, setCmdOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // v5.1 首启安装向导(未配置+未连接过自动弹;设置「重新配置」重入)
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [enterSends, setEnterSends] = useState<boolean>(() => {
     try { return window.localStorage.getItem('hmh.enterSends') !== 'newline'; } catch { return true; }
@@ -231,6 +234,14 @@ export function App(): React.ReactElement {
   useEffect(() => {
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight });
   }, [items, streaming]);
+
+  // v5.1 首启:未完成过向导且未被测试环境抑制 → 自动全屏弹出(一次)
+  useEffect(() => {
+    if (bridge === undefined) return;
+    void bridge.getWizard().then((r) => {
+      if ('done' in r && r.done !== true && r.suppressed !== true) setWizardOpen(true);
+    });
+  }, []);
 
   const refreshSessions = useCallback(async (cur: string | null = null) => {
     if (bridge === undefined) return;
@@ -783,6 +794,7 @@ export function App(): React.ReactElement {
 
   return (
     <>
+      {wizardOpen && <SetupWizard L={L} hostState={hostState} onClose={() => setWizardOpen(false)} />}
       <header className="titlebar">
         <button
           className="btn ghost titlebar-menu"
@@ -858,6 +870,7 @@ export function App(): React.ReactElement {
               <div className="seg">
                 <button disabled={runtimeBusy} onClick={() => void pickRuntime()}>{L.settings.pickEntry}</button>
                 <button disabled={runtimeBusy} onClick={() => void resetRuntimeAuto()}>{L.settings.resetAuto}</button>
+                <button onClick={() => { setSettingsOpen(false); setWizardOpen(true); }}>{L.settings.rerunWizard}</button>
               </div>
             </div>
             <div className="settings-note">{L.settings.shareNote}</div>

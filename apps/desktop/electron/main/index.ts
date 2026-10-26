@@ -13,8 +13,8 @@
  * 给 host —— fake 与真实 hmharness desktop-host 走同一条代码路径。
  */
 import { app, BrowserWindow, dialog, ipcMain, session, shell, Tray, Notification, Menu, nativeImage, nativeTheme } from 'electron';
-import { join, dirname, isAbsolute, resolve } from 'node:path';
-import { existsSync, realpathSync } from 'node:fs';
+import { join, dirname, basename, isAbsolute, resolve } from 'node:path';
+import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import { writeFile, readFile } from 'node:fs/promises';
 import { homedir, networkInterfaces } from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
 import { isEventEnvelope, type EventEnvelope } from '@hmh-desktop/contracts';
 import { attachUiVerify } from './uiverify.ts';
+import { installTarget, resolveInstalledEntry, startCliInstall, type InstallProgress } from './installer.ts';
 
 const here = import.meta.dirname ?? '.';
 const isDev = process.env.HMH_DESKTOP_DEV === '1';
@@ -370,20 +371,31 @@ if (!app.requestSingleInstanceLock()) {
     }
     return lanIp || fallback;
   }
-  /** CLI 入口(runtime 自动发现的 repo;fake 模式无 repo 返回空)。 */
+  /** CLI 入口:源码 repo 布局(main.ts,经 tsx)或 npm 安装布局(dist/main.js
+   *  直跑——从 runtime 入口上溯找 @hmharness/cli 包;嵌套/提升/源码三种布局通吃)。 */
   function cliEntryOf(): string {
-    if (runtimeEntry === null) return '';
+    if (runtimeEntry === '' || runtimeEntry === null) return '';
     try {
       const p = join(repoRootOf(runtimeEntry), 'packages', 'cli', 'src', 'main.ts');
-      return existsSync(p) ? p : '';
-    } catch { return ''; }
+      if (existsSync(p)) return p;
+    } catch { /* 非 repo 布局 */ }
+    let dir = dirname(runtimeEntry);
+    for (let i = 0; i < 8; i++) {
+      if (existsSync(join(dir, 'dist', 'main.js')) && pkgNameAt(dir) === '@hmharness/cli') return join(dir, 'dist', 'main.js');
+      if (basename(dir) === '@hmharness' && existsSync(join(dir, 'cli', 'dist', 'main.js'))) return join(dir, 'cli', 'dist', 'main.js');
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return '';
   }
   function runCli(args: string[]): void {
     const entry = cliEntryOf();
     if (entry === '') return;
+    const isTs = entry.endsWith('.ts');
     const repo = repoRootOf(runtimeEntry ?? entry);
-    const child = spawn(process.execPath, ['--import', 'tsx', entry, ...args], {
-      cwd: repo,
+    const child = spawn(process.execPath, isTs ? ['--import', 'tsx', entry, ...args] : [entry, ...args], {
+      cwd: isTs ? repo : dirname(entry),
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
@@ -440,43 +452,109 @@ if (!app.requestSingleInstanceLock()) {
 
   /* ---- hmharness runtime 自动发现(2026-10-10 用户定调:装过 hmharness 的
      机器零配置直连,复用 CLI/TUI/web 7788 的同一 HMH_HOME——config/providers/
-     会话历史天然共享)。发现顺序:显式配置 > where hmh > npm 全局 > 常见源码位置。 */
+     会话历史天然共享)。v5.1 发现顺序:显式配置 > where hmh(源码 link 与
+     @hmharness/cli npm 安装两种布局)> npm 全局根(同)> 向导安装目录
+     ~/.hmharness-global > 常见源码位置。 */
   const runtimeConfigFile = (): string => join(app.getPath('userData'), 'runtime.json');
-  async function loadRuntimeEntryOverride(): Promise<string> {
+  /** runtime.json:{ entry(手动/向导选择的入口), demo(持久演示模式) }。 */
+  async function loadRuntimeConfig(): Promise<{ entry: string; demo: boolean }> {
     try {
-      const v = JSON.parse(await readFile(runtimeConfigFile(), 'utf8')) as { entry?: unknown };
-      return typeof v.entry === 'string' && v.entry !== '' && isAbsolute(v.entry) ? v.entry : '';
-    } catch { return ''; }
+      const v = JSON.parse(await readFile(runtimeConfigFile(), 'utf8')) as { entry?: unknown; demo?: unknown };
+      return {
+        entry: typeof v.entry === 'string' && v.entry !== '' && isAbsolute(v.entry) ? v.entry : '',
+        demo: v.demo === true,
+      };
+    } catch { return { entry: '', demo: false }; }
+  }
+  async function saveRuntimeConfig(cfg: { entry: string; demo: boolean }): Promise<void> {
+    await writeFile(runtimeConfigFile(), JSON.stringify(cfg, null, 2), 'utf8').catch(() => undefined);
+  }
+  async function loadRuntimeEntryOverride(): Promise<string> {
+    return (await loadRuntimeConfig()).entry;
   }
   async function saveRuntimeEntryOverride(entry: string): Promise<void> {
-    await writeFile(runtimeConfigFile(), JSON.stringify({ entry }, null, 2), 'utf8').catch(() => undefined);
+    await saveRuntimeConfig({ entry, demo: (await loadRuntimeConfig()).demo });
   }
 
-  function detectRealEntry(): string {
+  interface ExternalRuntime { entry: string; version: string; source: string }
+
+  /** 读包版本(package.json 的 version 字段;失败空串)。 */
+  function pkgVersionAt(dir: string): string {
+    try {
+      const v = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { version?: unknown };
+      return typeof v.version === 'string' ? v.version : '';
+    } catch { return ''; }
+  }
+  /** 读包名(同上;@hmharness/cli 布局识别用)。 */
+  function pkgNameAt(dir: string): string {
+    try {
+      const v = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name?: unknown };
+      return typeof v.name === 'string' ? v.name : '';
+    } catch { return ''; }
+  }
+
+  /** npm 安装的 @hmharness/cli → desktop-host 编译入口(嵌套与提升两种布局)。 */
+  function entryFromCliDir(cliDir: string): string {
+    const nested = join(cliDir, 'node_modules', '@hmharness', 'web', 'dist', 'desktop-host.js');
+    if (existsSync(nested)) return nested;
+    const hoisted = join(dirname(cliDir), 'web', 'dist', 'desktop-host.js');
+    if (existsSync(hoisted)) return hoisted;
+    return '';
+  }
+
+  /** 外部发现(供自动连接与向导检测页共用)。优先级:env > where hmh > npm
+   *  全局根 > 向导安装目录 ~/.hmharness-global > 源码仓扫描;同一层内
+   *  "已装 CLI(npm 布局)" 先于 "源码 repo 布局"。 */
+  function detectExternalRuntime(): ExternalRuntime {
     // 1) 环境变量显式覆盖(高级用户)
     const envEntry = process.env.HMH_DESKTOP_REAL_ENTRY;
-    if (envEntry !== undefined && envEntry !== '' && isAbsolute(envEntry)) return envEntry;
+    if (envEntry !== undefined && envEntry !== '' && isAbsolute(envEntry)) {
+      return { entry: envEntry, version: '', source: 'env' };
+    }
 
-    const repos = new Set<string>();
-    // 2) where hmh:npm link/全局安装的 bin → node_modules/hmharness → 真 repo(npm link 是 symlink)
+    const whereRepos = new Set<string>();
+    const whereClis: string[] = [];
+    const npmRepos = new Set<string>();
+    let npmCli = '';
+    // 2) where hmh:npm link(源码根布局)与 @hmharness/cli npm 安装布局
     try {
       const out = execFileSync('where', ['hmh'], { encoding: 'utf8', timeout: 4_000, windowsHide: true });
       for (const line of out.split(/\r?\n/)) {
         const bin = line.trim();
         if (bin === '') continue;
         try {
-          const linked = join(dirname(bin), 'node_modules', 'hmharness');
-          if (existsSync(linked)) repos.add(realpathSync(linked));
+          const binDir = dirname(bin);
+          const linked = join(binDir, 'node_modules', 'hmharness');
+          if (existsSync(linked)) whereRepos.add(realpathSync(linked));
+          const cli = join(binDir, 'node_modules', '@hmharness', 'cli');
+          if (existsSync(cli)) whereClis.push(cli);
         } catch { /* bin 布局不符,跳过 */ }
       }
     } catch { /* hmh 不在 PATH */ }
-    // 3) npm 全局根
+    // 3) npm 全局根(两种布局同 where)
     try {
       const out = execFileSync('npm', ['root', '-g'], { encoding: 'utf8', timeout: 6_000, windowsHide: true });
-      const p = join(out.trim(), 'hmharness');
-      if (existsSync(p)) repos.add(realpathSync(p));
+      const root = out.trim();
+      const linked = join(root, 'hmharness');
+      if (existsSync(linked)) npmRepos.add(realpathSync(linked));
+      const cli = join(root, '@hmharness', 'cli');
+      if (existsSync(cli)) npmCli = cli;
     } catch { /* npm 不可用 */ }
-    // 4) 常见源码位置(本机开发布局)
+
+    // 已装 CLI(@hmharness/cli npm 布局;desktop-host 为编译产物可直跑):
+    // where(PATH 真相)> npm 全局根 > 向导安装目录
+    for (const [cli, source] of [[whereClis[0] ?? '', 'where-hmh'], [npmCli, 'npm-global']] as Array<[string, string]>) {
+      if (cli === '') continue;
+      const entry = entryFromCliDir(cli);
+      if (entry !== '') return { entry, version: pkgVersionAt(cli), source };
+    }
+    const wizardEntry = resolveInstalledEntry(installTarget());
+    if (wizardEntry !== '') {
+      return { entry: wizardEntry, version: pkgVersionAt(join(installTarget(), 'node_modules', '@hmharness', 'cli')), source: 'wizard-install' };
+    }
+
+    // 源码 repo 布局(where > npm 全局 > 常见源码位置;命中须有入口与依赖)
+    const repos = new Set<string>([...whereRepos, ...npmRepos]);
     const bases = ['C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\', homedir(), join(homedir(), 'Developer')];
     for (const base of bases) {
       try {
@@ -484,12 +562,17 @@ if (!app.requestSingleInstanceLock()) {
         if (existsSync(p)) repos.add(p);
       } catch { /* 盘不存在 */ }
     }
-    // 命中的 repo 必须有 desktop-host 入口与依赖布局
     for (const repo of repos) {
       const entry = join(repo, 'packages', 'web', 'src', 'desktop-host.ts');
-      if (existsSync(entry) && existsSync(join(repo, 'node_modules'))) return entry;
+      if (existsSync(entry) && existsSync(join(repo, 'node_modules'))) {
+        return { entry, version: pkgVersionAt(repo), source: 'source-repo' };
+      }
     }
-    return '';
+    return { entry: '', version: '', source: '' };
+  }
+
+  function detectRealEntry(): string {
+    return detectExternalRuntime().entry;
   }
 
   /** 解析 runtime 入口所属的 hmharness 仓库根(packages/web/src|dist 上溯)。 */
@@ -514,26 +597,74 @@ if (!app.requestSingleInstanceLock()) {
     return join(app.isPackaged ? process.resourcesPath : join(repoRoot, 'apps', 'desktop', 'resources'), 'runtime', 'runtime.cjs');
   }
 
-  /** 发现顺序:显式覆盖 > 内置开关(HMH_DESKTOP_BUNDLED=1)> 外部发现
-     (dev 相邻仓库 / where hmh / npm 全局 / 源码位置)> 内置兜底。
-     外部优先=老用户继续用自己装的版本;内置=新机器装完直连真实内核,
-     不再落演示模式。HMH_DESKTOP_FAKE=1 仍强制演示(测试/冒烟)。 */
+  /** 内置 runtime 元信息(向导"内置精简内核"选项的版本标注)。 */
+  function bundledRuntimeInfo(): { ready: boolean; version: string } {
+    const repoRoot = join(here, '..', '..', '..', '..');
+    const p = bundledRuntimePath(repoRoot);
+    let version = '';
+    try {
+      const v = JSON.parse(readFileSync(join(dirname(p), 'package.json'), 'utf8')) as { version?: unknown };
+      version = typeof v.version === 'string' ? v.version : '';
+    } catch { /* 元数据缺失则只报 ready */ }
+    return { ready: existsSync(p), version };
+  }
+
+  /** npm 是否在 PATH(向导选择页 ① 的安装方式标注;where 快探,不做完整探测)。 */
+  function npmOnPath(): boolean {
+    try {
+      execFileSync('where', ['npm'], { encoding: 'utf8', timeout: 4_000, windowsHide: true });
+      return true;
+    } catch { return false; }
+  }
+
+  /* ---- 首启安装向导状态(v5.1) ---- */
+  const wizardFile = (): string => join(app.getPath('userData'), 'wizard.json');
+  async function loadWizardState(): Promise<{ done: boolean; choice: string }> {
+    try {
+      const v = JSON.parse(await readFile(wizardFile(), 'utf8')) as { done?: unknown; choice?: unknown };
+      return { done: v.done === true, choice: typeof v.choice === 'string' ? v.choice : '' };
+    } catch { return { done: false, choice: '' }; }
+  }
+  async function saveWizardState(choice: string): Promise<void> {
+    await writeFile(wizardFile(), JSON.stringify({ done: true, choice }, null, 2), 'utf8').catch(() => undefined);
+  }
+  /** 向导自动弹出抑制:测试/开发环境不弹(UIVERIFY/SNAPSHOT/RENDER_TEST/
+   *  DOMPROBE/SECURITY_TEST/FAKE/dev);HMH_DESKTOP_WIZARD_FORCE=1 强制弹(验收)。 */
+  function wizardSuppressed(): boolean {
+    if (process.env.HMH_DESKTOP_WIZARD_FORCE === '1') return false;
+    return isDev
+      || process.env.HMH_DESKTOP_UIVERIFY === '1'
+      || process.env.HMH_DESKTOP_SNAPSHOT !== undefined
+      || process.env.HMH_DESKTOP_RENDER_TEST === '1'
+      || process.env.HMH_DESKTOP_DOMPROBE === '1'
+      || process.env.HMH_DESKTOP_SECURITY_TEST === '1'
+      || process.env.HMH_DESKTOP_FAKE === '1';
+  }
+
+  /** 发现顺序:显式覆盖(含向导选择:外部入口/内置路径/演示)> 内置开关
+     (HMH_DESKTOP_BUNDLED=1)> 外部发现(dev 相邻仓库 / where hmh / npm 全局 /
+     向导安装目录 / 源码位置)> 内置兜底。外部优先=老用户继续用自己装的版本;
+     内置=新机器装完直连真实内核。HMH_DESKTOP_FAKE=1 或 runtime.json demo=true
+     (向导"演示模式"选择,持久)进演示。 */
   async function startHost(): Promise<void> {
     const repoRoot = join(here, '..', '..', '..', '..'); // apps/desktop/dist-electron/main → repo root
     const packaged = app.isPackaged;
-    const forceFake = process.env.HMH_DESKTOP_FAKE === '1';
+    const cfg = await loadRuntimeConfig();
+    const forceFake = process.env.HMH_DESKTOP_FAKE === '1' || cfg.demo;
     const forceBundled = process.env.HMH_DESKTOP_BUNDLED === '1';
-    const override = await loadRuntimeEntryOverride();
+    const override = cfg.entry;
     const adjacent = join(repoRoot, '..', 'hmharness', 'packages', 'web', 'src', 'desktop-host.ts');
     const bundled = bundledRuntimePath(repoRoot);
     const bundledReady = existsSync(bundled);
-    // 解析(结果归一:override/external=.ts 需 tsx;bundled=自包含 cjs 直跑)
+    // 解析(结果归一:override=bundled 路径→内置;源码 .ts 需 tsx;
+    // npm 安装 .js 编译产物直跑;bundled=自包含 cjs 直跑)
     let entry = '';
     useBundledRuntime = false;
     if (forceFake) {
       // 演示模式
     } else if (override !== '') {
       entry = override;
+      if (override === bundled) useBundledRuntime = true; // 向导选"内置精简内核"的持久形态
     } else if (forceBundled) {
       if (bundledReady) { entry = bundled; useBundledRuntime = true; }
       else logInfo('host', 'HMH_DESKTOP_BUNDLED=1 但内置 runtime 缺失(先跑 scripts/bundle-runtime.mjs)');
@@ -553,6 +684,13 @@ if (!app.requestSingleInstanceLock()) {
       spec = {
         command: process.execPath,
         args: [entry], // 自包含单文件:electron-as-node 直跑,无 tsx 无 repo
+        env: { ELECTRON_RUN_AS_NODE: '1' },
+      };
+    } else if (useReal && entry.endsWith('.js')) {
+      spec = {
+        command: process.execPath,
+        args: [entry], // npm 安装的编译产物:ESM 依赖按文件位置解析,直跑即可
+        cwd: dirname(entry),
         env: { ELECTRON_RUN_AS_NODE: '1' },
       };
     } else if (useReal) {
@@ -835,13 +973,18 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     // ---- hmharness runtime 连接(自动发现 + 手动覆盖 + 热切换) ----
-    ipcMain.handle('bridge:runtime-info', (event) => {
+    ipcMain.handle('bridge:runtime-info', async (event) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const d = detectExternalRuntime();
+      const cfg = await loadRuntimeConfig();
       return {
         mode: bridge.mode,
         runtimeEntry: bridge.runtimeEntry,
-        override: loadRuntimeEntryOverride(),
-        detected: detectRealEntry(),
+        override: cfg.entry,
+        demo: cfg.demo,
+        detected: d.entry,
+        detectedVersion: d.version,
+        detectedSource: d.source,
       };
     });
 
@@ -870,6 +1013,91 @@ if (!app.requestSingleInstanceLock()) {
       sseAbort?.abort();
       if (supervisor !== null) await supervisor.stop();
       await startHost();
+      return { ok: true, mode: bridge.mode };
+    });
+
+    // ---- v5.1 首启安装向导:本机检测 / 下载安装(进度事件) / 向导状态 ----
+    ipcMain.handle('bridge:detect-runtime', (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const info = bundledRuntimeInfo();
+      // UIVERIFY 向导步的"伪造未配置态":fake 模式下恒报未检测
+      // (真实检测路径由 real 变体验收,见 evidence/setup-wizard/)
+      if (process.env.HMH_DESKTOP_UIVERIFY_WIZARD === 'fake' && process.env.HMH_DESKTOP_FAKE === '1') {
+        return { found: false, version: '', entry: '', source: '', bundled: info, npm: npmOnPath() };
+      }
+      const d = detectExternalRuntime();
+      return { found: d.entry !== '', version: d.version, entry: d.entry, source: d.source, bundled: info, npm: npmOnPath() };
+    });
+
+    ipcMain.handle('bridge:install-cli', (event, opts: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const o = (opts ?? {}) as { forceTgz?: unknown; mirrorFirst?: unknown };
+      return startCliInstall(
+        {
+          sendProgress: (p: InstallProgress): void => {
+            logInfo('install', `${p.phase}${p.pct !== undefined ? ` ${p.pct}%` : ''} ${p.text}`);
+            for (const w of BrowserWindow.getAllWindows()) {
+              if (!w.isDestroyed()) w.webContents.send('install:progress', p);
+            }
+          },
+          log: (m: string): void => { logInfo('install', m); },
+          // 安装成功即持久化并热切换(向导随后收尾;中途取消也已生效)
+          onInstalled: (entry: string): void => {
+            void (async () => {
+              await saveRuntimeConfig({ entry, demo: false });
+              sseAbort?.abort();
+              if (supervisor !== null) await supervisor.stop();
+              await startHost();
+            })();
+          },
+        },
+        {
+          forceTgz: o.forceTgz === true,
+          mirrorFirst: o.mirrorFirst === 'npmmirror' ? 'npmmirror' : o.mirrorFirst === 'npmjs' ? 'npmjs' : undefined,
+        },
+      );
+    });
+
+    ipcMain.handle('bridge:get-wizard', async (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const variant = process.env.HMH_DESKTOP_UIVERIFY_WIZARD;
+      if (variant !== undefined && variant !== '') {
+        // 验收构造:强制向导可见且视为未配置(可重复跑);persisted=真实落盘
+        // 状态(向导步断言"选择持久"用,不影响 UI 判定)
+        const w = await loadWizardState();
+        return { done: false, choice: '', suppressed: false, persisted: { done: w.done, choice: w.choice } };
+      }
+      const w = await loadWizardState();
+      const cfg = await loadRuntimeConfig();
+      // 已配置过 runtime(手动入口/向导选择/演示)视同已完成首启
+      return { done: w.done || cfg.entry !== '' || cfg.demo, choice: w.choice, suppressed: wizardSuppressed() };
+    });
+
+    /** 向导收尾:持久化选择并应用(external/bundled→入口覆盖;demo→持久演示;
+     *  install→入口已由安装器持久化,只记状态)。fake/测试环境只记状态。 */
+    ipcMain.handle('bridge:wizard-complete', async (event, choice: unknown, entry: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const c = choice === 'external' || choice === 'install' || choice === 'bundled' || choice === 'demo' ? choice : '';
+      if (c === '') return { error: 'choice must be external|install|bundled|demo', code: 'BAD_REQUEST' };
+      const e = typeof entry === 'string' ? entry : '';
+      await saveWizardState(c);
+      if (process.env.HMH_DESKTOP_FAKE === '1') return { ok: true, mode: bridge.mode, test: true };
+      const repoRoot = join(here, '..', '..', '..', '..');
+      if (c === 'external' || c === 'bundled') {
+        const target = c === 'bundled' ? bundledRuntimePath(repoRoot) : e;
+        if (target === '' || !isAbsolute(target) || !existsSync(target)) {
+          return { error: 'runtime 入口不存在', code: 'BAD_REQUEST' };
+        }
+        await saveRuntimeConfig({ entry: target, demo: false });
+      } else if (c === 'demo') {
+        await saveRuntimeConfig({ entry: '', demo: true });
+      }
+      if (c !== 'install') {
+        // install:安装器已在 onInstalled 持久化并热切换,这里不再重启
+        sseAbort?.abort();
+        if (supervisor !== null) await supervisor.stop();
+        await startHost();
+      }
       return { ok: true, mode: bridge.mode };
     });
 
@@ -1170,7 +1398,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'chromeTheme', 'cognitive', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'inject', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onMenuAction', 'onStreamChunks', 'pickDirectory', 'pickFiles', 'popupMainMenu', 'providerSave', 'providers', 'remoteWebAutostart', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['applyUpdate', 'approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'checkUpdate', 'chromeTheme', 'cognitive', 'detectRuntime', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'getWizard', 'inject', 'installCli', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onInstallProgress', 'onMenuAction', 'onStreamChunks', 'onUpdateState', 'pickDirectory', 'pickFiles', 'popupMainMenu', 'providerSave', 'providers', 'remoteWebAutostart', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'wizardComplete', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];

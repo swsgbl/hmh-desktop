@@ -86,6 +86,47 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
   });
 
   if (mode === 'fake') {
+    /* ========== fake(向导构造,HMH_DESKTOP_UIVERIFY_WIZARD=fake):
+       伪造未配置态 → 向导出现 → 检测(未装)→ 选择 → 内置 → 连上 ========== */
+    if (process.env.HMH_DESKTOP_UIVERIFY_WIZARD === 'fake') {
+      await step('向导:首启弹出欢迎页(开始配置/演示入口)', async () => {
+        const w = await waitFor('wizard overlay', `var o=document.querySelector('.wizard-overlay');
+          var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始配置';});
+          return {ok: !!o && !!b, detail: o ? 'overlay+开始配置' : 'no overlay'};`, 12_000);
+        await shot('wizard-welcome');
+        return w;
+      });
+      await step('向导:开始配置→检测(伪造未装)→自动进选择页(三选一+全局配置提示)', async () => {
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始配置';}); if(b) b.click(); })()`);
+        const w = await waitFor('select page', `var p=document.querySelector('.wizard-card.wizard-page-select');
+          if(!p) return {ok:false, detail:'not on select'};
+          var t=p.textContent;
+          var o1=t.indexOf('下载安装完整 hmh CLI')>=0, o2=t.indexOf('使用内置精简内核')>=0, o3=t.indexOf('跳过(演示模式)')>=0, note=t.indexOf('.hmharness')>=0;
+          return {ok: o1&&o2&&o3&&note, detail: 'opt1='+o1+' opt2='+o2+' opt3='+o3+' note='+note};`, 12_000);
+        await shot('wizard-select');
+        return w;
+      });
+      await step('向导:选内置精简内核→配置跳过→完成页→开始使用→关闭且已连接', async () => {
+        await js(`(function(){ var o=[].slice.call(document.querySelectorAll('.wizard-opt')).find(function(x){return x.textContent.indexOf('使用内置精简内核')>=0;}); if(o) o.click(); })()`);
+        await sleep(300);
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='下一步'||x.textContent.trim()==='开始安装';}); if(b) b.click(); })()`);
+        // 配置页:fake providers 已有密钥 → 自动跳过;兜底点"跳过"
+        await waitFor('config or done', `var d=document.querySelector('.wizard-card.wizard-page-done');
+          if(d) return {ok:true, detail:'done'};
+          var c=document.querySelector('.wizard-card.wizard-page-config');
+          if(c){ var s=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.indexOf('跳过')>=0;}); if(s) s.click(); }
+          return {ok:false, detail:'waiting'};`, 15_000);
+        const w = await waitFor('done page', `var d=document.querySelector('.wizard-card.wizard-page-done');
+          var t=d?d.textContent:'';
+          return {ok: !!d && t.indexOf('就绪')>=0 && t.indexOf('共享')>=0, detail: t.replace(/\\s+/g,' ').slice(0,60)};`, 8_000);
+        await shot('wizard-done');
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始使用';}); if(b) b.click(); })()`);
+        const closed = await waitFor('wizard closed + connected', `return {ok: !document.querySelector('.wizard-overlay') && !!document.querySelector('.host-dot.on'),
+          detail: 'overlay='+(document.querySelector('.wizard-overlay')?'open':'closed')+' dot='+(document.querySelector('.host-dot.on')?'on':'off')};`, 10_000);
+        return [w[0] && closed[0], `done: ${w[1]}; ${closed[1]}`];
+      });
+    }
+
     /* ========== fake:首跑引导层 ========== */
     await step('引导层:演示模式提示出现并可关闭', async () => {
       const w = await waitFor('guide', `var g=document.querySelector('.runtime-guide'); return {ok: !!g, detail: g ? 'shown' : 'not shown'};`, 8_000);
@@ -444,6 +485,102 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         return {ok: c >= 1, detail: 'chips='+c};`, 5_000);
     });
 
+    /* ========== fake(向导构造):设置「重新配置」重入 + 选择持久 ========== */
+    if (process.env.HMH_DESKTOP_UIVERIFY_WIZARD === 'fake') {
+      await step('向导:设置「重新配置」重入 + 选择持久(wizard.json)', async () => {
+        await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'p', ctrlKey:true, shiftKey:true, bubbles:true}))`);
+        const open = await waitFor('settings open', `var s=document.querySelector('.cmdk.settings');
+          return {ok: !!s, detail: s ? 'open' : 'closed'};`, 5_000);
+        if (!open[0]) return open;
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.cmdk.settings button')).find(function(x){return x.textContent.indexOf('重新配置')>=0;}); if(b) b.click(); })()`);
+        const shown = await waitFor('wizard reopened', `return {ok: !!document.querySelector('.wizard-overlay'),
+          detail: document.querySelector('.wizard-overlay') ? 'open' : 'closed'};`, 5_000);
+        if (!shown[0]) return shown;
+        await shot('wizard-reentry');
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='取消';}); if(b) b.click(); })()`);
+        const closed = await waitFor('wizard closed', `return {ok: !document.querySelector('.wizard-overlay'), detail: 'closed'};`, 5_000);
+        const st = (await js(`window.hmh.getWizard().then(function(r){return JSON.stringify(r);})`)) as string;
+        const p = JSON.parse(st) as { persisted?: { done?: boolean; choice?: string } };
+        const persisted = p.persisted?.done === true && p.persisted?.choice === 'bundled';
+        return [closed[0] && persisted, `closed=${closed[0]} persisted=${JSON.stringify(p.persisted ?? null)}`];
+      });
+    }
+
+    await shot('final');
+  } else if ((process.env.HMH_DESKTOP_UIVERIFY_WIZARD ?? '') !== '') {
+    /* ========== real(向导构造,互斥于常规 real 步骤):
+       WZ2 本机真实检测(默认共享页)/ WZ3 下载安装实测 ========== */
+    if (process.env.HMH_DESKTOP_UIVERIFY_WIZARD === 'detect') {
+      await step('向导(真实):欢迎→检测到本机已装 CLI(默认共享,勾选正确)', async () => {
+        const w = await waitFor('wizard overlay', `var o=document.querySelector('.wizard-overlay');
+          var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始配置';});
+          return {ok: !!o && !!b, detail: o ? 'overlay+开始配置' : 'no overlay'};`, 12_000);
+        if (!w[0]) return w;
+        await shot('wizard-real-welcome');
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始配置';}); if(b) b.click(); })()`);
+        const found = await waitFor('detect found', `var p=document.querySelector('.wizard-card.wizard-page-detect');
+          if(!p) return {ok:false, detail:'detect page not shown'};
+          var t=p.textContent;
+          var ok1=t.indexOf('检测到已安装 hmharness v')>=0;
+          var ok2=t.indexOf('默认共享使用它(推荐)')>=0;
+          var radio=p.querySelector('.wizard-opt.on');
+          return {ok: ok1&&ok2&&!!radio, detail: t.replace(/\\s+/g,' ').slice(0,90)};`, 20_000);
+        await shot('wizard-real-detect');
+        return found;
+      });
+    } else if (process.env.HMH_DESKTOP_UIVERIFY_WIZARD === 'install') {
+      await step('向导(真实):检测→仍要下载新版→选择①→进入安装页', async () => {
+        const w = await waitFor('wizard overlay', `var o=document.querySelector('.wizard-overlay');
+          return {ok: !!o, detail: o ? 'open' : 'closed'};`, 12_000);
+        if (!w[0]) return w;
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始配置';}); if(b) b.click(); })()`);
+        const found = await waitFor('detect found', `var p=document.querySelector('.wizard-card.wizard-page-detect');
+          return {ok: !!p && p.textContent.indexOf('检测到已安装 hmharness v')>=0, detail: p ? p.textContent.replace(/\\s+/g,' ').slice(0,60) : 'no detect page'};`, 20_000);
+        if (!found[0]) return found;
+        await js(`(function(){ var o=[].slice.call(document.querySelectorAll('.wizard-opt')).find(function(x){return x.textContent.indexOf('仍要下载新版')>=0;}); if(o) o.click(); })()`);
+        await sleep(200);
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='下一步';}); if(b) b.click(); })()`);
+        const sel = await waitFor('select page ① on', `var p=document.querySelector('.wizard-card.wizard-page-select');
+          var on=p?p.querySelector('.wizard-opt.on'):null;
+          return {ok: !!p && !!on && on.textContent.indexOf('下载安装完整 hmh CLI')>=0, detail: p ? 'select ① on' : 'no select'};`, 8_000);
+        if (!sel[0]) return sel;
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始安装';}); if(b) b.click(); })()`);
+        return waitFor('install page', `var p=document.querySelector('.wizard-card.wizard-page-install');
+          return {ok: !!p, detail: p ? 'installing' : 'not shown'};`, 8_000);
+      });
+      await step('向导(真实):安装进度可见(步骤文案/下载百分比滚动)', async () => {
+        const w = await waitFor('progress visible', `var bar=document.querySelector('.wizard-progress');
+          var log=document.querySelector('.wizard-install-log');
+          var lines=log?log.textContent.split('\\n').filter(function(x){return x.trim()!=='';}):[];
+          return {ok: !!bar && lines.length>=1, detail: 'bar='+(bar?'y':'n')+' lines='+lines.length+(lines.length>0?(' last='+(lines[lines.length-1]||'').slice(0,50)):'')};`, 60_000);
+        await shot('wizard-real-install');
+        return w;
+      });
+      await step('向导(真实):安装完成→配置跳过(已有密钥)→完成页→开始使用→新 runtime 连接', async () => {
+        // 安装全程(npm 解析+下载+落盘;镜像 npmmirror 通常 <2 分钟),上限 8 分钟
+        await waitFor('done page', `var d=document.querySelector('.wizard-card.wizard-page-done');
+          if(d) return {ok:true, detail:'done'};
+          var c=document.querySelector('.wizard-card.wizard-page-config');
+          if(c){ var s=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.indexOf('跳过')>=0;}); if(s) s.click(); }
+          var err=document.querySelector('.wizard-error');
+          if(err) return {ok:false, detail:'install error: '+err.textContent.slice(0,80)};
+          return {ok:false, detail:'installing…'};`, 8 * 60_000);
+        const w = await waitFor('done ready text', `var d=document.querySelector('.wizard-card.wizard-page-done');
+          var t=d?d.textContent:'';
+          return {ok: !!d && t.indexOf('就绪')>=0, detail: t.replace(/\\s+/g,' ').slice(0,60)};`, 10_000);
+        if (!w[0]) return w;
+        await shot('wizard-real-done');
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始使用';}); if(b) b.click(); })()`);
+        const connected = await waitFor('new runtime connected', `var dot=document.querySelector('.host-dot.on');
+          var l=document.querySelector('.host-label');
+          return {ok: !!dot && !!l && l.textContent.indexOf('runtime')>=0, detail: 'dot='+(dot?'on':'off')+' label='+(l?l.textContent.replace(/\\s+/g,' ').slice(0,50):'none')};`, 60_000);
+        const st = (await js(`window.hmh.getState().then(function(r){return JSON.stringify({mode:r.mode, runtimeEntry:r.runtimeEntry});})`)) as string;
+        const p = JSON.parse(st) as { mode?: string; runtimeEntry?: string | null };
+        const entryOk = (p.runtimeEntry ?? '').indexOf('.hmharness-global') >= 0;
+        await shot('wizard-real-final');
+        return [connected[0] && entryOk, `connected: ${connected[1]}; state=${st.slice(0, 90)}`];
+      });
+    }
     await shot('final');
   } else {
     /* ========== real:只读子集(不动真实会话) ========== */

@@ -1,0 +1,12 @@
+{
+  "name": "@hmh-desktop/cli-installer",
+  "version": "0.1.0-alpha.0",
+  "private": true,
+  "description": "HMH Desktop CLI 安装核心 — @hmharness/cli 依赖闭包解析、semver 范围匹配、registry 镜像地址派生与 node_modules 布局(纯逻辑,无 IO,供主进程安装器复用)。",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
