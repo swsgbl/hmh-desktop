@@ -156,6 +156,108 @@ if (!app.requestSingleInstanceLock()) {
       }
     }
   }
+
+  /* ---- 应用内更新(2026-10-26:自研轻量更新器,零依赖;GitHub Releases 通道)
+     流程:☰"检查更新"→ fetch latest release tag → 比版本 → 后台下载 Setup
+     exe 到临时目录 → 菜单变"重启并安装更新"→ 退出应用后 NSIS /S /D=原目录
+     静默覆盖安装(下次启动即新版)。无签名证书阶段可用;正式签名后可加校验。 */
+  const UPDATE_REPO = 'swsgbl/hmh-desktop';
+  interface UpdateState { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string }
+  let updateState: UpdateState = { checking: false, currentVersion: app.getVersion(), latest: null, notes: '', downloaded: false, error: '' };
+  let installerPath: string | null = null;
+  const bumpUpdate = (patch: Partial<UpdateState>): void => {
+    updateState = { ...updateState, ...patch };
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) w.webContents.send('update:state', updateState);
+    }
+  };
+  const cmpVersion = (a: string, b: string): number => {
+    const pa = a.replace(/^v/, '').split('.').map(Number);
+    const pb = b.replace(/^v/, '').split('.').map(Number);
+    for (let i = 0; i < 3; i++) { if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0) ? -1 : 1; }
+    return 0;
+  };
+  async function checkForUpdates(): Promise<UpdateState> {
+    if (updateState.checking || updateState.downloaded) return updateState;
+    bumpUpdate({ checking: true, error: '' });
+    logInfo('update', `checking… (current v${app.getVersion()})`);
+    try {
+      const r = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+        headers: { 'user-agent': 'hmh-desktop-updater' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+      const rel = (await r.json()) as { tag_name?: string; body?: string; assets?: Array<{ name: string; browser_download_url: string; size: number }> };
+      const tag = String(rel.tag_name ?? '');
+      logInfo('update', `latest=${tag} assets=${(rel.assets ?? []).length}`);
+      bumpUpdate({ checking: false, latest: tag, notes: String(rel.body ?? '').slice(0, 600) });
+      // 有新版且未下载过 → 后台下载安装包
+      if (tag !== '' && cmpVersion(app.getVersion(), tag) < 0 && !updateState.downloaded) {
+        void downloadInstaller(rel.assets ?? []);
+      }
+    } catch (err) {
+      logInfo('update', `check failed: ${String(err).slice(0, 140)}`);
+      bumpUpdate({ checking: false, error: String(err).slice(0, 120) });
+    }
+    return updateState;
+  }
+  async function downloadInstaller(assets: Array<{ name: string; browser_download_url: string; size: number }>): Promise<void> {
+    try {
+      const asset = assets.find((a) => /^HMH-Desktop-Setup-.*\.exe$/i.test(a.name)) ?? assets.find((a) => a.name.endsWith('.exe'));
+      if (asset === undefined) { bumpUpdate({ error: 'release 无安装包资产' }); return; }
+      const dest = join(app.getPath('temp'), asset.name);
+      // github.com 直连在部分网络超时 → 镜像回退链(实测 ghfast/gh-proxy 可用)
+      const mirrors = [
+        asset.browser_download_url,
+        `https://ghfast.top/${asset.browser_download_url}`,
+        `https://gh-proxy.com/${asset.browser_download_url}`,
+        `https://ghproxy.cn/${asset.browser_download_url}`,
+      ];
+      let buf: Buffer | null = null;
+      let lastErr = '';
+      for (const u of mirrors) {
+        try {
+          logInfo('update', `trying ${new URL(u).host}…`);
+          const r = await fetch(u, { signal: AbortSignal.timeout(600_000) });
+          if (!r.ok) { lastErr = `HTTP ${r.status}`; logInfo('update', `→ HTTP ${r.status}`); continue; }
+          buf = Buffer.from(await r.arrayBuffer());
+          if (buf.length > 1_000_000) { logInfo('update', `→ ok ${Math.round(buf.length / 1e6)}MB`); break; }
+          lastErr = '内容异常'; buf = null;
+        } catch (err) {
+          const e = err as { cause?: { code?: unknown } };
+          lastErr = String(e.cause?.code ?? err).slice(0, 60);
+          logInfo('update', `→ fail ${lastErr}`);
+        }
+      }
+      if (buf === null) throw new Error(`全部下载通道失败(${lastErr})`);
+      const { writeFile: wf } = await import('node:fs/promises');
+      await wf(dest, buf);
+      installerPath = dest;
+      bumpUpdate({ downloaded: true });
+      logInfo('update', `已下载 ${asset.name}(${Math.round(buf.length / 1e6)}MB) → ${dest}`);
+    } catch (err) {
+      bumpUpdate({ error: `下载失败: ${String(err).slice(0, 120)}` });
+    }
+  }
+  function applyUpdate(): void {
+    if (installerPath === null) return;
+    // 退出当前应用后由安装器静默覆盖安装(装回原目录)。NSIS assisted 规则:
+    // /S 且 /D=path 必须最后一个参数、值不加引号(含空格也不加)——node spawn
+    // 默认会给含空格参数加引号导致 NSIS 解析错路径(实测装坏目录),故用
+    // windowsVerbatimArguments 原样传递。
+    const installDir = dirname(process.execPath);
+    const child = spawn(`"${installerPath}" /S /D=${installDir}`, {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      shell: false,
+      windowsVerbatimArguments: true,
+    });
+    child.unref();
+    logInfo('update', `apply: ${installerPath} → ${installDir}`);
+    app.exit(0);
+  }
+
   function buildAppMenu(): void {
     // 精简:只保留 UI 没有的系统级能力(剪贴板/窗口);其余唯一入口在 UI。
     const template: Array<Electron.MenuItemConstructorOptions> = [
@@ -200,13 +302,31 @@ if (!app.requestSingleInstanceLock()) {
       { label: '手机远程控制', click: (): void => send('open-remote') },
       { type: 'separator' },
       {
+        label: updateState.downloaded ? `重启并安装更新(v${updateState.latest ?? '?'})` : '检查更新…',
+        click: (): void => {
+          if (updateState.downloaded) { applyUpdate(); return; }
+          void checkForUpdates().then((st) => {
+            const newer = st.latest !== null && cmpVersion(st.currentVersion, st.latest) < 0;
+            const detail = newer ? `${st.notes}\n\n安装包正在后台下载,完成后 ☰ 菜单会出现"重启并安装更新"。` : '';
+            void dialog.showMessageBox(win, {
+              type: 'info',
+              title: '检查更新',
+              message: newer
+                ? `发现新版本 v${st.latest}!`
+                : (st.error !== '' ? `检查失败:${st.error}` : `已是最新版本(v${st.currentVersion})`),
+              detail,
+            });
+          });
+        },
+      },
+      {
         label: '关于 HMH Desktop',
         click: (): void => {
           void dialog.showMessageBox(win, {
             type: 'info',
             title: '关于 HMH Desktop',
             message: 'HMH Desktop',
-            detail: `本地优先的 HMH Agent 图形工作台\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}\n模式: ${bridge.mode === 'real' ? '真实 hmharness' : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
+            detail: `本地优先的 HMH Agent 图形工作台 v${app.getVersion()}\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}\n模式: ${bridge.mode === 'real' ? '真实 hmharness' : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
           });
         },
       },
@@ -511,6 +631,18 @@ if (!app.requestSingleInstanceLock()) {
       const n = typeof name === 'string' ? name.trim().slice(0, 80) : '';
       if (n === '') return Promise.resolve({ error: 'name required', code: 'BAD_REQUEST' });
       return hostCall(event, (c) => c.postJson<{ ok: boolean; model?: string }>('/api/model', { name: n }));
+    });
+
+    // ---- 应用内更新(GitHub Releases;自研零依赖更新器) ----
+    ipcMain.handle('bridge:check-update', async (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      return checkForUpdates();
+    });
+    ipcMain.handle('bridge:apply-update', (event) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      if (installerPath === null) return { error: 'no installer downloaded', code: 'HOST_NOT_READY' };
+      applyUpdate();
+      return { ok: true };
     });
 
     // ---- 标题栏主题同步(浅色模式不再有黑条)+ ☰ 主菜单 ----
@@ -858,6 +990,8 @@ if (!app.requestSingleInstanceLock()) {
     app.setAppUserModelId('dev.hmh.desktop');
     setupTray();
     buildAppMenu();
+    // 启动 30s 后静默检查更新(有新版仅后台下载,不打扰;用户经 ☰ 菜单决定装)
+    if (app.isPackaged) setTimeout(() => { void checkForUpdates(); }, 30_000);
     // CSP(dev 与 prod 不同;prod 不允许任何远程源)
     const csp = isDev
       ? [

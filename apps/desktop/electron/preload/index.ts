@@ -68,6 +68,17 @@ const bridge = {
   popupMainMenu(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:popup-main-menu');
   },
+  checkUpdate(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:check-update');
+  },
+  applyUpdate(): Promise<unknown> {
+    return ipcRenderer.invoke('bridge:apply-update');
+  },
+  onUpdateState(cb: (st: { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string }) => void): () => void {
+    const listener = (_e: Electron.IpcRendererEvent, st: unknown): void => cb(st as Parameters<typeof cb>[0]);
+    ipcRenderer.on('update:state', listener);
+    return () => ipcRenderer.removeListener('update:state', listener);
+  },
   fsSearch(q: string): Promise<unknown> {
     return ipcRenderer.invoke('bridge:fs-search', q);
   },
