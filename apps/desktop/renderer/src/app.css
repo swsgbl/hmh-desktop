@@ -139,9 +139,10 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .ws-group-caret { font-size: var(--hmh-font-size-xs); }
 .ws-bar-caret { font-size: var(--hmh-font-size-xs); }
 .session-export { width: 30px; font-size: 15px; }
-/* 输入族:高 32、8px 圆角、1px border-l2、focus 变品牌边(DSH §3) */
+/* 输入族:高 32、8px 圆角、1px border-l2、focus 变品牌边(DSH §3);
+   HIG P2(RFC §2.1):次要控件文字用 subtle 档 13/20 */
 .session-search, .status-filter {
-  margin-top: 6px; min-height: 32px; padding: 5px 10px; font: 13px/18px var(--hmh-font-ui);
+  margin-top: 6px; min-height: 32px; padding: 5px 10px; font: var(--hmh-font-size-subtle)/var(--hmh-line-height-subtle) var(--hmh-font-ui);
   background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
   border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); outline: none;
 }
@@ -185,7 +186,8 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 }
 .turn.user { align-self: flex-end; background: var(--hmh-user-turn-bg); }
 .turn.system { border-color: var(--hmh-state-error); }
-.turn-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: var(--hmh-font-size-sm); line-height: var(--hmh-line-height-sm); }
+/* HIG P2(RFC §2.1):会话正文/最终答案升 body 档 15/23(旧 sm=14/22 保留为底层) */
+.turn-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: var(--hmh-font-size-body); line-height: var(--hmh-line-height-body); }
 .status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--hmh-font-size-xs); margin-bottom: 6px; }
 .status-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .status-running { color: var(--hmh-status-running); }
@@ -321,7 +323,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; gap: 12px; }
 .settings-row > span { font-size: var(--hmh-font-size-sm); }
 .seg { display: flex; border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); overflow: hidden; background: var(--hmh-bg-layer-1); }
-.seg button { padding: 4px 12px; font-size: 13px; color: var(--hmh-label-secondary); }
+.seg button { padding: 4px 12px; font-size: var(--hmh-font-size-subtle); color: var(--hmh-label-secondary); }
 .seg button:hover { background: var(--hmh-interactive-bg-hover); }
 .seg button.on { background: var(--hmh-brand-primary); color: #fff; }
 .settings-note { padding: 6px 14px 12px; font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
@@ -332,13 +334,13 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 
 /* Provider 设置 */
 .provider-list { padding: 0 14px; display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; }
-.provider-row { display: flex; gap: 10px; font-size: 13px; align-items: baseline; }
+.provider-row { display: flex; gap: 10px; font-size: var(--hmh-font-size-subtle); align-items: baseline; }
 .provider-name { font-weight: 600; min-width: 70px; }
 .provider-model { color: var(--hmh-label-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .provider-key { font: var(--hmh-font-size-xs) var(--hmh-font-mono); color: var(--hmh-state-success); }
 .provider-form { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px 4px; }
 .provider-form input {
-  flex: 1 1 45%; min-height: 32px; padding: 5px 10px; font: 13px/18px var(--hmh-font-ui);
+  flex: 1 1 45%; min-height: 32px; padding: 5px 10px; font: var(--hmh-font-size-subtle)/var(--hmh-line-height-subtle) var(--hmh-font-ui);
   background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
   border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); outline: none;
 }
@@ -347,7 +349,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* 工作区选择器 */
 .ws-picker { display: flex; flex-direction: column; gap: 6px; }
 .ws-picker select {
-  min-height: 32px; padding: 5px 8px; font: 13px/18px var(--hmh-font-ui);
+  min-height: 32px; padding: 5px 8px; font: var(--hmh-font-size-subtle)/var(--hmh-line-height-subtle) var(--hmh-font-ui);
   background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
   border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); outline: none;
 }
