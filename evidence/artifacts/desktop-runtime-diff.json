@@ -1,0 +1,137 @@
+{
+  "schema": "hmh-desktop/desktop-runtime-diff@1",
+  "generatedAtUtc": "2026-10-27T13:36:23.097Z",
+  "harnessRoot": "G:\\hmharness",
+  "fromRef": "v0.23.40",
+  "toRef": "main",
+  "bundleInputs": {
+    "total": 228,
+    "packages": [
+      "agent",
+      "browser",
+      "cognitive",
+      "domain-harmony",
+      "domain-ops",
+      "evolution",
+      "extension",
+      "kernel",
+      "lsp",
+      "observability",
+      "sandbox",
+      "web"
+    ]
+  },
+  "changedFilesTotal": 62,
+  "changedFilesInDesktopBundle": [
+    "packages/extension/src/adapters.ts",
+    "packages/kernel/src/config.ts",
+    "packages/sandbox/src/broker.ts",
+    "packages/sandbox/src/index.ts",
+    "packages/sandbox/src/microvm.ts",
+    "packages/sandbox/src/provider.ts",
+    "packages/sandbox/src/trust.ts"
+  ],
+  "commits": [
+    {
+      "hash": "566f10c",
+      "subject": "chore(release): v0.23.43 — 沙箱隔离诚实化+fail-closed+演化守护30min+FALLBACK_PINS 15名(993测试;钉版44+板级15钉全同步;PR#24四轮CI攻坚含守护进程预热致探测分裂的根修)",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "1714cd0",
+      "subject": "fix(sandbox): 隔离判定单一证据源——probe/detect 双探测分裂根除(PR#24 第三次 CI 失败)",
+      "desktopFiles": [
+        "packages/sandbox/src/microvm.ts"
+      ],
+      "affectsDesktop": true
+    },
+    {
+      "hash": "f7fba88",
+      "subject": "test(sandbox): detectHighestIsolation 断言机器常量→关系不变量(PR#24 CI 第二次失败)",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "f0e22a5",
+      "subject": "fix(sandbox): Docker 前置断言环境守卫(PR#24 CI 修复)",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "262eca3",
+      "subject": "feat(evidence): 血缘索引页+三目录 provenance-manifest+门面诚实化(任务A收尾集成)——evidence-provenance.html(标签期/观测期/导出时间/首次入库/源commit/逐文件sha256)、manifest v2 全字段、llms 两文件如实标注预写标签目录(导出后无新数据);审计器15/15+strict全OK",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "21e6fa8",
+      "subject": "feat(evidence): 导出器固化 provenance manifest,活页显示事件覆盖/导出时间/源 commit/指纹",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "08b1473",
+      "subject": "feat(evidence): provenance 语义 v2——目录标签=计划标签,数据内容定观测期,正确性/新鲜度分离",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "0cd8429",
+      "subject": "fix(sandbox): 隔离声明诚实化+fail-closed 执行门禁(Issue #21 P0)——MicroVMSandboxProvider 的 Docker 兜底谎言根除:旧行为 firecracker 不在时只要 docker info 通就 isAvailable()=true,exec 实跑 docker run 却顶着\"最强隔离 tier\"名号;copyIn/copyOut 直接 copyFile 宿主文件系统(零边界的越权写);snapshot 返回哈希字符串/restore 空操作(假 API)。现:isAvailable() 仅真实 hypervisor 启动并通过 boot 自测才 true(自测未实现→所有机器恒 false,Docker-only 明确不可用);exec/copyIn/copyOut/snapshot/restore 全部 fail closed 抛结构化 IsolationGateError(报期望隔离级别+实际可用最高级别+remediation,toJSON 三端一致)。新增 trust.ts:TrustLevel(process/worker/container/real-microvm)四档 CapabilityContract(boundary/escapeVectors/secretsInherit 全部 pin 为 source-level fact:process 档如实声明继承宿主全环境;container 档如实声明共享内核+同路径 volume 直通宿主;worker 档 pin dynamic-import 声明 bypass 与 cognitive SANDBOX_BYPASS_VECTORS 互为镜像)。broker 新增 assertExecutionGate(critical 决策遇 container-only 机器必炸,worker 档由 Node runtime 自带墙永不 gate);detectHighestIsolation() 探测永不谎报 microvm。红队反剧场加强 R9-R11:declared bypass 必须实证真实后果(node:net 连通 loopback/宿主文件可读/node:child_process 可起宿主子进程),向量不悄悄删。真实 VM 路径标 NEEDS-DATA(本机无 Firecracker)。SandboxBackend 扩展 firecracker/cloud-hypervisor 声明位。全量 972/973(1 失败为 agent git checkpoint tar C: 盘符被 GNU tar 当主机名的既有环境问题,与本改动零交集,双跑稳定复现+bsdtar 归因)",
+      "desktopFiles": [
+        "packages/sandbox/src/broker.ts",
+        "packages/sandbox/src/index.ts",
+        "packages/sandbox/src/microvm.ts",
+        "packages/sandbox/src/provider.ts",
+        "packages/sandbox/src/trust.ts"
+      ],
+      "affectsDesktop": true
+    },
+    {
+      "hash": "08e96f4",
+      "subject": "fix(board): FALLBACK_PINS 补全 15 包——离线路径 cognitive 等 5 包 pins[n]=undefined 会下载 <name>-undefined.tgz 404 直接 INSTALL FAILED,与安装器注释承诺(离线不可产生不完整树)矛盾;publish.cjs 0b 同步模板同步扩到 15 名,并新增钉名覆盖断言(cli 声明集 ⊆ pins 名集,缺失即发版失败),防未来新增包重演。证据: cli 0.23.42 dependencies 声明 14 个 @hmharness/*(registry 实证 15/15 同版本),PACKAGES floor 已是 15 名。两份孪生副本同步修改,仍逐字节等价。",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "5acd3fe",
+      "subject": "test(evidence): add dated evidence provenance audit and regression tests",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "652f543",
+      "subject": "fix(cli): 演化守护周期超时 600s→30min——修复后真实 evolve 周期(40+ 真实调用,20min 实测)超旧上限被恰 600s 击杀;401 时代秒完从未暴露",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "b1bc38f",
+      "subject": "fix(ci): preflight 超时 600s→30min——CI runner 全量测试 8m54s 惊险过关后超 10min 被 execSync 静默击杀(恰+600s 无 FAIL 输出),误读为测试失败;v0.23.42 从未到 npm,修复后 workflow_dispatch 重发",
+      "desktopFiles": [],
+      "affectsDesktop": false
+    },
+    {
+      "hash": "39951c9",
+      "subject": "fix(release): 钉版事故修复——44 根跨包依赖钉同步 0.23.42(0.23.40/0.23.41 混合版本出厂,两轮根修从未到达用户);版本一致性门禁升级为钉版硬检查;本地 pack 逐包钉值复核 43/43",
+      "desktopFiles": [
+        "packages/extension/src/adapters.ts"
+      ],
+      "affectsDesktop": true
+    },
+    {
+      "hash": "5515994",
+      "subject": "fix(kernel): /evolve 401 根修——loadConfig 派生顶层 provider(化石 key 永不出厂)+TUI /bench /evolve 目的路由解析;附扩展真机测试僵尸进程精确清扫+firefox 子测试定序最前(954 测试,946+1环境跳过全量/扩展 8/8 两遍)",
+      "desktopFiles": [
+        "packages/kernel/src/config.ts"
+      ],
+      "affectsDesktop": true
+    }
+  ],
+  "npmDependenciesBundled": [
+    "qrcode",
+    "dijkstrajs",
+    "pngjs"
+  ]
+}
