@@ -1,0 +1,90 @@
+{
+  "schema": "hmh-desktop/version-manifest@1",
+  "generatedAtUtc": "2026-10-27T13:35:00Z",
+  "generator": "任务 E(跨仓库发布工件一致性验证,2026-10-27)人工汇总 + 机器证据;E-finish 收尾轮在 0.23.43 发版后全量实跑刷新",
+  "objects": {
+    "harness-source-main": {
+      "what": "hmharness 源码 main 分支",
+      "version": "0.23.43(已发版:main HEAD 即 v0.23.43 发版提交,无未发版代码)",
+      "commit": "566f10c",
+      "evidence": [
+        "git log --oneline -1 G:\\hmharness: 566f10c chore(release): v0.23.43——沙箱隔离诚实化+fail-closed+演化守护30min+FALLBACK_PINS 15名(2026-10-27 实查)",
+        "PR#24(sandbox/trust-tiers-2026-10-27)与 PR#25(kaihongos/fallback-pins-fullset)均已合并入 main 并随 0.23.43 出厂"
+      ],
+      "notes": "任务书写作时(main=0152908)列出的候载修复现均已在 0.23.43 出厂:演化守护 30min(652f543)、FALLBACK_PINS 15 名(08e96f4,原在本地分支现已并入)。原『等 0.23.43 列车』的前提已满足"
+    },
+    "npm-latest": {
+      "what": "npm registry @hmharness/* latest",
+      "version": "0.23.43",
+      "evidence": [
+        "evidence/artifacts/artifact-manifest-0.23.43.json:16/16 包 PASS(147 checks,0 failures;E-finish 轮在线下载解包实跑)",
+        "registry dist-tags.latest=0.23.43(2026-10-27 实查,npm view @hmharness/cli dist-tags)"
+      ],
+      "notes": "16 包=cli 闭包 15(cli+14 first-party deps)+codexhost-bridge(bin-only 旁挂)。0.23.43 跨包钉全同步;sandbox 包 dist 14→16 文件(+2:PR#24 trust/microvm 新模块)。同轮基线复跑:0.23.42 仍 PASS(直跑+npm run 两份存证);0.23.40 expected-fail 57 failures(V2 钉版事故形态,cli 14 根依赖全钉 0.23.39)复现无误"
+    },
+    "desktop-v0.2.6-bundled": {
+      "what": "HMH Desktop v0.2.6 内置 runtime(esbuild 打平,非 npm 安装)",
+      "version": "0.23.40",
+      "evidence": [
+        "evidence/artifacts/bundled-runtime-audit-0.2.6.json(E-finish 轮复跑 PASS 4/4):GitHub Release v0.2.6 的 HMH-Desktop-Setup-0.2.6.exe(112,120,520 B,sha256=9367159…f3098)7z 静态解包,安装器未运行",
+        "声明 @hmharness/web@0.23.40 ✓(C1);内容指纹互证:含 abortIntent(0.23.40 挂死根修)✓、无 0.23.41 的 /evolve 401 根修特征 ✓、无 30min 特征 ✓",
+        "本机打包残留 G:\\hmh-desktop\\apps\\desktop\\resources 与 Release 工件 byte 级一致(runtime.cjs/task-runner.js/package.json sha256 3/3 相同)"
+      ],
+      "notes": "esbuild 打平产物无 node_modules 树,0.23.40/0.23.41 npm 钉版事故不影响它;它缺 0.23.41(/evolve 401 根修)、0.23.43(沙箱信任层 fail-closed)——桌面路径影响见 desktopDiff"
+    },
+    "kaihongos-device": {
+      "what": "KaihongOS VM(192.168.161.137:10178)设备侧 hmh",
+      "version": "0.23.39",
+      "evidence": [
+        "【引用】任务 K 报告 docs/kaihongos-runtime-upgrade-2026-10-27.md「版本口径」表:hdc 只读探测 15 包全部 0.23.39,无混合版本"
+      ],
+      "notes": "任务 E/E-finish 未做任何设备侧探测或升级动作(任务书禁止);引用值以 K 报告为源,升级执行人按其 A1-A7 复核"
+    }
+  },
+  "desktopDiff": {
+    "scope": "hmharness v0.23.40..main(566f10c=v0.23.43) 源码差异对桌面内置 runtime 的影响",
+    "evidence": "evidence/artifacts/desktop-runtime-diff.json(E-finish 轮实跑:esbuild metafile 227 输入文件 ∩ git diff 62 改动文件 = 7 文件在桌面打包链内)",
+    "items": [
+      {
+        "commit": "5515994(v0.23.41)",
+        "change": "/evolve /bench 401 根修(kernel loadConfig 派生顶层 provider,化石 key 永不出厂)",
+        "desktopBenefit": "受益",
+        "files": ["packages/kernel/src/config.ts"],
+        "reason": "kernel 在桌面打包链内(desktop-host→server→kernel);TUI 目的地路由部分(cli/src/tui.ts)不在链内"
+      },
+      {
+        "commit": "0cd8429 + 1714cd0(v0.23.43,PR#24)",
+        "change": "沙箱信任层:隔离声明诚实化+fail-closed 执行门禁(Issue #21 P0)+probe/detect 双探测分裂根除",
+        "desktopBenefit": "受益(本轮新增口径:旧版 manifest 仅有 2 文件命中,0.23.43 后 sandbox 5 文件进入桌面链)",
+        "files": ["packages/sandbox/src/broker.ts", "packages/sandbox/src/index.ts", "packages/sandbox/src/microvm.ts", "packages/sandbox/src/provider.ts", "packages/sandbox/src/trust.ts"],
+        "reason": "sandbox 包整体在桌面打包链内;MicroVMSandboxProvider fail-closed 与隔离判定单源将随重打进入桌面 runtime(sandbox dist 14→16 文件印证)"
+      },
+      {
+        "commit": "39951c9(v0.23.42)",
+        "change": "钉版事故修复(44 根跨包钉同步)+extension EXTENSION_VERSION 0.23.30→0.23.31",
+        "desktopBenefit": "几乎不受益(仅扩展桥版本常量)",
+        "files": ["packages/extension/src/adapters.ts"],
+        "reason": "钉版修复改的是各包 package.json 依赖钉与发版脚本——桌面 esbuild 打平无 node_modules,与桌面无关;打包链内命中仅 EXTENSION_VERSION 常量 bump"
+      },
+      {
+        "commit": "652f543+b1bc38f(v0.23.43) / 08e96f4(PR#25)",
+        "change": "演化守护周期 600s→30min;CI preflight 超时同调;FALLBACK_PINS 补全 15 包",
+        "desktopBenefit": "不受益(前两者) / 不受益(后者)",
+        "files": [],
+        "reason": "evolution-daemon.ts(cli 包)与 .github workflow、scripts/board 均不在桌面打包链(桌面链含 12 包:agent browser cognitive domain-harmony domain-ops evolution extension kernel lsp observability sandbox web);FALLBACK_PINS 是离线装板路径,与桌面 esbuild 链无关"
+      },
+      {
+        "commit": "262eca3/21e6fa8/08b1473/5acd3fe",
+        "change": "evidence provenance 系列",
+        "desktopBenefit": "不相关",
+        "reason": "evaluation/evidence 侧文件,均不在桌面打包链"
+      }
+    ],
+    "bottomLine": "桌面 v0.2.6(0.23.40)重打到 0.23.43 的实质收益=kernel /evolve 401 根修 + sandbox 信任层 fail-closed(隔离声明诚实化、MicroVM 执行门禁、probe/detect 单源,5 文件)+扩展桥版本标记;执行器挂死根修 0.23.40 已含;演化守护 30min 与 FALLBACK_PINS 与桌面内置形态无关"
+  },
+  "conclusion": {
+    "consistent": false,
+    "summary": "四对象三个版本同时在场:源码 main=0.23.43(已发版)=npm latest=0.23.43(工件 16/16 PASS);桌面 v0.2.6 内置 0.23.40 落后三版;设备侧 0.23.39(K 报告引用值)落后四版",
+    "recommendedAction": "0.23.43 已发版且工件门禁 PASS(artifact-manifest-0.23.43.json)——『等 0.23.43』的等待已结束,立即按 K 报告路径 B 重打桌面内置 runtime(随桌面 v0.2.7+ 发版,重打后跑 audit-bundled-runtime 复核),设备侧走路径 A 在线升级到 0.23.43。发版/升级前置门已就位:npm run verify:artifacts -- <version>(0.23.42/0.23.43 实证 PASS、0.23.40 实证 FAIL 拦截)"
+  }
+}

@@ -1,0 +1,1070 @@
+{
+  "schema": "hmh-desktop/artifact-manifest@1",
+  "generatedAtUtc": "2026-10-27T13:34:58.177Z",
+  "target": {
+    "package": "@hmharness/cli",
+    "version": "0.23.43",
+    "registry": "https://registry.npmjs.org"
+  },
+  "tool": "scripts/verify-artifacts.mjs",
+  "totals": {
+    "packages": 16,
+    "checks": 147
+  },
+  "registryMetadataChecks": [
+    {
+      "id": "M0-meta-pin:@hmharness/lsp",
+      "ok": true,
+      "detail": "registry metadata @hmharness/lsp=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/web",
+      "ok": true,
+      "detail": "registry metadata @hmharness/web=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/agent",
+      "ok": true,
+      "detail": "registry metadata @hmharness/agent=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/kernel",
+      "ok": true,
+      "detail": "registry metadata @hmharness/kernel=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/browser",
+      "ok": true,
+      "detail": "registry metadata @hmharness/browser=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/sandbox",
+      "ok": true,
+      "detail": "registry metadata @hmharness/sandbox=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/cognitive",
+      "ok": true,
+      "detail": "registry metadata @hmharness/cognitive=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/evolution",
+      "ok": true,
+      "detail": "registry metadata @hmharness/evolution=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/extension",
+      "ok": true,
+      "detail": "registry metadata @hmharness/extension=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/domain-ops",
+      "ok": true,
+      "detail": "registry metadata @hmharness/domain-ops=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/evaluation",
+      "ok": true,
+      "detail": "registry metadata @hmharness/evaluation=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/environments",
+      "ok": true,
+      "detail": "registry metadata @hmharness/environments=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/observability",
+      "ok": true,
+      "detail": "registry metadata @hmharness/observability=\"0.23.43\" vs 0.23.43"
+    },
+    {
+      "id": "M0-meta-pin:@hmharness/domain-harmony",
+      "ok": true,
+      "detail": "registry metadata @hmharness/domain-harmony=\"0.23.43\" vs 0.23.43"
+    }
+  ],
+  "closureCheck": {
+    "id": "G1-cli-closure",
+    "ok": true,
+    "detail": "expected 15, verified 16; note: extra verified (not in this expected set): @hmharness/codexhost-bridge"
+  },
+  "result": "PASS",
+  "failureCount": 0,
+  "failures": [],
+  "packages": [
+    {
+      "name": "@hmharness/cli",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-1/g71D1OIQ8i/AdbdrYVo/LIwPVh447r+5MnkgA9buKe8dRBDJitfN9VOzz/DrwNAiANqAbHQ8RF+5O1asMIJg==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/cli/-/cli-0.23.43.tgz",
+      "tarballSha256": "77f5ca81dac1ba007f09b71323e319c0925d1e017f93008d582f38fec7744040",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/agent": "0.23.43",
+        "@hmharness/browser": "0.23.43",
+        "@hmharness/cognitive": "0.23.43",
+        "@hmharness/domain-harmony": "0.23.43",
+        "@hmharness/domain-ops": "0.23.43",
+        "@hmharness/environments": "0.23.43",
+        "@hmharness/evaluation": "0.23.43",
+        "@hmharness/evolution": "0.23.43",
+        "@hmharness/extension": "0.23.43",
+        "@hmharness/kernel": "0.23.43",
+        "@hmharness/observability": "0.23.43",
+        "@hmharness/sandbox": "0.23.43",
+        "@hmharness/web": "0.23.43",
+        "@hmharness/lsp": "0.23.43"
+      },
+      "entry": "./dist/main.js",
+      "bins": [
+        "dist/main.js"
+      ],
+      "distFileCount": 34,
+      "boardFiles": [
+        "board/heal-tree.cjs",
+        "board/install-kaihongos.cjs"
+      ],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/agent",
+          "ok": true,
+          "detail": "dependency @hmharness/agent=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/browser",
+          "ok": true,
+          "detail": "dependency @hmharness/browser=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/cognitive",
+          "ok": true,
+          "detail": "dependency @hmharness/cognitive=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/domain-harmony",
+          "ok": true,
+          "detail": "dependency @hmharness/domain-harmony=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/domain-ops",
+          "ok": true,
+          "detail": "dependency @hmharness/domain-ops=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/environments",
+          "ok": true,
+          "detail": "dependency @hmharness/environments=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/evaluation",
+          "ok": true,
+          "detail": "dependency @hmharness/evaluation=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/evolution",
+          "ok": true,
+          "detail": "dependency @hmharness/evolution=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/extension",
+          "ok": true,
+          "detail": "dependency @hmharness/extension=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/observability",
+          "ok": true,
+          "detail": "dependency @hmharness/observability=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/sandbox",
+          "ok": true,
+          "detail": "dependency @hmharness/sandbox=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/web",
+          "ok": true,
+          "detail": "dependency @hmharness/web=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/lsp",
+          "ok": true,
+          "detail": "dependency @hmharness/lsp=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "37 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V3-declared-files:board",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V3-declared-files:release-notes.json",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/main.js present"
+        },
+        {
+          "id": "V5-bin-exists:dist/main.js",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V5-bin-syntax:C:\\Users\\hongfu\\AppData\\Local\\Temp\\hmh-artifact-verify-SazdB5\\extract\\@hmharness__cli\\package\\dist\\main.js",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/lsp",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-5ln7ZD+IVBgjpO8g8HIPxP7C8xCubx1tddKSozEnDmoXWk2EDCDk2go1Y+98jH3Uuone8D9Xp3UObUY5LIk3KQ==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/lsp/-/lsp-0.23.43.tgz",
+      "tarballSha256": "2dc2576d09f4a0a529e9debce00e9f8b05159918e033a16a62679fe6482dfb63",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 14,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "28 payload files"
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/web",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-nTcb+if5aIww7A+yR1VfbWKwleVjhk3iNEbTrCIZWiMAN2B5NflUtlHhKmE4NBdJHU2i4BYXEyauqK3ESGGN/w==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/web/-/web-0.23.43.tgz",
+      "tarballSha256": "3024a4afe38a0a861a14abd970e1cd852dcd1b9e370e870939f9fb2f3081926f",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/agent": "0.23.43",
+        "@hmharness/cognitive": "0.23.43",
+        "@hmharness/domain-ops": "0.23.43",
+        "@hmharness/evolution": "0.23.43",
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 28,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/agent",
+          "ok": true,
+          "detail": "dependency @hmharness/agent=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/cognitive",
+          "ok": true,
+          "detail": "dependency @hmharness/cognitive=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/domain-ops",
+          "ok": true,
+          "detail": "dependency @hmharness/domain-ops=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/evolution",
+          "ok": true,
+          "detail": "dependency @hmharness/evolution=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "28 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/agent",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-tkGOxrlXC3Il4j+cPtIeSOZAbTgbl2ynNXcYgQ1nXVUo94ZtskkelZ+PTMxluJ3nUZ80hpRYkKp72AioX47pNw==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/agent/-/agent-0.23.43.tgz",
+      "tarballSha256": "9843fe8afd4b7452e65798af859c7655b34d130a18d6e9ba3972b5b465a4e4b6",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/cognitive": "0.23.43",
+        "@hmharness/domain-harmony": "0.23.43",
+        "@hmharness/domain-ops": "0.23.43",
+        "@hmharness/evolution": "0.23.43",
+        "@hmharness/kernel": "0.23.43",
+        "@hmharness/observability": "0.23.43",
+        "@hmharness/sandbox": "0.23.43",
+        "@hmharness/lsp": "0.23.43",
+        "@hmharness/browser": "0.23.43",
+        "@hmharness/extension": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 46,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/cognitive",
+          "ok": true,
+          "detail": "dependency @hmharness/cognitive=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/domain-harmony",
+          "ok": true,
+          "detail": "dependency @hmharness/domain-harmony=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/domain-ops",
+          "ok": true,
+          "detail": "dependency @hmharness/domain-ops=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/evolution",
+          "ok": true,
+          "detail": "dependency @hmharness/evolution=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/observability",
+          "ok": true,
+          "detail": "dependency @hmharness/observability=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/sandbox",
+          "ok": true,
+          "detail": "dependency @hmharness/sandbox=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/lsp",
+          "ok": true,
+          "detail": "dependency @hmharness/lsp=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/browser",
+          "ok": true,
+          "detail": "dependency @hmharness/browser=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/extension",
+          "ok": true,
+          "detail": "dependency @hmharness/extension=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "46 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/kernel",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-UhkZjwCbM5E8gyQhku975Z1u7MRF8VhXnVY8odmGcovRrNVyP2tIfk4fP9sw8cSlzV534djlbzj+AaAjs/2Usg==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/kernel/-/kernel-0.23.43.tgz",
+      "tarballSha256": "67298812a5f6e2de5558bc6770aedb7a8b6483c9253dcaac5b7e9758bf4300e6",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {},
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 36,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "36 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/browser",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-lmlN/Qyby1wpxAHvYNNkH/5xKcb3tLI+J3AvOQ4+Mo7Fk4lramvMCc+1KDUrcKkTB+OslsmHq9R+X1PTHZc9NA==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/browser/-/browser-0.23.43.tgz",
+      "tarballSha256": "aee2ab9b977f35ef70aa6fce9b04651b743398ce57b51041042aceed8256cbbb",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 14,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "14 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/sandbox",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-urtJws40Aci0TdY5FOcMKXkzb+mu4+3R3nuQfOvyzQOPY/Mrz9DVL2DHcBfY9dG81cHz6uB7k8I6IeCMmr8wjA==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/sandbox/-/sandbox-0.23.43.tgz",
+      "tarballSha256": "eb74ab1b79c9878a9989c79d17620a2229108a660e310c4ca25c26129cbfc3ba",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {},
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 16,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "16 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/cognitive",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-q20t0DWLR9JROWoSIt/1CAj0qlrz4vVeDIPPa84AzQUM2b7XYb9rVNp8JEFRN43j0vB0Oe1A6t5mfUfBLMfu7Q==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/cognitive/-/cognitive-0.23.43.tgz",
+      "tarballSha256": "f4235160ad6275e7a040022de7dfc18da8047c99315e73c2d219d6a4e750e232",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 68,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "68 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/evolution",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-/0OWbx1wO3rr4CTuqlQbzFTvlwzeptScEnzaBYJDOIQiHC7v0MTSBlGJiAtKOhLAtfqOJ6WHpI/ftO9DaL+Eyg==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/evolution/-/evolution-0.23.43.tgz",
+      "tarballSha256": "57d79f73991678eff5fb7129dc2c3a741c77f4c0424e86cafc61f0735a883d63",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/cognitive": "0.23.43",
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 56,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/cognitive",
+          "ok": true,
+          "detail": "dependency @hmharness/cognitive=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "56 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/extension",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-9ugkjBpVAhhx2LED4ggDO5XBXA/8PqXIQE8wmVW5MM2k8h7N+KLgHmJUFirbcvbv58hsuugxkvm93Jg14U/U6A==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/extension/-/extension-0.23.43.tgz",
+      "tarballSha256": "4f284965673d0ac2924cf91236f7a0643a582e7cad03b757c56e738ac1614746",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 22,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "28 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V3-declared-files:extension",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/domain-ops",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-A0NoX1FFx2Qes2sdaG9q8OruRD5fQ7arvwoZ0YSS8+n5H5knaZxM2ATW3nrHfMgt0qXtO2UDDRUEbHq2RImI3w==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/domain-ops/-/domain-ops-0.23.43.tgz",
+      "tarballSha256": "16397088416538947790e410a720ac7200b7274f7084ab31dc95e38fe52e1950",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 6,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "6 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/evaluation",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-mKAn3jJ72QUj1mZe0T1AaV1eEbu3Am8pGCf7RfHeB/AprMrucrbSSNXDwjzuWt/v0jYqI9nZJ7F9Kzk0uDM/KA==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/evaluation/-/evaluation-0.23.43.tgz",
+      "tarballSha256": "18c5e5b02e36f228fe916c58348227f5c09473459857cf2d1deab2fdb97514a4",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43",
+        "@hmharness/observability": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 24,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/observability",
+          "ok": true,
+          "detail": "dependency @hmharness/observability=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "24 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/environments",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-7s2N2ezUVgL6GbTfgrAO1Sl6Fz5cThIgOE+g4V3nWAnjN/XZV/681ps1GXqQdeXMkWLm7xcjNY345dgMPuquCw==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/environments/-/environments-0.23.43.tgz",
+      "tarballSha256": "e7efcec5f521e3725b96bfe8387925f764f8d19e00f6dcde1aca43b415ee1bb2",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43",
+        "@hmharness/cognitive": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 16,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/cognitive",
+          "ok": true,
+          "detail": "dependency @hmharness/cognitive=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "16 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/observability",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-o7MJYCzLp9QZVLE8UkQQqXC8SS+rfuKy7Ms3THcl3zTP8YSTxFKfxcZU1BJn8YfSPb+/OdYtFRhdB0a0cdk8xg==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/observability/-/observability-0.23.43.tgz",
+      "tarballSha256": "76c274367d46474a4969177e1bf4b5e3cf61e5217a39eb4838c6a19c5799646c",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {},
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 12,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "12 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/domain-harmony",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-p/QEhwgOBsdtWc9r/5lm9xtFViyaVjEXeCaVEoT7CyZzS7RTk4gtjsneqzCHaALbbEq4/Lywvl5V4V/egPuY0g==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/domain-harmony/-/domain-harmony-0.23.43.tgz",
+      "tarballSha256": "fca0304f18424daa5de66aa7fd0ca9ca67919ee5d0267a8a4f984e3900b0d15f",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": "./dist/index.js",
+      "bins": [],
+      "distFileCount": 30,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "30 payload files"
+        },
+        {
+          "id": "V3-declared-files:dist",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "entry ./dist/index.js present"
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    },
+    {
+      "name": "@hmharness/codexhost-bridge",
+      "version": "0.23.43",
+      "registryIntegrity": "sha512-OUsCRWoemj9XtZj0k2Ge5w3aXlGCQGlCybd6xxRla13sGThKXsCzCwbHg4rc9dLWmylyP/BKpeT88pygLhLMmw==",
+      "tarballUrl": "https://registry.npmjs.org/@hmharness/codexhost-bridge/-/codexhost-bridge-0.23.43.tgz",
+      "tarballSha256": "c3f1a5b301be29a790602c1891649b32c674a54aa329d7c6233e5a916656ba22",
+      "tarballIntegrityOk": true,
+      "hmharnessDeps": {
+        "@hmharness/agent": "0.23.43",
+        "@hmharness/kernel": "0.23.43"
+      },
+      "entry": null,
+      "bins": [
+        "bin/hmh-codexhost.mjs"
+      ],
+      "distFileCount": 0,
+      "boardFiles": [],
+      "result": "PASS",
+      "checks": [
+        {
+          "id": "V1-self-version",
+          "ok": true,
+          "detail": "package.json version=0.23.43, target=0.23.43"
+        },
+        {
+          "id": "V2-pin:@hmharness/agent",
+          "ok": true,
+          "detail": "dependency @hmharness/agent=\"0.23.43\""
+        },
+        {
+          "id": "V2-pin:@hmharness/kernel",
+          "ok": true,
+          "detail": "dependency @hmharness/kernel=\"0.23.43\""
+        },
+        {
+          "id": "V3-payload-nonempty",
+          "ok": true,
+          "detail": "3 payload files"
+        },
+        {
+          "id": "V3-declared-files:bin",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V3-declared-files:README.md",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V3-declared-files:LICENSE",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V4-entry-exists",
+          "ok": true,
+          "detail": "no exports[\".\"]/main declared (bin-only package; bin 已在 V5 核对)"
+        },
+        {
+          "id": "V5-bin-exists:bin/hmh-codexhost.mjs",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V5-bin-syntax:C:\\Users\\hongfu\\AppData\\Local\\Temp\\hmh-artifact-verify-SazdB5\\extract\\@hmharness__codexhost-bridge\\package\\bin\\hmh-codexhost.mjs",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "id": "V6-tarball-integrity",
+          "ok": true,
+          "detail": "sha512 matches registry dist.integrity"
+        }
+      ]
+    }
+  ]
+}
