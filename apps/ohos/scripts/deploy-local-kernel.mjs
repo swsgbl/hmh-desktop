@@ -41,6 +41,10 @@ const RESTART_WEB = flag('--restart-web')
 const DEV_NODE = '/data/local/home/.ohos/node/bin/node'
 const HMH = '/data/local/home/.local/bin/hmh'
 const INSTALLER = 'G:\\hmharness\\scripts\\install-kaihongos.cjs'
+// the installer installs the self-heal layer from its SIBLING heal-tree.cjs —
+// a deploy that pushes only the installer leaves the device without the heal
+// layer (observed on the 0.23.43 upgrade; the warn is easy to miss)
+const HEAL_TREE = 'G:\\hmharness\\scripts\\heal-tree.cjs'
 
 function sh(cmd, timeoutMs = 60000) {
   try {
@@ -87,8 +91,9 @@ if (!SKIP_INSTALL) {
     }
     send(armTar, '/data/local/tmp/node-arm.tar.gz')
   }
-  console.log('— push installer…')
+  console.log('— push installer + heal-tree…')
   console.log(send(INSTALLER, '/data/local/tmp/install-kaihongos.cjs'))
+  console.log(send(HEAL_TREE, '/data/local/tmp/heal-tree.cjs'))
   console.log('— run installer on device (数分钟)…')
   const out = sh(`${DEV_NODE} /data/local/tmp/install-kaihongos.cjs`, 300000)
   console.log(String(out).slice(-1200))
