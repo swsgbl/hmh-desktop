@@ -48,7 +48,7 @@ scripts/               dev/build/package/ui-verify/install-verify/update-verify 
 ```bash
 npm install
 node scripts/install-electron.mjs     # 国内镜像下载 electron(postinstall 被拦时)
-npm test                              # 46 测试(node:test + tsx)
+npm test                              # 61 测试(node:test + tsx;含 verify-artifacts 断言单测 15)
 npm run typecheck
 npm run dev                           # vite dev + electron
 node scripts/ui-verify.mjs --dev --fake --wizard   # 逐功能 UI 验收(35 步,含安装向导)
@@ -56,6 +56,18 @@ node scripts/ui-verify.mjs --dev --real --real-task # 真实 runtime+真实模�
 npm run package                       # NSIS Setup(release/)+ 深开鸿见 apps/ohos
 node scripts/install-verify.mjs       # 安装级验证 7/7
 ```
+
+### 升级/发版前置门:npm 侧工件 clean-room 验证(必经)
+
+升级内置 runtime、或任何依赖 `@hmharness/*` npm 新版本的发版动作之前,先过发布工件门:
+
+```bash
+npm run verify:artifacts -- <version>   # 如 0.23.42;下载 exact tarball(独立临时 cache,不碰本机)逐包断言
+```
+
+断言:16 包集合闭合、每包 version 与全部 `@hmharness/*` 依赖钉 === 目标版本(0.23.40/0.23.41 是钉版事故版本,该门必 FAIL——这是设计行为,用于证明门能拦住事故)、dist 存在、bin/入口 `node --check`、tarball sha512 === registry integrity。产物:`evidence/artifacts/artifact-manifest-<ver>.json`(机器可读,含每包 SHA256/依赖树/逐项结果)。配套:`scripts/desktop-runtime-audit.mjs`(源码差异→桌面打包链影响清单)与 `scripts/audit-bundled-runtime.mjs`(发布 Setup 静态解包核对内置 runtime 声明与内容指纹)。
+
+> 0.23.40 的事故形态:cli@0.23.40 携 kernel@0.23.39 等旧件(44 根跨包钉不同步)。`npm run verify:artifacts -- 0.23.40` 预期 FAIL,存证见 `evidence/artifacts/artifact-manifest-0.23.40.expected-fail.json`。
 
 深开鸿:`cd apps/ohos && hvigorw assembleHap`;装机链 `node scripts/ohos-sign-final.mjs`(api23 降版+VM 签名)或一键 `apps/ohos/scripts/deploy.mjs`。
 
