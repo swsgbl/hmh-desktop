@@ -30,11 +30,12 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
     box-shadow var(--hmh-dur) var(--hmh-ease);
 }
 
-/* 按钮:胶囊、高 32、padding 0 14(DSH §3 四型:primary 品牌底 / ghost hover 灰 / danger) */
+/* 按钮:高 32、padding 0 14(DSH §3 四型:primary 品牌底 / ghost hover 灰 / danger)
+   HIG P2(RFC §2.3):控件圆角收敛到 control 档(8px),胶囊仅保留 chip 类 */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   min-height: 32px; padding: 0 14px; border: none;
-  border-radius: var(--hmh-radius-pill);
+  border-radius: var(--hmh-radius-control);
   font-size: var(--hmh-font-size-sm); line-height: var(--hmh-line-height-sm);
   color: var(--hmh-label-primary);
 }
@@ -439,7 +440,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-1); border-left: 1px solid var(--hmh-border-l1);
 }
 .dock-tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--hmh-border-l1); }
-.dock-tab { padding: 3px 10px; border-radius: var(--hmh-radius-pill); font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs); color: var(--hmh-label-secondary); }
+.dock-tab { padding: 3px 10px; border-radius: var(--hmh-radius-control); font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs); color: var(--hmh-label-secondary); }
 .dock-tab:hover { background: var(--hmh-interactive-bg-hover); }
 .dock-tab.active { background: var(--hmh-list-active-bg); color: var(--hmh-label-primary); box-shadow: inset 0 0 0 1px var(--hmh-border-l2); }
 .dock-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
