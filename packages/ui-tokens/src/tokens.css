@@ -81,6 +81,55 @@
   --hmh-dur: 0.2s;
   --hmh-dur-slow: 0.3s;
 
+  /* ==== HIG RFC 2026-10-27(docs/design-rfc-apple-hig-2026-10-27.md)====
+     以下为 Apple HIG-inspired 语义 token 快照(阶段 1:只立 token,组件样式零改动)。
+     规则:纯新增,不修改上方任何既有变量;引用型变量在深色主题下自动跟随换值。
+     旧 xs/sm/md 三档与 fast/dur/slow 三档保留为底层,组件迁移逐步切换到语义档。 */
+
+  /* 字体层级:12/18 辅助 · 13/20 次要 · 15/23 正文 · 20/28 小标题 · 28/34 页面标题 */
+  --hmh-font-size-caption: 12px;  --hmh-line-height-caption: 18px; /* 辅助(同 xs) */
+  --hmh-font-size-subtle: 13px;   --hmh-line-height-subtle: 20px;  /* 次要标签 */
+  --hmh-font-size-body: 15px;     --hmh-line-height-body: 23px;    /* 正文/最终答案 */
+  --hmh-font-size-heading: 20px;  --hmh-line-height-heading: 28px; /* 小标题 */
+  --hmh-font-size-title: 28px;    --hmh-line-height-title: 34px;   /* 页面标题(28-32 区间) */
+
+  /* 间距:4px 网格六档(与 ui-tokens/src/index.ts spacing 同源) */
+  --hmh-space-xs: 4px;
+  --hmh-space-sm: 8px;
+  --hmh-space-md: 12px;
+  --hmh-space-lg: 16px;
+  --hmh-space-xl: 24px;
+  --hmh-space-xxl: 32px;
+
+  /* 圆角语义:6-8 控件 · 10-12 浮层 · 14-16 面板;胶囊仅限 chip/少数按钮。
+     radius-lg(18px)在 app.css 零引用,弃用;组件圆角迁移在阶段 2 执行 */
+  --hmh-radius-control: var(--hmh-radius-sm); /* 控件(=8px,在 6-8 区间) */
+  --hmh-radius-overlay: var(--hmh-radius-md); /* 浮层(=12px,在 10-12 区间) */
+  --hmh-radius-panel: 16px;                    /* 内容面板(14-16;替代 lg=18) */
+
+  /* 表面 4 级语义:主背景/侧栏/内容/浮层。
+     目标差异:侧栏与内容分离(侧栏=base,内容=layer-1,内容浮于侧栏之上);
+     迁移期组件仍引用 bg-layer-*,视觉不变;阶段 2 切换 */
+  --hmh-surface-base: var(--hmh-bg-base);       /* 主背景 */
+  --hmh-surface-sidebar: var(--hmh-bg-base);    /* 侧栏(目标态;现组件用 layer-1) */
+  --hmh-surface-content: var(--hmh-bg-layer-1); /* 内容层 */
+  --hmh-surface-elevated: var(--hmh-bg-menu);   /* 浮层 */
+
+  /* 动效语义档:hover 100-140ms · 面板 160-220ms · 完成 200-260ms。
+     reduce-motion 关断由 app.css 媒体查询统一处理(PR#4) */
+  --hmh-dur-hover: 120ms;    /* hover/激活反馈 */
+  --hmh-dur-panel: 180ms;    /* 面板/tab 切换 */
+  --hmh-dur-complete: 230ms; /* 完成/状态变化反馈 */
+
+  /* 焦点环(PR#4 focus-visible 样式的 token 化,供组件统一引用) */
+  --hmh-focus-ring-color: var(--hmh-brand-primary);
+  --hmh-focus-ring-width: 2px;
+  --hmh-focus-ring-offset: 2px;
+
+  /* 图标规范:统一线性 icon 集的尺寸档(Emoji/Unicode 全量替换在阶段 3) */
+  --hmh-icon-size-inline: 16px; /* 行内/按钮内 */
+  --hmh-icon-size-status: 20px; /* 状态/空态 */
+
   /* ---- 旧 token 别名(v3 及更早;兼容兜底,新代码禁用) ---- */
   --hmh-bg: var(--hmh-bg-base);
   --hmh-bg-raised: var(--hmh-bg-layer-1);
