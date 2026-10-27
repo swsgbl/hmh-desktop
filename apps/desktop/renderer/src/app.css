@@ -513,3 +513,38 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   height: 32px; padding: 0 10px; border-radius: var(--hmh-radius-sm);
   border: 1px solid var(--hmh-border-l2); background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
 }
+
+/* Accessibility refinement 2026-10-27 (Apple HIG-inspired, not a product reskin):
+   keep keyboard-reachable actions visible, make compact toolbar targets explicit,
+   and respect the OS Reduce Motion preference. */
+.session-row:focus-within .session-export {
+  opacity: 1;
+}
+.session-export:focus-visible,
+.icon-btn:focus-visible,
+.titlebar .titlebar-menu:focus-visible {
+  outline: 2px solid var(--hmh-brand-primary);
+  outline-offset: 2px;
+  opacity: 1;
+}
+.icon-btn {
+  min-width: 36px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .session-running-dot,
+  .cursor {
+    animation: none !important;
+  }
+}
