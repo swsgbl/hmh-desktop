@@ -12,6 +12,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 input, select, textarea { font: inherit; color: var(--hmh-label-primary); }
 ::placeholder { color: var(--hmh-label-dimmed); }
 
+/* HIG P3(RFC §2.7)内置线性 icon 集(icons.tsx,自绘 SVG 零依赖):
+   尺寸走 token(inline 16 / status 20),stroke=currentColor 随文字色。
+   .hmh-icon-flow = 文本流内前置图标的对齐与间距;替代旧 Emoji 字号 hack */
+.hmh-icon { width: var(--hmh-icon-size-inline); height: var(--hmh-icon-size-inline); flex-shrink: 0; display: inline-block; }
+.hmh-icon.status { width: var(--hmh-icon-size-status); height: var(--hmh-icon-size-status); }
+.hmh-icon-flow { margin-right: 4px; vertical-align: -3px; }
+
 /* 细滚动条(DSH:thumb 浅灰 + hover 加深;scrollbar-* 可继承,设一次即可) */
 body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -58,7 +65,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-1); border-bottom: 1px solid var(--hmh-border-l1);
   -webkit-app-region: drag; user-select: none;
 }
-.titlebar .titlebar-menu { -webkit-app-region: no-drag; font-size: 17px; padding: 2px 10px; border-radius: var(--hmh-radius-sm); }
+.titlebar .titlebar-menu { -webkit-app-region: no-drag; padding: 2px 10px; border-radius: var(--hmh-radius-sm); }
 .titlebar .titlebar-title { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
 
 /* minmax(0,1fr):行高锁死为容器高。2026-10-10 装机事故根因——grid 隐式行是
@@ -91,7 +98,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .workspace-bar:hover { background: var(--hmh-interactive-bg-hover); }
 .ws-bar-label { font-size: var(--hmh-font-size-xs); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; color: var(--hmh-label-tertiary); }
 .ws-bar-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hmh-label-primary); }
-.ws-bar-caret { flex-shrink: 0; font-size: var(--hmh-font-size-xs); }
+.ws-bar-caret { flex-shrink: 0; }
 .ws-menu-backdrop { position: fixed; inset: 0; z-index: 80; }
 /* 菜单浮层:12px 圆角 + 对比细边 + shadow-lv3 + 内 padding 4(DSH §3) */
 .ws-menu {
@@ -120,8 +127,10 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   color: var(--hmh-label-secondary); font-size: var(--hmh-font-size-xs);
 }
 .ws-group-head:hover { background: var(--hmh-interactive-bg-hover); }
-.ws-group-caret { font-size: var(--hmh-font-size-xs); transition: transform var(--hmh-dur-panel) var(--hmh-ease); flex-shrink: 0; }
-.ws-group-caret.open { transform: rotate(90deg); }
+/* 组头 caret:SVG chevron(基态指下=展开;收起时左转 90° 指右;
+   旋转过渡沿用 panel 档;HIG P3 组2 由 Unicode ▸ 换线性 icon) */
+.ws-group-caret { display: inline-flex; transform: rotate(-90deg); transition: transform var(--hmh-dur-panel) var(--hmh-ease); flex-shrink: 0; }
+.ws-group-caret.open { transform: rotate(0deg); }
 .ws-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-group-count { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); flex-shrink: 0; }
 
@@ -136,13 +145,12 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* 侧栏收缩 + 状态过滤 + 快捷键面板 */
 .app-shell.no-sidebar { grid-template-columns: 0 1fr auto; }
 .app-shell.no-sidebar .sidebar { display: none; }
-/* 图标按钮触达区加大(2026-10-11 用户反馈图标太小)——尺寸不动,只换 hover 皮 */
-.icon-btn { padding: 6px 10px; font-size: 17px; flex-shrink: 0; min-width: 36px; border-radius: var(--hmh-radius-sm); }
+/* 图标按钮触达区加大(2026-10-11 用户反馈图标太小)——尺寸不动,只换 hover 皮
+   HIG P3 组2:Emoji 字号 hack 移除,图标尺寸由 .hmh-icon token 驱动 */
+.icon-btn { padding: 6px 10px; flex-shrink: 0; min-width: 36px; border-radius: var(--hmh-radius-sm); }
 .topbar .btn { font-size: 15px; }
 .composer-row .btn { font-size: 18px; }
-.ws-group-caret { font-size: var(--hmh-font-size-xs); }
-.ws-bar-caret { font-size: var(--hmh-font-size-xs); }
-.session-export { width: 30px; font-size: 15px; }
+.session-export { width: 30px; }
 /* 输入族:高 32、8px 圆角、1px border-l2、focus 变品牌边(DSH §3);
    HIG P2(RFC §2.1):次要控件文字用 subtle 档 13/20 */
 .session-search, .status-filter {
@@ -190,9 +198,23 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-1); border: 1px solid var(--hmh-border-l1);
 }
 .turn.user { align-self: flex-end; background: var(--hmh-user-turn-bg); }
+/* HIG P3(RFC §3 ConversationTimeline)三级视觉权重:
+   一级=最终答案(.assistant/.streaming:实底卡 + border-l2 + 阴影,正文 body 15/23);
+   二级=用户请求(.user 浅染气泡,无阴影,保持现状);
+   三级=工具活动(.tool-card 收窄 + 更浅底,见下)。只改样式层,数据流不变。 */
+.turn.assistant { border-color: var(--hmh-border-l2); box-shadow: var(--hmh-shadow-lv1); }
+.turn.streaming { border-style: dashed; box-shadow: var(--hmh-shadow-lv1); }
 .turn.system { border-color: var(--hmh-state-error); }
 /* HIG P2(RFC §2.1):会话正文/最终答案升 body 档 15/23(旧 sm=14/22 保留为底层) */
 .turn-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: var(--hmh-font-size-body); line-height: var(--hmh-line-height-body); }
+/* HIG P3(RFC §3):fenced 长代码块内滚动——max-height + overflow auto,
+   长(横向溢出)代码行在块内滚动(pre),不再撑长 turn 卡;正文仍通排 */
+.turn-code {
+  margin: var(--hmh-space-xs) 0; padding: var(--hmh-space-sm) var(--hmh-space-md);
+  max-height: 320px; overflow: auto; white-space: pre;
+  background: var(--hmh-bg-layer-2); border-radius: var(--hmh-radius-sm);
+  font: var(--hmh-font-size-xs)/18px var(--hmh-font-mono); color: var(--hmh-label-secondary);
+}
 .status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--hmh-font-size-xs); margin-bottom: 6px; }
 .status-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .status-running { color: var(--hmh-status-running); }
@@ -214,11 +236,13 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .composer-row .btn { align-self: flex-end; height: 44px; }
 .send { align-self: flex-end; }
 
-/* 工具折叠卡(过程默认折叠) */
+/* 工具折叠卡(过程默认折叠)
+   HIG P3(RFC §3):三级降权——收窄(760→620)+ 半透明更浅底 + 次要色(现状) */
 .tool-card {
-  max-width: 760px; align-self: flex-start;
+  max-width: 620px; align-self: flex-start;
   border: 1px solid var(--hmh-border-l1); border-radius: var(--hmh-radius-md);
-  background: var(--hmh-bg-layer-2); color: var(--hmh-label-secondary);
+  background: color-mix(in srgb, var(--hmh-bg-layer-2) 55%, transparent);
+  color: var(--hmh-label-secondary);
   font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs);
 }
 .tool-card summary {
@@ -241,13 +265,20 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .approval-card { border-color: var(--hmh-state-warn); align-self: stretch; max-width: 760px; }
 .approval-head { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; color: var(--hmh-state-warn); }
 .approval-risk { margin: 8px 0 0; font-size: var(--hmh-font-size-sm); color: var(--hmh-label-secondary); }
+/* HIG P3(RFC §3 ApprovalCard):目标/权限两字段结构化展示
+   (数据来自 payload 既有参数,展示层解析);主批准 primary + 次拒绝 ghost。
+   防误触边界:审批权威在 runtime,UI 只转述——上方注释语义不可动 */
+.approval-fields { display: flex; flex-direction: column; gap: var(--hmh-space-xs); margin-bottom: var(--hmh-space-sm); }
+.approval-field { display: flex; gap: var(--hmh-space-sm); align-items: baseline; }
+.approval-k { flex-shrink: 0; width: 48px; font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
+.approval-v { min-width: 0; font-size: var(--hmh-font-size-subtle); color: var(--hmh-label-primary); word-break: break-all; }
+.approval-v.mono { font: var(--hmh-font-size-xs) var(--hmh-font-mono); }
 .approval-actions { display: flex; gap: 8px; margin-top: 12px; }
 
 .turn.system { border-color: var(--hmh-state-error); align-self: stretch; max-width: 760px; }
 .composer-side { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
 
-/* 流式输出 */
-.turn.streaming { border-style: dashed; }
+/* 流式输出(dashed 边与主角阴影已并入上方 .turn.assistant 区块) */
 .cursor { animation: hmh-blink 1s steps(1) infinite; color: var(--hmh-brand-primary); }
 @keyframes hmh-blink { 50% { opacity: 0; } }
 
@@ -293,13 +324,15 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .cmdk-item { display: block; width: 100%; text-align: left; padding: 8px 12px; border-radius: var(--hmh-radius-sm); font-size: var(--hmh-font-size-sm); }
 .cmdk-item:hover, .cmdk-item:focus-visible { background: var(--hmh-interactive-bg-hover); outline: none; }
 
-/* 交付物卡:success 细边 + 浅染底 */
+/* 交付物卡:success 细边 + 浅染底
+   HIG P3(RFC §3):结果卡突出——与一级答案同级加阴影,边框染度 35%→45% */
 .artifact-card {
   display: flex; align-items: center; gap: 8px;
   max-width: 760px; padding: 8px 14px;
-  border: 1px solid color-mix(in srgb, var(--hmh-state-success) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hmh-state-success) 45%, transparent);
   border-radius: var(--hmh-radius-md);
   background: color-mix(in srgb, var(--hmh-state-success) 6%, transparent);
+  box-shadow: var(--hmh-shadow-lv1);
   font-size: var(--hmh-font-size-sm);
 }
 .artifact-title { font: var(--hmh-font-size-xs) var(--hmh-font-mono); color: var(--hmh-label-primary); word-break: break-all; }
@@ -314,7 +347,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* 会话行(标题 + 导出) */
 .session-row { display: flex; align-items: stretch; gap: 2px; border-radius: var(--hmh-radius-sm); }
 .session-row .session-item { flex: 1; min-width: 0; }
-.session-export { width: 26px; flex-shrink: 0; color: var(--hmh-label-tertiary); opacity: 0; border-radius: var(--hmh-radius-sm); font-size: 15px; }
+.session-export { width: 26px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--hmh-label-tertiary); opacity: 0; border-radius: var(--hmh-radius-sm); }
 .session-row:hover .session-export { opacity: 1; }
 .session-export:hover { color: var(--hmh-brand-primary); background: var(--hmh-interactive-bg-hover); }
 .session-export.danger:hover { color: var(--hmh-state-error); }
@@ -378,6 +411,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   color: var(--hmh-label-secondary); background: var(--hmh-bg-layer-2);
 }
 .model-picker-anchor { position: relative; }
+.topbar-model .hmh-icon { margin-left: 2px; }
 .topbar-model.as-button { cursor: pointer; }
 .topbar-model.as-button:hover { color: var(--hmh-label-primary); background: var(--hmh-interactive-bg-hover); }
 .topbar-model.as-button:disabled { cursor: default; }
@@ -405,7 +439,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-2); color: var(--hmh-label-secondary);
 }
 .att-chip:hover { background: var(--hmh-interactive-bg-hover); }
-.att-chip button { color: var(--hmh-label-tertiary); font-size: 11px; }
+.att-chip button { display: inline-flex; color: var(--hmh-label-tertiary); }
 .att-chip button:hover { color: var(--hmh-state-error); }
 
 /* 图片附件 chip + 拖放提示 + 顶栏语言切换(2026-10-11 对标 DSH) */

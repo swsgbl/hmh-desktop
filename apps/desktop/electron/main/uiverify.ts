@@ -349,14 +349,15 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
 
     /* ========== fake:侧栏收缩 + 状态过滤 ========== */
     await step('侧栏收缩:⇤ 收起左栏,⇥ 展开恢复', async () => {
-      const w = await waitFor('toggle btn', `var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return x.textContent.trim()==='⇤'||x.textContent.trim()==='⇥';});
-        return {ok: !!b, detail: 'btn='+(b?b.textContent.trim():'none')};`, 5_000);
+      // HIG P3 组2:⇤/⇥ Emoji 已换 SVG icon,按钮以 aria-label(含"侧栏")定位
+      const w = await waitFor('toggle btn', `var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return (x.getAttribute('aria-label')||'').indexOf('侧栏')>=0;});
+        return {ok: !!b, detail: 'btn='+(b?b.getAttribute('aria-label'):'none')};`, 5_000);
       if (!w[0]) return w;
-      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return x.textContent.trim()==='⇤'||x.textContent.trim()==='⇥';}); if(b) b.click(); })()`);
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return (x.getAttribute('aria-label')||'').indexOf('侧栏')>=0;}); if(b) b.click(); })()`);
       const hidden = await waitFor('sidebar hidden', `var sb=document.querySelector('.sidebar');
         var gone = !sb || getComputedStyle(sb).display === 'none';
         return {ok: gone, detail: 'display='+(sb?getComputedStyle(sb).display:'none')};`, 5_000);
-      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return x.textContent.trim()==='⇤'||x.textContent.trim()==='⇥';}); if(b) b.click(); })()`);
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return (x.getAttribute('aria-label')||'').indexOf('侧栏')>=0;}); if(b) b.click(); })()`);
       const shown = await waitFor('sidebar back', `var sb=document.querySelector('.sidebar');
         return {ok: !!sb && getComputedStyle(sb).display !== 'none', detail: 'display='+(sb?getComputedStyle(sb).display:'none')};`, 5_000);
       return [hidden[0] && shown[0], `hide: ${hidden[1]}; show: ${shown[1]}`];
