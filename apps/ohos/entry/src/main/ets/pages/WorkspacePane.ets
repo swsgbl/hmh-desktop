@@ -492,7 +492,7 @@ export struct WorkspacePane {
           .backgroundColor(Th.c.l1)
           .borderRadius(6)
           .height(44)
-          .width(36)
+          .width(44)
           .onClick(() => {
             this.atOpen = !this.atOpen
           })

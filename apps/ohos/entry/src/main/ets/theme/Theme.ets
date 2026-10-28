@@ -133,7 +133,7 @@ export class Metrics {
   static readonly radiusSm: number = 6
   static readonly radiusMd: number = 10
   static readonly radiusLg: number = 14
-  static readonly iconBtnMin: number = 36
+  static readonly iconBtnMin: number = 48       // HIG B-1 触达区下限(原 36)
   static readonly sendH: number = 44
   // ---- DSH 组件规范 ----
   static readonly btnH: number = 32        // 按钮高 32
@@ -145,7 +145,7 @@ export class Metrics {
   static readonly pillRadius: number = 12  // pill 圆角(全圆)
   static readonly menuRadius: number = 12  // 菜单/浮层圆角
   static readonly cardRadius: number = 12  // 卡片圆角
-  static readonly listItemH: number = 36   // 会话列表项高
+  static readonly listItemH: number = 48   // 会话列表项高(HIG B-1 ≥48,原 36)
   static readonly listItemRadius: number = 8
   static readonly spinnerSize: number = 20 // spinner 2px 环
 }

@@ -48,10 +48,12 @@ export struct ApprovalCardView {
 
         Row({ space: 12 }) {
           Button('拒绝')
+            .height(48)
             .backgroundColor(Th.c.danger)
             .enabled(!this.sending)
             .onClick(() => this.onDecision(false))
           Button('批准')
+            .height(48)
             .backgroundColor(Th.c.success)
             .enabled(!this.sending)
             .onClick(() => this.onDecision(true))
