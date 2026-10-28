@@ -12,6 +12,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 input, select, textarea { font: inherit; color: var(--hmh-label-primary); }
 ::placeholder { color: var(--hmh-label-dimmed); }
 
+/* HIG P3(RFC §2.7)内置线性 icon 集(icons.tsx,自绘 SVG 零依赖):
+   尺寸走 token(inline 16 / status 20),stroke=currentColor 随文字色。
+   .hmh-icon-flow = 文本流内前置图标的对齐与间距;替代旧 Emoji 字号 hack */
+.hmh-icon { width: var(--hmh-icon-size-inline); height: var(--hmh-icon-size-inline); flex-shrink: 0; display: inline-block; }
+.hmh-icon.status { width: var(--hmh-icon-size-status); height: var(--hmh-icon-size-status); }
+.hmh-icon-flow { margin-right: 4px; vertical-align: -3px; }
+
 /* 细滚动条(DSH:thumb 浅灰 + hover 加深;scrollbar-* 可继承,设一次即可) */
 body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transparent; }
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -58,7 +65,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-1); border-bottom: 1px solid var(--hmh-border-l1);
   -webkit-app-region: drag; user-select: none;
 }
-.titlebar .titlebar-menu { -webkit-app-region: no-drag; font-size: 17px; padding: 2px 10px; border-radius: var(--hmh-radius-sm); }
+.titlebar .titlebar-menu { -webkit-app-region: no-drag; padding: 2px 10px; border-radius: var(--hmh-radius-sm); }
 .titlebar .titlebar-title { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
 
 /* minmax(0,1fr):行高锁死为容器高。2026-10-10 装机事故根因——grid 隐式行是
@@ -91,7 +98,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .workspace-bar:hover { background: var(--hmh-interactive-bg-hover); }
 .ws-bar-label { font-size: var(--hmh-font-size-xs); text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; color: var(--hmh-label-tertiary); }
 .ws-bar-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hmh-label-primary); }
-.ws-bar-caret { flex-shrink: 0; font-size: var(--hmh-font-size-xs); }
+.ws-bar-caret { flex-shrink: 0; }
 .ws-menu-backdrop { position: fixed; inset: 0; z-index: 80; }
 /* 菜单浮层:12px 圆角 + 对比细边 + shadow-lv3 + 内 padding 4(DSH §3) */
 .ws-menu {
@@ -120,8 +127,10 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   color: var(--hmh-label-secondary); font-size: var(--hmh-font-size-xs);
 }
 .ws-group-head:hover { background: var(--hmh-interactive-bg-hover); }
-.ws-group-caret { font-size: var(--hmh-font-size-xs); transition: transform var(--hmh-dur-panel) var(--hmh-ease); flex-shrink: 0; }
-.ws-group-caret.open { transform: rotate(90deg); }
+/* 组头 caret:SVG chevron(基态指下=展开;收起时左转 90° 指右;
+   旋转过渡沿用 panel 档;HIG P3 组2 由 Unicode ▸ 换线性 icon) */
+.ws-group-caret { display: inline-flex; transform: rotate(-90deg); transition: transform var(--hmh-dur-panel) var(--hmh-ease); flex-shrink: 0; }
+.ws-group-caret.open { transform: rotate(0deg); }
 .ws-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-group-count { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); flex-shrink: 0; }
 
@@ -136,13 +145,12 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* 侧栏收缩 + 状态过滤 + 快捷键面板 */
 .app-shell.no-sidebar { grid-template-columns: 0 1fr auto; }
 .app-shell.no-sidebar .sidebar { display: none; }
-/* 图标按钮触达区加大(2026-10-11 用户反馈图标太小)——尺寸不动,只换 hover 皮 */
-.icon-btn { padding: 6px 10px; font-size: 17px; flex-shrink: 0; min-width: 36px; border-radius: var(--hmh-radius-sm); }
+/* 图标按钮触达区加大(2026-10-11 用户反馈图标太小)——尺寸不动,只换 hover 皮
+   HIG P3 组2:Emoji 字号 hack 移除,图标尺寸由 .hmh-icon token 驱动 */
+.icon-btn { padding: 6px 10px; flex-shrink: 0; min-width: 36px; border-radius: var(--hmh-radius-sm); }
 .topbar .btn { font-size: 15px; }
 .composer-row .btn { font-size: 18px; }
-.ws-group-caret { font-size: var(--hmh-font-size-xs); }
-.ws-bar-caret { font-size: var(--hmh-font-size-xs); }
-.session-export { width: 30px; font-size: 15px; }
+.session-export { width: 30px; }
 /* 输入族:高 32、8px 圆角、1px border-l2、focus 变品牌边(DSH §3);
    HIG P2(RFC §2.1):次要控件文字用 subtle 档 13/20 */
 .session-search, .status-filter {
@@ -331,7 +339,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* 会话行(标题 + 导出) */
 .session-row { display: flex; align-items: stretch; gap: 2px; border-radius: var(--hmh-radius-sm); }
 .session-row .session-item { flex: 1; min-width: 0; }
-.session-export { width: 26px; flex-shrink: 0; color: var(--hmh-label-tertiary); opacity: 0; border-radius: var(--hmh-radius-sm); font-size: 15px; }
+.session-export { width: 26px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--hmh-label-tertiary); opacity: 0; border-radius: var(--hmh-radius-sm); }
 .session-row:hover .session-export { opacity: 1; }
 .session-export:hover { color: var(--hmh-brand-primary); background: var(--hmh-interactive-bg-hover); }
 .session-export.danger:hover { color: var(--hmh-state-error); }
@@ -395,6 +403,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   color: var(--hmh-label-secondary); background: var(--hmh-bg-layer-2);
 }
 .model-picker-anchor { position: relative; }
+.topbar-model .hmh-icon { margin-left: 2px; }
 .topbar-model.as-button { cursor: pointer; }
 .topbar-model.as-button:hover { color: var(--hmh-label-primary); background: var(--hmh-interactive-bg-hover); }
 .topbar-model.as-button:disabled { cursor: default; }
@@ -422,7 +431,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-2); color: var(--hmh-label-secondary);
 }
 .att-chip:hover { background: var(--hmh-interactive-bg-hover); }
-.att-chip button { color: var(--hmh-label-tertiary); font-size: 11px; }
+.att-chip button { display: inline-flex; color: var(--hmh-label-tertiary); }
 .att-chip button:hover { color: var(--hmh-state-error); }
 
 /* 图片附件 chip + 拖放提示 + 顶栏语言切换(2026-10-11 对标 DSH) */

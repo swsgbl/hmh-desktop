@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventEnvelope, RunStatus } from '@hmh-desktop/contracts';
 import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type ProviderDetailDto, type SessionPreviewDto, type WorkspaceDto } from './bridge.ts';
 import { useLocale } from './i18n.ts';
+import { Icon } from './icons.tsx';
 import { useTheme, type Theme } from './theme.ts';
 import { SetupWizard } from './SetupWizard.tsx';
 
@@ -533,7 +534,7 @@ export function App(): React.ReactElement {
     }
   }, [L, switchWorkspace]);
 
-  // 应用菜单动作(标题栏 ☰/托盘 → 主题/面板;文件→新建)
+  // 应用菜单动作(标题栏主菜单/托盘 → 主题/面板;文件→新建)
   useEffect(() => {
     if (bridge === undefined) return;
     const off = bridge.onMenuAction((action) => {
@@ -840,7 +841,7 @@ export function App(): React.ReactElement {
           aria-label={L.shortcuts.title}
           title={L.shortcuts.title}
           onClick={() => { if (bridge !== undefined) void bridge.popupMainMenu(); }}
-        >☰</button>
+        ><Icon name="menu" /></button>
         <span className="titlebar-title">HMH Desktop</span>
         <span className="titlebar-spacer" aria-hidden="true" />
       </header>
@@ -980,7 +981,7 @@ export function App(): React.ReactElement {
               aria-expanded={wsMenuOpen}
               onClick={() => setWsMenuOpen((v) => !v)}
               disabled={workspaces === null}
-            >▾</button>
+            ><Icon name="chevron-down" /></button>
           </div>
           <input
             className="session-search"
@@ -1011,7 +1012,7 @@ export function App(): React.ReactElement {
         >
           <span className="ws-bar-label">{L.sidebar.workspaceBar}</span>
           <span className="ws-bar-name">{workspaces !== null ? (workspaces.items.find((w) => w.id === workspaces.current)?.name ?? L.dock.none) : L.dock.loading}</span>
-          <span className="ws-bar-caret" aria-hidden="true">▾</span>
+          <span className="ws-bar-caret" aria-hidden="true"><Icon name="chevron-down" /></span>
         </button>
         {wsMenuOpen && (
           <>
@@ -1025,7 +1026,7 @@ export function App(): React.ReactElement {
                   onClick={() => void newSessionIn(w.id)}
                   title={L.sidebar.newInWs(w.name)}
                 >
-                  <span className="ws-menu-name">📁 {w.name}</span>
+                  <span className="ws-menu-name"><Icon name="folder" className="hmh-icon-flow" />{w.name}</span>
                   <span className="ws-menu-path">{w.path}</span>
                   {w.id === workspaces.current && <span className="ws-menu-check">✓ {L.sidebar.wsCurrent}</span>}
                 </button>
@@ -1049,8 +1050,8 @@ export function App(): React.ReactElement {
                   title={g.cwd !== '' ? L.sidebar.sessionIn(g.cwd) : ''}
                   onClick={() => toggleGroup(g.cwd)}
                 >
-                  <span className={`ws-group-caret${collapsed ? '' : ' open'}`} aria-hidden="true">▸</span>
-                  <span className="ws-group-name">📁 {g.name}</span>
+                  <span className={`ws-group-caret${collapsed ? '' : ' open'}`} aria-hidden="true"><Icon name="chevron-down" /></span>
+                  <span className="ws-group-name"><Icon name="folder" className="hmh-icon-flow" />{g.name}</span>
                   <span className="ws-group-count">{L.sidebar.sessionCountUnit(g.items.length)}</span>
                 </button>
                 {!collapsed && g.items.map((s) => (
@@ -1063,10 +1064,10 @@ export function App(): React.ReactElement {
                       <span className="session-title">{pinned.has(s.id) ? L.sidebar.pinnedFirst : ''}{s.title !== '' ? s.title : s.task.slice(0, 40) || s.id}</span>
                       <span className="session-time">{busySessions.has(s.id) && <span className="session-running-dot" title={L.sidebar.runningTitle} aria-label={L.sidebar.runningTitle} />}{s.updatedAt.slice(0, 16).replace('T', ' ')}</span>
                     </button>
-                    <button className={`session-export${pinned.has(s.id) ? ' pinned' : ''}`} aria-label={pinned.has(s.id) ? L.sidebar.unpinAria(s.id) : L.sidebar.pinAria(s.id)} title={L.sidebar.pinTitle} onClick={() => togglePin(s.id)}>{pinned.has(s.id) ? '★' : '☆'}</button>
-                    <button className="session-export" aria-label={L.sidebar.exportAria(s.id)} title={L.sidebar.exportTitle} onClick={() => void exportSession(s.id)}>⤓</button>
-                    <button className="session-export" aria-label={L.sidebar.archiveAria(s.id)} title={L.sidebar.archiveTitle} onClick={() => void sessionOp(s.id, 'archive')}>🗄</button>
-                    <button className="session-export danger" aria-label={L.sidebar.deleteAria(s.id)} title={L.sidebar.deleteTitle} onClick={() => void sessionOp(s.id, 'delete')}>🗑</button>
+                    <button className={`session-export${pinned.has(s.id) ? ' pinned' : ''}`} aria-label={pinned.has(s.id) ? L.sidebar.unpinAria(s.id) : L.sidebar.pinAria(s.id)} title={L.sidebar.pinTitle} onClick={() => togglePin(s.id)}><Icon name={pinned.has(s.id) ? 'star-filled' : 'star'} /></button>
+                    <button className="session-export" aria-label={L.sidebar.exportAria(s.id)} title={L.sidebar.exportTitle} onClick={() => void exportSession(s.id)}><Icon name="download" /></button>
+                    <button className="session-export" aria-label={L.sidebar.archiveAria(s.id)} title={L.sidebar.archiveTitle} onClick={() => void sessionOp(s.id, 'archive')}><Icon name="archive" /></button>
+                    <button className="session-export danger" aria-label={L.sidebar.deleteAria(s.id)} title={L.sidebar.deleteTitle} onClick={() => void sessionOp(s.id, 'delete')}><Icon name="trash" /></button>
                   </div>
                 ))}
               </div>
@@ -1092,7 +1093,7 @@ export function App(): React.ReactElement {
                 return !v;
               });
             }}
-          >{sidebarCollapsed ? '⇥' : '⇤'}</button>
+          >{sidebarCollapsed ? <Icon name="panel-expand" /> : <Icon name="panel-collapse" />}</button>
           <span className={`host-dot ${hostBadge.connected ? 'on' : 'off'}`} aria-hidden="true" />
           <span className="host-label">{hostBadge.label}{hostBadge.detail !== '' ? ` · ${hostBadge.detail}` : ''}</span>
           {workspaces !== null && (
@@ -1107,7 +1108,7 @@ export function App(): React.ReactElement {
                 aria-expanded={modelMenuOpen}
                 onClick={() => setModelMenuOpen((v) => !v)}
                 disabled={providers.length < 2}
-              >{currentModel} ▾</button>
+              >{currentModel}<Icon name="chevron-down" /></button>
               {modelMenuOpen && (
                 <>
                   <div className="ws-menu-backdrop" onClick={() => setModelMenuOpen(false)} aria-hidden="true" />
@@ -1145,7 +1146,7 @@ export function App(): React.ReactElement {
           )}
           {busy && <button className="btn danger" onClick={() => void interrupt()}>{L.topbar.stop}</button>}
           <span className={`approval-mode${approvalMode === 'auto' ? ' auto' : ''}`} title={L.topbar.approvalTitle}>{L.topbar.approval}:{approvalMode === 'ask' ? L.topbar.approvalAsk : L.topbar.approvalAuto}</span>
-          <button className="btn ghost" aria-label={L.topbar.settingsAria} onClick={() => setSettingsOpen(true)}>⚙</button>
+          <button className="btn ghost" aria-label={L.topbar.settingsAria} onClick={() => setSettingsOpen(true)}><Icon name="sliders" /></button>
           <div className="seg lang-seg" role="group" aria-label={L.settings.language}>
             <button className={locale === 'zh' ? 'on' : ''} onClick={() => setLocale('zh')} aria-pressed={locale === 'zh'} title="中文">中</button>
             <button className={locale === 'en' ? 'on' : ''} onClick={() => setLocale('en')} aria-pressed={locale === 'en'} title="English">EN</button>
@@ -1180,7 +1181,7 @@ export function App(): React.ReactElement {
               return (
                 <details key={it.id} className="tool-card">
                   <summary>
-                    <span className={`tool-badge${it.isError === true ? ' err' : ''}`}>{it.isError === true ? '✕' : '⚙'}</span>
+                    <span className={`tool-badge${it.isError === true ? ' err' : ''}`}><Icon name={it.isError === true ? 'x' : 'cog'} /></span>
                     {it.name}
                     {it.outputPreview === undefined ? <span className="tool-running">{L.stream.toolRunning}</span> : null}
                   </summary>
@@ -1193,7 +1194,7 @@ export function App(): React.ReactElement {
               return (
                 <article key={it.id} className="turn approval-card" aria-label={L.stream.approvalAria}>
                   <div className="approval-head">
-                    <span className="approval-icon">🛡</span> {L.stream.needApproval}:{it.tool}
+                    <Icon name="shield" /> {L.stream.needApproval}:{it.tool}
                   </div>
                   <pre className="tool-io">{it.argsPreview}</pre>
                   <p className="approval-risk">{it.risk}</p>
@@ -1207,7 +1208,7 @@ export function App(): React.ReactElement {
             if (it.kind === 'artifact') {
               return (
                 <div key={it.id} className="artifact-card" aria-label={L.stream.artifactAria}>
-                  <span className="artifact-icon" aria-hidden="true">📦</span>
+                  <Icon name="package" />
                   <span className="artifact-title">{it.title}</span>
                   <span className="artifact-hint">{L.stream.artifactHint}</span>
                 </div>
@@ -1254,7 +1255,7 @@ export function App(): React.ReactElement {
                   <button key={f.path} className="fs-row" onClick={() => {
                     setAttachments((prev) => (prev.some((a) => a.path === f.path) ? prev : [...prev, f]));
                     setAttOpen(false); setAttQuery(''); setAttResults([]);
-                  }}>📄 {f.rel}</button>
+                  }}><Icon name="file" className="hmh-icon-flow" />{f.rel}</button>
                 ))}
                 {attQuery !== '' && attResults.length === 0 && <div className="empty-hint">{L.composer.attachEmpty}</div>}
               </div>
@@ -1264,8 +1265,8 @@ export function App(): React.ReactElement {
             <div className="att-chips">
               {attachments.map((a) => (
                 <span key={a.path} className="att-chip">
-                  📄 {a.rel}
-                  <button aria-label={L.composer.removeAttachAria(a.rel)} onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}>✕</button>
+                  <Icon name="file" className="hmh-icon-flow" />{a.rel}
+                  <button aria-label={L.composer.removeAttachAria(a.rel)} onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}><Icon name="x" /></button>
                 </span>
               ))}
             </div>
@@ -1275,14 +1276,14 @@ export function App(): React.ReactElement {
               {images.map((im, i) => (
                 <span key={im.dataUrl.slice(-64)} className="att-chip img" aria-label={L.composer.pasteImageAria(i + 1)}>
                   <img src={im.dataUrl} alt={im.name} className="att-thumb" />
-                  <button aria-label={L.composer.removeImageAria(i + 1)} onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}>✕</button>
+                  <button aria-label={L.composer.removeImageAria(i + 1)} onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}><Icon name="x" /></button>
                 </span>
               ))}
             </div>
           )}
           <div className="composer-row">
             <button className="btn ghost" aria-label={L.composer.attachAria} title={L.composer.attachTitle} onClick={() => setAttOpen((v) => !v)} disabled={activeSession === ''}>@</button>
-            <button className="btn ghost" aria-label={L.composer.uploadAria} title={L.composer.uploadTitle} onClick={() => void uploadFiles()} disabled={activeSession === ''}>📎</button>
+            <button className="btn ghost" aria-label={L.composer.uploadAria} title={L.composer.uploadTitle} onClick={() => void uploadFiles()} disabled={activeSession === ''}><Icon name="paperclip" /></button>
             <textarea
             value={draft}
             placeholder={activeSession === ''
@@ -1393,10 +1394,10 @@ export function App(): React.ReactElement {
                 </div>
                 <div className="fs-list">
                   {(fsData?.dirs ?? []).map((d) => (
-                    <button key={d.path} className="fs-row dir" onClick={() => void loadFs(d.path)}>📁 {d.name}</button>
+                    <button key={d.path} className="fs-row dir" onClick={() => void loadFs(d.path)}><Icon name="folder" className="hmh-icon-flow" />{d.name}</button>
                   ))}
                   {(fsData?.files ?? []).map((f) => (
-                    <button key={f.path} className="fs-row" onClick={() => void previewFile(f.path)}>📄 {f.name}</button>
+                    <button key={f.path} className="fs-row" onClick={() => void previewFile(f.path)}><Icon name="file" className="hmh-icon-flow" />{f.name}</button>
                   ))}
                   {fsData !== null && (fsData.dirs.length === 0 && (fsData.files ?? []).length === 0) && <div className="empty-hint">{L.dock.emptyDir}</div>}
                   {fsData === null && <div className="empty-hint">{hostState === 'ready' ? L.dock.loading : L.dock.hostNotConnected}</div>}
