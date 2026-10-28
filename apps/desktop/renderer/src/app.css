@@ -265,6 +265,14 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .approval-card { border-color: var(--hmh-state-warn); align-self: stretch; max-width: 760px; }
 .approval-head { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; color: var(--hmh-state-warn); }
 .approval-risk { margin: 8px 0 0; font-size: var(--hmh-font-size-sm); color: var(--hmh-label-secondary); }
+/* HIG P3(RFC §3 ApprovalCard):目标/权限两字段结构化展示
+   (数据来自 payload 既有参数,展示层解析);主批准 primary + 次拒绝 ghost。
+   防误触边界:审批权威在 runtime,UI 只转述——上方注释语义不可动 */
+.approval-fields { display: flex; flex-direction: column; gap: var(--hmh-space-xs); margin-bottom: var(--hmh-space-sm); }
+.approval-field { display: flex; gap: var(--hmh-space-sm); align-items: baseline; }
+.approval-k { flex-shrink: 0; width: 48px; font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
+.approval-v { min-width: 0; font-size: var(--hmh-font-size-subtle); color: var(--hmh-label-primary); word-break: break-all; }
+.approval-v.mono { font: var(--hmh-font-size-xs) var(--hmh-font-mono); }
 .approval-actions { display: flex; gap: 8px; margin-top: 12px; }
 
 .turn.system { border-color: var(--hmh-state-error); align-self: stretch; max-width: 760px; }

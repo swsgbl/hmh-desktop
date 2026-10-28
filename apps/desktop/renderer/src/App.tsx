@@ -75,6 +75,32 @@ function TurnText({ text, cursor }: { text: string; cursor?: React.ReactNode }):
   );
 }
 
+/** HIG P3(RFC §3 ApprovalCard)展示层结构化:从 argsPreview 提取目标
+ *  (path/command 等常见参数键);解析不出时截首行摘要。权威判定在 runtime。 */
+function approvalTargetOf(argsPreview: string): string {
+  try {
+    const a = JSON.parse(argsPreview) as Record<string, unknown>;
+    for (const k of ['path', 'file', 'target', 'dest', 'cwd', 'command', 'cmd', 'url']) {
+      const v = a[k];
+      if (typeof v === 'string' && v !== '') return v;
+    }
+  } catch { /* 非 JSON 参数 */ }
+  return (argsPreview.split('\n')[0] ?? '').slice(0, 120);
+}
+
+/** 权限范围标签键:按工具名推断(展示层文案;不替代 runtime 审批门)。 */
+type ApprovalScope = 'write' | 'delete' | 'exec' | 'read' | 'net' | 'tool';
+
+function approvalScopeOf(tool: string): ApprovalScope {
+  const t = tool.toLowerCase();
+  if (/(delete|remove|trash|drop)/.test(t)) return 'delete';
+  if (/(write|create|mkdir|rename|move|patch|edit)/.test(t)) return 'write';
+  if (/(exec|shell|bash|cmd|powershell|spawn|run)/.test(t)) return 'exec';
+  if (/(fetch|http|web|net|curl|request)/.test(t)) return 'net';
+  if (/(read|list|glob|search|stat|grep|find)/.test(t)) return 'read';
+  return 'tool';
+}
+
 export function App(): React.ReactElement {
   const { locale, L, setLocale } = useLocale();
   const { theme, setTheme } = useTheme();
@@ -1191,16 +1217,35 @@ export function App(): React.ReactElement {
               );
             }
             if (it.kind === 'approval') {
+              const scopeKey = approvalScopeOf(it.tool);
+              const scopeText = scopeKey === 'write' ? L.stream.scopeWrite
+                : scopeKey === 'delete' ? L.stream.scopeDelete
+                : scopeKey === 'exec' ? L.stream.scopeExec
+                : scopeKey === 'net' ? L.stream.scopeNet
+                : scopeKey === 'read' ? L.stream.scopeRead
+                : L.stream.scopeTool;
               return (
                 <article key={it.id} className="turn approval-card" aria-label={L.stream.approvalAria}>
                   <div className="approval-head">
                     <Icon name="shield" /> {L.stream.needApproval}:{it.tool}
                   </div>
+                  {/* HIG P3(RFC §3):目标路径/权限说明结构化展示——
+                      数据全部来自 approval payload 既有参数,展示层解析;UI 不替代 runtime 审批门 */}
+                  <div className="approval-fields">
+                    <div className="approval-field">
+                      <span className="approval-k">{L.stream.approvalTargetLabel}</span>
+                      <code className="approval-v mono">{approvalTargetOf(it.argsPreview)}</code>
+                    </div>
+                    <div className="approval-field">
+                      <span className="approval-k">{L.stream.approvalScopeLabel}</span>
+                      <span className="approval-v">{scopeText}</span>
+                    </div>
+                  </div>
                   <pre className="tool-io">{it.argsPreview}</pre>
                   <p className="approval-risk">{it.risk}</p>
                   <div className="approval-actions">
                     <button className="btn primary" disabled={approvalBusy} onClick={() => void approve(true)}>{L.stream.approve}</button>
-                    <button className="btn danger" disabled={approvalBusy} onClick={() => void approve(false)}>{L.stream.reject}</button>
+                    <button className="btn ghost" disabled={approvalBusy} onClick={() => void approve(false)}>{L.stream.reject}</button>
                   </div>
                 </article>
               );
