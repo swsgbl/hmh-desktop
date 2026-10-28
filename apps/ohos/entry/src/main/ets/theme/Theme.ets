@@ -102,7 +102,7 @@ export class Th {
 
 // ---------- 尺寸:v3 布局不回退 + DSH 组件规范(蓝本 §3) ----------
 export class Metrics {
-  static readonly titlebarH: number = 36
+  static readonly titlebarH: number = 44        // HIG §3 表格栏 44-52 下限(原 36)
   static readonly sidebarW: number = 264
   static readonly sidebarMin: number = 250
   static readonly sidebarMax: number = 280
