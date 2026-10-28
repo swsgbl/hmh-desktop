@@ -75,13 +75,27 @@ export class Th {
     AppStorage.setOrCreate('themeRev', rev)
   }
 
-  // 'light' | 'dark' | 'system' → 应用(浅色默认:非法值也落浅色,任务书 §一.3)
+  // 'light' | 'dark' | 'system' → 应用(浅色默认:非法值也落浅色)
   static apply(pref: string): void {
+    AppStorage.setOrCreate('themePref', pref)
     if (pref === 'dark') {
       Th.setDark(true)
+    } else if (pref === 'system') {
+      // 跟随系统:读 EntryAbility.onConfigurationUpdate 写入的 colorMode 快照
+      // ('systemDark' 缺省 false=浅色;深色跟随由 EntryAbility 兑现,HIG 适配项 2)
+      const sysDark = AppStorage.get<boolean>('systemDark') ?? false
+      Th.setDark(sysDark)
     } else {
-      // light 与 system 均落浅色(VM 无深色系统态;深色仅用户显式选择)
       Th.setDark(false)
+    }
+  }
+
+  /** EntryAbility.onConfigurationUpdate 调用:系统深色态变化 → 若当前偏好为
+   * system 则即时重应用(真跟随);由 Ability 层持有偏好值,Theme 不读 store */
+  static onSystemColorMode(sysDark: boolean): void {
+    AppStorage.setOrCreate('systemDark', sysDark)
+    if (AppStorage.get<string>('themePref') === 'system') {
+      Th.setDark(sysDark)
     }
   }
 }
