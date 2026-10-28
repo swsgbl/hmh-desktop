@@ -190,9 +190,23 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-1); border: 1px solid var(--hmh-border-l1);
 }
 .turn.user { align-self: flex-end; background: var(--hmh-user-turn-bg); }
+/* HIG P3(RFC §3 ConversationTimeline)三级视觉权重:
+   一级=最终答案(.assistant/.streaming:实底卡 + border-l2 + 阴影,正文 body 15/23);
+   二级=用户请求(.user 浅染气泡,无阴影,保持现状);
+   三级=工具活动(.tool-card 收窄 + 更浅底,见下)。只改样式层,数据流不变。 */
+.turn.assistant { border-color: var(--hmh-border-l2); box-shadow: var(--hmh-shadow-lv1); }
+.turn.streaming { border-style: dashed; box-shadow: var(--hmh-shadow-lv1); }
 .turn.system { border-color: var(--hmh-state-error); }
 /* HIG P2(RFC §2.1):会话正文/最终答案升 body 档 15/23(旧 sm=14/22 保留为底层) */
 .turn-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: var(--hmh-font-size-body); line-height: var(--hmh-line-height-body); }
+/* HIG P3(RFC §3):fenced 长代码块内滚动——max-height + overflow auto,
+   长(横向溢出)代码行在块内滚动(pre),不再撑长 turn 卡;正文仍通排 */
+.turn-code {
+  margin: var(--hmh-space-xs) 0; padding: var(--hmh-space-sm) var(--hmh-space-md);
+  max-height: 320px; overflow: auto; white-space: pre;
+  background: var(--hmh-bg-layer-2); border-radius: var(--hmh-radius-sm);
+  font: var(--hmh-font-size-xs)/18px var(--hmh-font-mono); color: var(--hmh-label-secondary);
+}
 .status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--hmh-font-size-xs); margin-bottom: 6px; }
 .status-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .status-running { color: var(--hmh-status-running); }
@@ -214,11 +228,13 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .composer-row .btn { align-self: flex-end; height: 44px; }
 .send { align-self: flex-end; }
 
-/* 工具折叠卡(过程默认折叠) */
+/* 工具折叠卡(过程默认折叠)
+   HIG P3(RFC §3):三级降权——收窄(760→620)+ 半透明更浅底 + 次要色(现状) */
 .tool-card {
-  max-width: 760px; align-self: flex-start;
+  max-width: 620px; align-self: flex-start;
   border: 1px solid var(--hmh-border-l1); border-radius: var(--hmh-radius-md);
-  background: var(--hmh-bg-layer-2); color: var(--hmh-label-secondary);
+  background: color-mix(in srgb, var(--hmh-bg-layer-2) 55%, transparent);
+  color: var(--hmh-label-secondary);
   font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs);
 }
 .tool-card summary {
@@ -246,8 +262,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .turn.system { border-color: var(--hmh-state-error); align-self: stretch; max-width: 760px; }
 .composer-side { display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
 
-/* 流式输出 */
-.turn.streaming { border-style: dashed; }
+/* 流式输出(dashed 边与主角阴影已并入上方 .turn.assistant 区块) */
 .cursor { animation: hmh-blink 1s steps(1) infinite; color: var(--hmh-brand-primary); }
 @keyframes hmh-blink { 50% { opacity: 0; } }
 
@@ -293,13 +308,15 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .cmdk-item { display: block; width: 100%; text-align: left; padding: 8px 12px; border-radius: var(--hmh-radius-sm); font-size: var(--hmh-font-size-sm); }
 .cmdk-item:hover, .cmdk-item:focus-visible { background: var(--hmh-interactive-bg-hover); outline: none; }
 
-/* 交付物卡:success 细边 + 浅染底 */
+/* 交付物卡:success 细边 + 浅染底
+   HIG P3(RFC §3):结果卡突出——与一级答案同级加阴影,边框染度 35%→45% */
 .artifact-card {
   display: flex; align-items: center; gap: 8px;
   max-width: 760px; padding: 8px 14px;
-  border: 1px solid color-mix(in srgb, var(--hmh-state-success) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hmh-state-success) 45%, transparent);
   border-radius: var(--hmh-radius-md);
   background: color-mix(in srgb, var(--hmh-state-success) 6%, transparent);
+  box-shadow: var(--hmh-shadow-lv1);
   font-size: var(--hmh-font-size-sm);
 }
 .artifact-title { font: var(--hmh-font-size-xs) var(--hmh-font-mono); color: var(--hmh-label-primary); word-break: break-all; }

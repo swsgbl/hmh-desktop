@@ -35,6 +35,45 @@ type Item =
 
 type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs' | 'remote';
 
+/** HIG P3(RFC §3):turn 文本切分——fenced(```)代码块独立成段,
+ *  代码段进内滚动容器(.turn-code)不再撑长卡片,正文段保持通排。纯渲染层,不碰数据流。 */
+interface TurnChunk { kind: 'text' | 'code'; body: string }
+
+function splitCodeChunks(text: string): TurnChunk[] {
+  const chunks: TurnChunk[] = [];
+  let buf: string[] = [];
+  let inCode = false;
+  const flush = (): void => {
+    if (buf.length === 0) return;
+    chunks.push({ kind: inCode ? 'code' : 'text', body: buf.join('\n') });
+    buf = [];
+  };
+  for (const line of text.split('\n')) {
+    if (line.trim().startsWith('```')) {
+      flush();
+      inCode = !inCode;
+      continue;
+    }
+    buf.push(line);
+  }
+  flush(); // 流式中未闭合的 fence 同样收敛进 code 段(容器内增长,历史不重排)
+  return chunks;
+}
+
+function TurnText({ text, cursor }: { text: string; cursor?: React.ReactNode }): React.ReactElement {
+  const chunks = splitCodeChunks(text).filter((c) => c.body !== '');
+  return (
+    <>
+      {chunks.length === 0 && cursor !== undefined && <p className="turn-text">{cursor}</p>}
+      {chunks.map((c, i) => c.kind === 'code' ? (
+        <pre key={i} className="turn-code">{c.body}</pre>
+      ) : (
+        <p key={i} className="turn-text">{i === chunks.length - 1 && cursor !== undefined ? <>{c.body}{cursor}</> : c.body}</p>
+      ))}
+    </>
+  );
+}
+
 export function App(): React.ReactElement {
   const { locale, L, setLocale } = useLocale();
   const { theme, setTheme } = useTheme();
@@ -1126,14 +1165,14 @@ export function App(): React.ReactElement {
             if (it.kind === 'user') {
               return (
                 <article key={it.id} className="turn user">
-                  <p className="turn-text">{it.text}</p>
+                  <TurnText text={it.text} />
                 </article>
               );
             }
             if (it.kind === 'assistant') {
               return (
-                <article key={it.id} className="turn">
-                  <p className="turn-text">{it.text}</p>
+                <article key={it.id} className="turn assistant">
+                  <TurnText text={it.text} />
                 </article>
               );
             }
@@ -1186,8 +1225,8 @@ export function App(): React.ReactElement {
             );
           })}
           {streaming !== '' && (
-            <article className="turn streaming">
-              <p className="turn-text">{streaming}<span className="cursor" aria-hidden="true">▍</span></p>
+            <article className="turn streaming assistant">
+              <TurnText text={streaming} cursor={<span className="cursor" aria-hidden="true">▍</span>} />
             </article>
           )}
         </div>
