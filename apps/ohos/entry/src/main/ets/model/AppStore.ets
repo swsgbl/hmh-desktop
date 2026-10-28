@@ -30,6 +30,8 @@ const KEY_COLLAPSED = 'collapsedGroups'
 // v6.1: 首启智能检测持久化
 const KEY_LOCAL_SEEN = 'localKernelSeen'
 const KEY_WIZARD_DONE = 'wizardDone'
+// HIG B-4: reduce-motion in-app toggle (no system-level equivalent on OHOS)
+const KEY_REDUCE_MOTION = 'reduceMotion'
 
 export class AppStore {
   private static instance: AppStore | null = null
@@ -41,6 +43,8 @@ export class AppStore {
   // v6.1: 首启智能检测状态(localKernelSeen=本机内核见过/装过;wizardDone=向导走过一遍)
   localKernelSeen: boolean = false
   wizardDone: boolean = false
+  // HIG B-4: reduce-motion in-app toggle
+  reduceMotion: boolean = false
   pinned: Set<string> = new Set<string>()
   collapsedGroups: Set<string> = new Set<string>()
   chat: ChatState = newChatState('')
@@ -85,6 +89,8 @@ export class AppStore {
     this.collapsedGroups = this.parseSet(await this.prefs.get(KEY_COLLAPSED, '[]') as string)
     this.localKernelSeen = (await this.prefs.get(KEY_LOCAL_SEEN, false)) as boolean
     this.wizardDone = (await this.prefs.get(KEY_WIZARD_DONE, false)) as boolean
+    this.reduceMotion = (await this.prefs.get(KEY_REDUCE_MOTION, false)) as boolean
+    Th.setReduceMotion(this.reduceMotion)
   }
 
   /** v6.1: 记住"见过本机内核"(本地共享连成或向导装过) */
@@ -157,6 +163,16 @@ export class AppStore {
       await this.prefs.flush()
     }
     Th.apply(th)
+  }
+
+  /** HIG B-4: reduce-motion toggle persist + apply instantly */
+  async saveReduceMotion(on: boolean): Promise<void> {
+    this.reduceMotion = on
+    if (this.prefs !== null) {
+      await this.prefs.put(KEY_REDUCE_MOTION, on)
+      await this.prefs.flush()
+    }
+    Th.setReduceMotion(on)
   }
 
   async saveConfig(baseUrl: string, token: string): Promise<void> {

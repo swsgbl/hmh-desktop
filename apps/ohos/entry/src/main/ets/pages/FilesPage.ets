@@ -6,6 +6,7 @@ import { AppStore } from '../model/AppStore'
 import { guardFsDir, guardFsRead } from '../model/Guards'
 import { FsDirResp, FsReadResp, FsSegment, FsEntry } from '../model/Types'
 import { ApiError, toApiError } from '../net/ApiClient'
+import { MotionSpinner } from '../components/MotionSpinner'
 
 @Component
 export struct FilesPage {
@@ -99,7 +100,7 @@ export struct FilesPage {
       } else {
         Column({ space: 8 }) {
           if (this.loading) {
-            LoadingProgress().width(28).height(28)
+            MotionSpinner({ side: 28 })
           }
           Text('输入绝对路径浏览(留空列盘符)').fontSize(12).fontColor(Th.c.text3)
           Row({ space: 8 }) {

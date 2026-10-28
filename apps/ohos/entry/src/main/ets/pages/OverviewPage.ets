@@ -6,6 +6,7 @@ import { Th } from '../theme/Theme'
 import { AppStore } from '../model/AppStore'
 import { StateObj } from '../model/Types'
 import { t } from '../model/I18n'
+import { MotionSpinner } from '../components/MotionSpinner'
 
 @Component
 export struct OverviewPage {
@@ -56,7 +57,7 @@ export struct OverviewPage {
       }
       if (this.st === null) {
         if (this.errMsg === '') {
-          LoadingProgress().width(24).height(24)
+          MotionSpinner({ side: 24 })
         }
       } else {
         Scroll() {

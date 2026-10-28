@@ -67,12 +67,20 @@ export function darkVals(): ThemeVals {
 export class Th {
   static c: ThemeVals = lightVals()
   static isDark: boolean = false
+  // 减弱动效(应用内开关;鸿蒙无系统级等价物,HIG RFC 附录 B-4 既定方案)
+  static reduceMotion: boolean = false
 
   static setDark(on: boolean): void {
     Th.isDark = on
     Th.c = on ? darkVals() : lightVals()
     const rev = (AppStorage.get<number>('themeRev') ?? 0) + 1
     AppStorage.setOrCreate('themeRev', rev)
+  }
+
+  static setReduceMotion(on: boolean): void {
+    Th.reduceMotion = on
+    const rev = (AppStorage.get<number>('motionRev') ?? 0) + 1
+    AppStorage.setOrCreate('motionRev', rev)
   }
 
   // 'light' | 'dark' | 'system' → 应用(浅色默认:非法值也落浅色)
