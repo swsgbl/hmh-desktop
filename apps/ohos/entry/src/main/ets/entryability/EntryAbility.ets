@@ -1,7 +1,8 @@
-import { UIAbility, AbilityConstant, Want } from '@kit.AbilityKit'
+import { UIAbility, AbilityConstant, Want, Configuration, ConfigurationConstant } from '@kit.AbilityKit'
 import { window } from '@kit.ArkUI'
 import { AppStore } from '../model/AppStore'
 import { bootstrapAfterPrefs } from '../model/Bootstrap'
+import { Th } from '../theme/Theme'
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -49,6 +50,12 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     console.info('HMH Desktop EntryAbility onWindowStageCreate')
+    // HIG 项2 冷启动兜底:系统已处深色而偏好为 system 时,初始化即跟随
+    // (onConfigurationUpdate 只覆盖运行中的系统切换,不覆盖冷启动初始态)
+    const cfg = this.context.config
+    if (cfg !== undefined) {
+      Th.onSystemColorMode(cfg.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK)
+    }
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
         console.error(`Failed to load UI content: ${err.message}`)
@@ -56,6 +63,14 @@ export default class EntryAbility extends UIAbility {
       }
       console.info('UI content loaded successfully')
     })
+  }
+
+  /** HIG 适配项2:系统深色模式变化 → Th.onSystemColorMode(仅 system 偏好下生效)。
+   * 历史差距(Theme.ets:79-86 借口注释)随本回调兑现修复。 */
+  onConfigurationUpdate(newConfig: Configuration): void {
+    const cm = newConfig.colorMode
+    console.info('HMH EntryAbility onConfigurationUpdate colorMode=' + JSON.stringify(cm))
+    Th.onSystemColorMode(cm === ConfigurationConstant.ColorMode.COLOR_MODE_DARK)
   }
 
   onWindowStageDestroy(): void {

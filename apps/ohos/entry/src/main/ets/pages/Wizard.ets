@@ -9,6 +9,7 @@
 import { AppStore } from '../model/AppStore'
 import { Th } from '../theme/Theme'
 import { pasteboard } from '@kit.BasicServicesKit'
+import { MotionSpinner } from '../components/MotionSpinner'
 
 @Component
 export struct Wizard {
@@ -255,7 +256,7 @@ export struct Wizard {
 
         if (this.polling) {
           Row({ space: 8 }) {
-            LoadingProgress().width(16).height(16).color(Th.c.brand)
+            MotionSpinner({ side: 16, color: Th.c.brand })
             Text(`等待本机服务就绪… (${this.pollCount}/60)`)
               .fontSize(11)
               .fontColor(Th.c.text2)

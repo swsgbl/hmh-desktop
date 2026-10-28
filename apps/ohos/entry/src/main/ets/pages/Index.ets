@@ -60,6 +60,20 @@ struct Index {
     }
   }
 
+  /** HIG 适配项1:返回手势拦截——弹层开着时返回=关弹层而非退出应用;其余透传系统 */
+  onBackPress(): boolean {
+    if (this.wizardOpen) {
+      AppStorage.setOrCreate('wizardOpen', false)
+      this.store.markWizardDone()
+      return true
+    }
+    if (this.settingsOpen) {
+      this.settingsOpen = false
+      return true
+    }
+    return false
+  }
+
   private L(key: string): string {
     return t(key, this.locale === 'en' ? 'en' : 'zh')
   }
@@ -89,7 +103,7 @@ struct Index {
         .alignItems(VerticalAlign.Center)
       }
 
-      // ---- titlebar 36px ----
+      // ---- titlebar(HIG §3 44-52 下限;Metrics.titlebarH) ----
       Row({ space: 8 }) {
         Text('☰')
           .fontSize(17)
@@ -103,7 +117,7 @@ struct Index {
           .fontColor(Th.c.text3)
         Blank()
       }
-      .height(36)
+      .height(Metrics.titlebarH)
       .width('100%')
       .backgroundColor(Th.c.l2)
       .alignItems(VerticalAlign.Center)

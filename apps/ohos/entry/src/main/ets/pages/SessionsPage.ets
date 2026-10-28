@@ -15,6 +15,7 @@ import { FsSearchResp } from '../model/Types'
 import { photoAccessHelper } from '@kit.MediaLibraryKit'
 import { fileIo } from '@kit.CoreFileKit'
 import { util } from '@kit.ArkTS'
+import { MotionSpinner } from '../components/MotionSpinner'
 
 @Component
 export struct SessionsPage {
@@ -134,7 +135,7 @@ export struct SessionsPage {
       .width('100%')
 
       if (this.loading) {
-        LoadingProgress().width(24).height(24)
+        MotionSpinner({ side: 24 })
       }
       if (this.errMsg !== '') {
         Text(this.errMsg).fontSize(12).fontColor(Th.c.danger)
@@ -415,7 +416,7 @@ export struct SessionsPage {
             Text(this.atErr).fontSize(11).fontColor(Th.c.danger).width('100%')
           }
           if (this.atSearching) {
-            LoadingProgress().width(20).height(20)
+            MotionSpinner({ side: 20 })
           }
           if (this.atHits.length > 0) {
             Scroll() {

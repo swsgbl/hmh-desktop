@@ -251,7 +251,8 @@ export struct Sidebar {
       }
       .width('100%')
     }
-    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .padding({ left: 10, right: 10, top: 9, bottom: 9 })
+    .constraintSize({ minHeight: Metrics.listItemH })
     .borderRadius(6)
     .backgroundColor(s.id === this.activeId ? Th.c.l1 : Th.c.l2)
     .width('100%')

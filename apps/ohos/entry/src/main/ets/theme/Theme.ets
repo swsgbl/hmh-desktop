@@ -67,6 +67,8 @@ export function darkVals(): ThemeVals {
 export class Th {
   static c: ThemeVals = lightVals()
   static isDark: boolean = false
+  // 减弱动效(应用内开关;鸿蒙无系统级等价物,HIG RFC 附录 B-4 既定方案)
+  static reduceMotion: boolean = false
 
   static setDark(on: boolean): void {
     Th.isDark = on
@@ -75,20 +77,40 @@ export class Th {
     AppStorage.setOrCreate('themeRev', rev)
   }
 
-  // 'light' | 'dark' | 'system' → 应用(浅色默认:非法值也落浅色,任务书 §一.3)
+  static setReduceMotion(on: boolean): void {
+    Th.reduceMotion = on
+    const rev = (AppStorage.get<number>('motionRev') ?? 0) + 1
+    AppStorage.setOrCreate('motionRev', rev)
+  }
+
+  // 'light' | 'dark' | 'system' → 应用(浅色默认:非法值也落浅色)
   static apply(pref: string): void {
+    AppStorage.setOrCreate('themePref', pref)
     if (pref === 'dark') {
       Th.setDark(true)
+    } else if (pref === 'system') {
+      // 跟随系统:读 EntryAbility.onConfigurationUpdate 写入的 colorMode 快照
+      // ('systemDark' 缺省 false=浅色;深色跟随由 EntryAbility 兑现,HIG 适配项 2)
+      const sysDark = AppStorage.get<boolean>('systemDark') ?? false
+      Th.setDark(sysDark)
     } else {
-      // light 与 system 均落浅色(VM 无深色系统态;深色仅用户显式选择)
       Th.setDark(false)
+    }
+  }
+
+  /** EntryAbility.onConfigurationUpdate 调用:系统深色态变化 → 若当前偏好为
+   * system 则即时重应用(真跟随);由 Ability 层持有偏好值,Theme 不读 store */
+  static onSystemColorMode(sysDark: boolean): void {
+    AppStorage.setOrCreate('systemDark', sysDark)
+    if (AppStorage.get<string>('themePref') === 'system') {
+      Th.setDark(sysDark)
     }
   }
 }
 
 // ---------- 尺寸:v3 布局不回退 + DSH 组件规范(蓝本 §3) ----------
 export class Metrics {
-  static readonly titlebarH: number = 36
+  static readonly titlebarH: number = 44        // HIG §3 表格栏 44-52 下限(原 36)
   static readonly sidebarW: number = 264
   static readonly sidebarMin: number = 250
   static readonly sidebarMax: number = 280
@@ -111,7 +133,7 @@ export class Metrics {
   static readonly radiusSm: number = 6
   static readonly radiusMd: number = 10
   static readonly radiusLg: number = 14
-  static readonly iconBtnMin: number = 36
+  static readonly iconBtnMin: number = 48       // HIG B-1 触达区下限(原 36)
   static readonly sendH: number = 44
   // ---- DSH 组件规范 ----
   static readonly btnH: number = 32        // 按钮高 32
@@ -123,7 +145,23 @@ export class Metrics {
   static readonly pillRadius: number = 12  // pill 圆角(全圆)
   static readonly menuRadius: number = 12  // 菜单/浮层圆角
   static readonly cardRadius: number = 12  // 卡片圆角
-  static readonly listItemH: number = 36   // 会话列表项高
+  static readonly listItemH: number = 48   // 会话列表项高(HIG B-1 ≥48,原 36)
   static readonly listItemRadius: number = 8
   static readonly spinnerSize: number = 20 // spinner 2px 环
+  // ---- HIG RFC §2 圆角/字号语义档(对齐 Windows 侧 tokens,vp 语义) ----
+  // 圆角三档:控件 8 / 浮层 12 / 面板 16(RFC §2.3)
+  static readonly radiusControl: number = 8
+  static readonly radiusOverlay: number = 12
+  static readonly radiusPanel: number = 16
+  // 字号层级(RFC §2.1:辅助 12/18 · 次要 13/20 · 正文 15/23 · 小标题 20/28 · 标题 28/34)
+  static readonly fontCaption: number = 12
+  static readonly fontCaptionLH: number = 18
+  static readonly fontSubtle: number = 13
+  static readonly fontSubtleLH: number = 20
+  static readonly fontBody: number = 15
+  static readonly fontBodyLH: number = 23
+  static readonly fontHeading: number = 20
+  static readonly fontHeadingLH: number = 28
+  static readonly fontTitle: number = 28
+  static readonly fontTitleLH: number = 34
 }

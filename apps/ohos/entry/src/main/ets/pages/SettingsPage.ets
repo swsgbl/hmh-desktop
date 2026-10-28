@@ -20,6 +20,7 @@ export struct SettingsPage {
   @State testOk: boolean = false
   @State locale: string = 'zh'
   @State theme: string = 'system'
+  @State reduceMotion: boolean = false
   @State model: string = ''
   @State chatProvider: string = ''
   @State providers: ProviderRow[] = []
@@ -44,6 +45,7 @@ export struct SettingsPage {
     this.token = this.store.token
     this.locale = this.store.locale
     this.theme = this.store.theme
+    this.reduceMotion = this.store.reduceMotion
     this.loadState()
   }
 
@@ -180,6 +182,32 @@ export struct SettingsPage {
             }, (th: string) => th)
           }
           .width('100%')
+        }
+        .alignItems(HorizontalAlign.Start)
+        .width('100%')
+
+        // HIG B-4: 减弱动效(鸿蒙无系统级等价物,应用内开关)
+        Column({ space: 8 }) {
+          Text(this.locale === 'en' ? 'Reduce Motion' : '减弱动效')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .alignSelf(ItemAlign.Start)
+          Row({ space: 6 }) {
+            ForEach([false, true], (on: boolean) => {
+              Text(on ? (this.locale === 'en' ? 'On' : '开') : (this.locale === 'en' ? 'Off' : '关'))
+                .fontSize(12)
+                .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+                .backgroundColor(this.reduceMotion === on ? Th.c.brand : Th.c.l2)
+                .fontColor(this.reduceMotion === on ? Th.c.l1 : Th.c.text)
+                .borderRadius(14)
+                .onClick(() => this.setReduceMotion(on))
+            }, (on: boolean) => `${on}`)
+          }
+          .width('100%')
+          Text(this.locale === 'en' ? 'Disables spinner/pulse animations' : '关闭旋转/脉冲类动效')
+            .fontSize(10)
+            .fontColor(Th.c.text3)
+            .alignSelf(ItemAlign.Start)
         }
         .alignItems(HorizontalAlign.Start)
         .width('100%')
@@ -395,6 +423,11 @@ export struct SettingsPage {
   private setTheme(th: string): void {
     this.theme = th
     this.store.saveTheme(th)
+  }
+
+  private setReduceMotion(on: boolean): void {
+    this.reduceMotion = on
+    this.store.saveReduceMotion(on)
   }
 
   private setLocale(l: string): void {

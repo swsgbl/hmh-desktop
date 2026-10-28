@@ -6,6 +6,7 @@ import { AppStore } from '../model/AppStore'
 import { guardWorkspacesResp } from '../model/Guards'
 import { WorkspacesResp, WorkspaceInfo, WsUseReq } from '../model/Types'
 import { ApiError, toApiError } from '../net/ApiClient'
+import { MotionSpinner } from '../components/MotionSpinner'
 
 @Component
 export struct WorkspacesPage {
@@ -46,7 +47,7 @@ export struct WorkspacesPage {
         Text(this.errMsg).fontSize(13).fontColor(Th.c.danger).width('100%')
       }
       if (this.loading) {
-        LoadingProgress().width(28).height(28)
+        MotionSpinner({ side: 28 })
       }
 
       Scroll() {
