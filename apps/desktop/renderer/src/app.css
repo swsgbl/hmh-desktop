@@ -66,10 +66,13 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
    composer 被推到视口外 6028px 处 = "没有输入框、看不到会话内容"。 */
 .app-shell { display: grid; grid-template-columns: 264px 1fr auto; grid-template-rows: minmax(0, 1fr); height: calc(100% - 36px); }
 
-/* 左栏 */
+/* 左栏
+   HIG P2(RFC §2.4):侧栏表面与内容分离——侧栏=--hmh-surface-sidebar(base),
+   中栏/右栏仍 layer-1 内容浮于其上(浅色 #f9fafb vs #fff 微差,深色 #101216 vs #16181d 清晰)。
+   侧栏内的输入/菜单项仍用 layer-1,控件浮于侧栏表面之上。 */
 .sidebar {
   display: flex; flex-direction: column; position: relative;
-  background: var(--hmh-bg-layer-1);
+  background: var(--hmh-surface-sidebar);
   border-right: 1px solid var(--hmh-border-l1);
   min-width: 250px; max-width: 280px;
 }
