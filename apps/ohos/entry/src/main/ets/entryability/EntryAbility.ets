@@ -50,6 +50,12 @@ export default class EntryAbility extends UIAbility {
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
     console.info('HMH Desktop EntryAbility onWindowStageCreate')
+    // HIG 项2 冷启动兜底:系统已处深色而偏好为 system 时,初始化即跟随
+    // (onConfigurationUpdate 只覆盖运行中的系统切换,不覆盖冷启动初始态)
+    const cfg = this.context.config
+    if (cfg !== undefined) {
+      Th.onSystemColorMode(cfg.colorMode === ConfigurationConstant.ColorMode.COLOR_MODE_DARK)
+    }
     windowStage.loadContent('pages/Index', (err) => {
       if (err.code) {
         console.error(`Failed to load UI content: ${err.message}`)
