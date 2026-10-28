@@ -19,22 +19,24 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 ::-webkit-scrollbar-thumb { background: var(--hmh-scrollbar-thumb); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--hmh-scrollbar-thumb-hover); }
 
-/* 交互反馈统一动效(hover/active 一律过渡;DSH §4) */
+/* 交互反馈统一动效(hover/active 一律过渡;DSH §4)
+   HIG P2(RFC §2.6):hover 反馈 → --hmh-dur-hover(120ms) */
 .btn, .icon-btn, .session-item, .ws-menu-item, .ws-group-head, .workspace-bar,
 .dock-tab, .fs-row, .cmdk-item, .seg button, .topbar-model, .topbar-ws, .att-chip,
 .session-search, .status-filter, .provider-form input, .ws-add, .composer textarea,
 .session-export, .lang-seg button, .guide-pill {
-  transition: background-color var(--hmh-dur) var(--hmh-ease),
-    color var(--hmh-dur) var(--hmh-ease),
-    border-color var(--hmh-dur) var(--hmh-ease),
-    box-shadow var(--hmh-dur) var(--hmh-ease);
+  transition: background-color var(--hmh-dur-hover) var(--hmh-ease),
+    color var(--hmh-dur-hover) var(--hmh-ease),
+    border-color var(--hmh-dur-hover) var(--hmh-ease),
+    box-shadow var(--hmh-dur-hover) var(--hmh-ease);
 }
 
-/* 按钮:胶囊、高 32、padding 0 14(DSH §3 四型:primary 品牌底 / ghost hover 灰 / danger) */
+/* 按钮:高 32、padding 0 14(DSH §3 四型:primary 品牌底 / ghost hover 灰 / danger)
+   HIG P2(RFC §2.3):控件圆角收敛到 control 档(8px),胶囊仅保留 chip 类 */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;
   min-height: 32px; padding: 0 14px; border: none;
-  border-radius: var(--hmh-radius-pill);
+  border-radius: var(--hmh-radius-control);
   font-size: var(--hmh-font-size-sm); line-height: var(--hmh-line-height-sm);
   color: var(--hmh-label-primary);
 }
@@ -64,10 +66,13 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
    composer 被推到视口外 6028px 处 = "没有输入框、看不到会话内容"。 */
 .app-shell { display: grid; grid-template-columns: 264px 1fr auto; grid-template-rows: minmax(0, 1fr); height: calc(100% - 36px); }
 
-/* 左栏 */
+/* 左栏
+   HIG P2(RFC §2.4):侧栏表面与内容分离——侧栏=--hmh-surface-sidebar(base),
+   中栏/右栏仍 layer-1 内容浮于其上(浅色 #f9fafb vs #fff 微差,深色 #101216 vs #16181d 清晰)。
+   侧栏内的输入/菜单项仍用 layer-1,控件浮于侧栏表面之上。 */
 .sidebar {
   display: flex; flex-direction: column; position: relative;
-  background: var(--hmh-bg-layer-1);
+  background: var(--hmh-surface-sidebar);
   border-right: 1px solid var(--hmh-border-l1);
   min-width: 250px; max-width: 280px;
 }
@@ -115,7 +120,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   color: var(--hmh-label-secondary); font-size: var(--hmh-font-size-xs);
 }
 .ws-group-head:hover { background: var(--hmh-interactive-bg-hover); }
-.ws-group-caret { font-size: var(--hmh-font-size-xs); transition: transform var(--hmh-dur) var(--hmh-ease); flex-shrink: 0; }
+.ws-group-caret { font-size: var(--hmh-font-size-xs); transition: transform var(--hmh-dur-panel) var(--hmh-ease); flex-shrink: 0; }
 .ws-group-caret.open { transform: rotate(90deg); }
 .ws-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-group-count { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); flex-shrink: 0; }
@@ -138,9 +143,10 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .ws-group-caret { font-size: var(--hmh-font-size-xs); }
 .ws-bar-caret { font-size: var(--hmh-font-size-xs); }
 .session-export { width: 30px; font-size: 15px; }
-/* 输入族:高 32、8px 圆角、1px border-l2、focus 变品牌边(DSH §3) */
+/* 输入族:高 32、8px 圆角、1px border-l2、focus 变品牌边(DSH §3);
+   HIG P2(RFC §2.1):次要控件文字用 subtle 档 13/20 */
 .session-search, .status-filter {
-  margin-top: 6px; min-height: 32px; padding: 5px 10px; font: 13px/18px var(--hmh-font-ui);
+  margin-top: 6px; min-height: 32px; padding: 5px 10px; font: var(--hmh-font-size-subtle)/var(--hmh-line-height-subtle) var(--hmh-font-ui);
   background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
   border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); outline: none;
 }
@@ -176,7 +182,8 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .spacer { flex: 1; }
 .approval-mode { font-size: var(--hmh-font-size-xs); color: var(--hmh-state-warn); flex-shrink: 0; white-space: nowrap; }
 
-.stream { flex: 1; min-height: 0; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+/* HIG P2(RFC §2.2):组件间留白 → --hmh-space-* 六档;组件内部紧凑保持现状 */
+.stream { flex: 1; min-height: 0; overflow-y: auto; padding: var(--hmh-space-xl); display: flex; flex-direction: column; gap: var(--hmh-space-md); }
 /* 卡片:白底/12px 圆角/细边(DSH §3) */
 .turn {
   max-width: 760px; padding: 12px 16px; border-radius: var(--hmh-radius-md);
@@ -184,7 +191,8 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 }
 .turn.user { align-self: flex-end; background: var(--hmh-user-turn-bg); }
 .turn.system { border-color: var(--hmh-state-error); }
-.turn-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: var(--hmh-font-size-sm); line-height: var(--hmh-line-height-sm); }
+/* HIG P2(RFC §2.1):会话正文/最终答案升 body 档 15/23(旧 sm=14/22 保留为底层) */
+.turn-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: var(--hmh-font-size-body); line-height: var(--hmh-line-height-body); }
 .status-chip { display: inline-flex; align-items: center; gap: 6px; font-size: var(--hmh-font-size-xs); margin-bottom: 6px; }
 .status-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .status-running { color: var(--hmh-status-running); }
@@ -244,7 +252,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 @keyframes hmh-blink { 50% { opacity: 0; } }
 
 /* Dock 面板通用 */
-.files-pane, .evidence-pane { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.files-pane, .evidence-pane { display: flex; flex-direction: column; gap: var(--hmh-space-sm); min-height: 0; }
 .fs-crumbs { display: flex; align-items: center; gap: 8px; font-size: var(--hmh-font-size-xs); }
 .fs-path { color: var(--hmh-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fs-list { display: flex; flex-direction: column; overflow-y: auto; max-height: 40%; }
@@ -320,7 +328,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; gap: 12px; }
 .settings-row > span { font-size: var(--hmh-font-size-sm); }
 .seg { display: flex; border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); overflow: hidden; background: var(--hmh-bg-layer-1); }
-.seg button { padding: 4px 12px; font-size: 13px; color: var(--hmh-label-secondary); }
+.seg button { padding: 4px 12px; font-size: var(--hmh-font-size-subtle); color: var(--hmh-label-secondary); }
 .seg button:hover { background: var(--hmh-interactive-bg-hover); }
 .seg button.on { background: var(--hmh-brand-primary); color: #fff; }
 .settings-note { padding: 6px 14px 12px; font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
@@ -331,13 +339,13 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 
 /* Provider 设置 */
 .provider-list { padding: 0 14px; display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; }
-.provider-row { display: flex; gap: 10px; font-size: 13px; align-items: baseline; }
+.provider-row { display: flex; gap: 10px; font-size: var(--hmh-font-size-subtle); align-items: baseline; }
 .provider-name { font-weight: 600; min-width: 70px; }
 .provider-model { color: var(--hmh-label-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .provider-key { font: var(--hmh-font-size-xs) var(--hmh-font-mono); color: var(--hmh-state-success); }
 .provider-form { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px 4px; }
 .provider-form input {
-  flex: 1 1 45%; min-height: 32px; padding: 5px 10px; font: 13px/18px var(--hmh-font-ui);
+  flex: 1 1 45%; min-height: 32px; padding: 5px 10px; font: var(--hmh-font-size-subtle)/var(--hmh-line-height-subtle) var(--hmh-font-ui);
   background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
   border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); outline: none;
 }
@@ -346,7 +354,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* 工作区选择器 */
 .ws-picker { display: flex; flex-direction: column; gap: 6px; }
 .ws-picker select {
-  min-height: 32px; padding: 5px 8px; font: 13px/18px var(--hmh-font-ui);
+  min-height: 32px; padding: 5px 8px; font: var(--hmh-font-size-subtle)/var(--hmh-line-height-subtle) var(--hmh-font-ui);
   background: var(--hmh-bg-layer-1); color: var(--hmh-label-primary);
   border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm); outline: none;
 }
@@ -439,15 +447,15 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   background: var(--hmh-bg-layer-1); border-left: 1px solid var(--hmh-border-l1);
 }
 .dock-tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--hmh-border-l1); }
-.dock-tab { padding: 3px 10px; border-radius: var(--hmh-radius-pill); font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs); color: var(--hmh-label-secondary); }
+.dock-tab { padding: 3px 10px; border-radius: var(--hmh-radius-control); font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs); color: var(--hmh-label-secondary); }
 .dock-tab:hover { background: var(--hmh-interactive-bg-hover); }
 .dock-tab.active { background: var(--hmh-list-active-bg); color: var(--hmh-label-primary); box-shadow: inset 0 0 0 1px var(--hmh-border-l2); }
-.dock-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
+.dock-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--hmh-space-md); }
 .dock-row { display: flex; justify-content: space-between; padding: 6px 4px; font-size: var(--hmh-font-size-sm); }
 .dock-k { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
-.dock-note { margin-top: 12px; font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
+.dock-note { margin-top: var(--hmh-space-md); font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
 
-.empty-hint { color: var(--hmh-label-tertiary); padding: 16px; font-size: var(--hmh-font-size-sm); }
+.empty-hint { color: var(--hmh-label-tertiary); padding: var(--hmh-space-lg); font-size: var(--hmh-font-size-sm); }
 .empty-hint.big { text-align: center; margin: auto; font-size: var(--hmh-font-size-md); }
 
 /* ---- v5.1 首启安装向导(Setup Wizard;结构同 runtime-guide 的遮罩层,置顶) ---- */
@@ -499,7 +507,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .wizard-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
 .wizard-footer { display: flex; justify-content: space-between; gap: 8px; padding-top: 4px; border-top: 1px solid var(--hmh-border-l1); }
 .wizard-progress { height: 8px; border-radius: var(--hmh-radius-pill); background: var(--hmh-bg-layer-2); overflow: hidden; }
-.wizard-progress-fill { height: 100%; background: var(--hmh-brand-primary); transition: width 0.25s ease; }
+.wizard-progress-fill { height: 100%; background: var(--hmh-brand-primary); transition: width var(--hmh-dur-complete) var(--hmh-ease); }
 .wizard-progress.indeterminate .wizard-progress-fill { width: 34%; animation: wizard-slide 1.2s ease-in-out infinite; }
 @keyframes wizard-slide { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
 .wizard-install-log {
