@@ -19,15 +19,16 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 ::-webkit-scrollbar-thumb { background: var(--hmh-scrollbar-thumb); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--hmh-scrollbar-thumb-hover); }
 
-/* 交互反馈统一动效(hover/active 一律过渡;DSH §4) */
+/* 交互反馈统一动效(hover/active 一律过渡;DSH §4)
+   HIG P2(RFC §2.6):hover 反馈 → --hmh-dur-hover(120ms) */
 .btn, .icon-btn, .session-item, .ws-menu-item, .ws-group-head, .workspace-bar,
 .dock-tab, .fs-row, .cmdk-item, .seg button, .topbar-model, .topbar-ws, .att-chip,
 .session-search, .status-filter, .provider-form input, .ws-add, .composer textarea,
 .session-export, .lang-seg button, .guide-pill {
-  transition: background-color var(--hmh-dur) var(--hmh-ease),
-    color var(--hmh-dur) var(--hmh-ease),
-    border-color var(--hmh-dur) var(--hmh-ease),
-    box-shadow var(--hmh-dur) var(--hmh-ease);
+  transition: background-color var(--hmh-dur-hover) var(--hmh-ease),
+    color var(--hmh-dur-hover) var(--hmh-ease),
+    border-color var(--hmh-dur-hover) var(--hmh-ease),
+    box-shadow var(--hmh-dur-hover) var(--hmh-ease);
 }
 
 /* 按钮:高 32、padding 0 14(DSH §3 四型:primary 品牌底 / ghost hover 灰 / danger)
@@ -116,7 +117,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   color: var(--hmh-label-secondary); font-size: var(--hmh-font-size-xs);
 }
 .ws-group-head:hover { background: var(--hmh-interactive-bg-hover); }
-.ws-group-caret { font-size: var(--hmh-font-size-xs); transition: transform var(--hmh-dur) var(--hmh-ease); flex-shrink: 0; }
+.ws-group-caret { font-size: var(--hmh-font-size-xs); transition: transform var(--hmh-dur-panel) var(--hmh-ease); flex-shrink: 0; }
 .ws-group-caret.open { transform: rotate(90deg); }
 .ws-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-group-count { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); flex-shrink: 0; }
@@ -503,7 +504,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .wizard-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
 .wizard-footer { display: flex; justify-content: space-between; gap: 8px; padding-top: 4px; border-top: 1px solid var(--hmh-border-l1); }
 .wizard-progress { height: 8px; border-radius: var(--hmh-radius-pill); background: var(--hmh-bg-layer-2); overflow: hidden; }
-.wizard-progress-fill { height: 100%; background: var(--hmh-brand-primary); transition: width 0.25s ease; }
+.wizard-progress-fill { height: 100%; background: var(--hmh-brand-primary); transition: width var(--hmh-dur-complete) var(--hmh-ease); }
 .wizard-progress.indeterminate .wizard-progress-fill { width: 34%; animation: wizard-slide 1.2s ease-in-out infinite; }
 @keyframes wizard-slide { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }
 .wizard-install-log {
