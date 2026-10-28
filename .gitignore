@@ -2,7 +2,10 @@ node_modules/
 dist/
 dist-electron/
 dist-renderer/
-resources/
+# 桌面构建期 runtime 产物(bundle-runtime/bundle-fake-host 生成)——钉到绝对路径,
+# 裸 `resources/` 会误伤 ohos 源码资源(entry/src/main/resources、AppScope/resources,
+# 其 element/profile 曾因此游离在版本控制外,干净 clone 无法构建 HAP)
+/apps/desktop/resources/
 out/
 release/
 build/

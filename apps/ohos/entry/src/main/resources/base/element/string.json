@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "HMH Desktop HarmonyOS client"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "HMH Desktop main entry"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "HMH Desktop"
+    },
+    {
+      "name": "internet_permission_reason",
+      "value": "Connect to hmharness runtime over LAN"
+    }
+  ]
+}

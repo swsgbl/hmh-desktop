@@ -9,13 +9,22 @@
  * 默认保留安装(用户直接可用);--uninstall 结束后卸载做全回环验证。
  */
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, renameSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const setup = join(root, 'apps', 'desktop', 'release', 'HMH-Desktop-Setup-0.1.0-alpha.0.exe');
+// Setup 文件名随版本走(electron-builder artifactName ${version}):自动发现
+// release/ 下最新的 HMH-Desktop-Setup-*.exe,不再硬编码版本号
+const releaseDir = join(root, 'apps', 'desktop', 'release');
+const setup = existsSync(releaseDir)
+  ? readdirSync(releaseDir)
+      .filter((f) => /^HMH-Desktop-Setup-[\w.-]+\.exe$/i.test(f))
+      .map((f) => join(releaseDir, f))
+      .sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+      .at(-1) ?? join(releaseDir, 'HMH-Desktop-Setup.exe')
+  : join(releaseDir, 'HMH-Desktop-Setup.exe');
 const installDir = join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'Programs', 'HMH Desktop');
 const installedExe = join(installDir, 'HMH Desktop.exe');
 const uninstaller = join(installDir, 'Uninstall HMH Desktop.exe');
