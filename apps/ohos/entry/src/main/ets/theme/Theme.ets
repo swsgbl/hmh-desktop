@@ -148,4 +148,20 @@ export class Metrics {
   static readonly listItemH: number = 48   // 会话列表项高(HIG B-1 ≥48,原 36)
   static readonly listItemRadius: number = 8
   static readonly spinnerSize: number = 20 // spinner 2px 环
+  // ---- HIG RFC §2 圆角/字号语义档(对齐 Windows 侧 tokens,vp 语义) ----
+  // 圆角三档:控件 8 / 浮层 12 / 面板 16(RFC §2.3)
+  static readonly radiusControl: number = 8
+  static readonly radiusOverlay: number = 12
+  static readonly radiusPanel: number = 16
+  // 字号层级(RFC §2.1:辅助 12/18 · 次要 13/20 · 正文 15/23 · 小标题 20/28 · 标题 28/34)
+  static readonly fontCaption: number = 12
+  static readonly fontCaptionLH: number = 18
+  static readonly fontSubtle: number = 13
+  static readonly fontSubtleLH: number = 20
+  static readonly fontBody: number = 15
+  static readonly fontBodyLH: number = 23
+  static readonly fontHeading: number = 20
+  static readonly fontHeadingLH: number = 28
+  static readonly fontTitle: number = 28
+  static readonly fontTitleLH: number = 34
 }
