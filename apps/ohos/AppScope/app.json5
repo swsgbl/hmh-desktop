@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.hmh.desktop.ohos",
     "vendor": "hmh",
-    "versionCode": 1000001,
-    "versionName": "0.2.7",
+    "versionCode": 1000002,
+    "versionName": "0.2.8",
     "icon": "$media:app_icon",
     "label": "$string:app_name"
   }
