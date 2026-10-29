@@ -25,6 +25,7 @@ import { isEventEnvelope, type EventEnvelope } from '@hmh-desktop/contracts';
 import { attachUiVerify } from './uiverify.ts';
 import { attachVisualRegression } from './visualregression.ts';
 import { installTarget, resolveInstalledEntry, startCliInstall, type InstallProgress } from './installer.ts';
+import { orderedCheckChannels, orderedDownloadMirrors, normalizeChannel, summarizeCheckFailures, type UpdateChannelId } from './updater-channels.ts';
 
 const here = import.meta.dirname ?? '.';
 const isDev = process.env.HMH_DESKTOP_DEV === '1';
@@ -162,10 +163,13 @@ if (!app.requestSingleInstanceLock()) {
   /* ---- 应用内更新(2026-10-26:自研轻量更新器,零依赖;GitHub Releases 通道)
      流程:☰"检查更新"→ fetch latest release tag → 比版本 → 后台下载 Setup
      exe 到临时目录 → 菜单变"重启并安装更新"→ 退出应用后 NSIS /S /D=原目录
-     静默覆盖安装(下次启动即新版)。无签名证书阶段可用;正式签名后可加校验。 */
+     静默覆盖安装(下次启动即新版)。无签名证书阶段可用;正式签名后可加校验。
+     2026-10-29 双通道根修(用户国内收不到推送):检查通道镜像回退链
+     (直连 8s → gh-proxy → ghfast,规则见 updater-channels.ts)+ 命中通道
+     粘性记忆 + 下载镜像与检查通道同源优先。 */
   const UPDATE_REPO = 'swsgbl/hmh-desktop';
-  interface UpdateState { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string }
-  let updateState: UpdateState = { checking: false, currentVersion: app.getVersion(), latest: null, notes: '', downloaded: false, error: '' };
+  interface UpdateState { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string; channel: string }
+  let updateState: UpdateState = { checking: false, currentVersion: app.getVersion(), latest: null, notes: '', downloaded: false, error: '', channel: '' };
   let installerPath: string | null = null;
   const bumpUpdate = (patch: Partial<UpdateState>): void => {
     updateState = { ...updateState, ...patch };
@@ -179,24 +183,59 @@ if (!app.requestSingleInstanceLock()) {
     for (let i = 0; i < 3; i++) { if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0) ? -1 : 1; }
     return 0;
   };
+  /** 通道粘性:上次成功命中的检查通道(userData/update-channel.json,与 runtime.json 同模式)。 */
+  const updateChannelFile = (): string => join(app.getPath('userData'), 'update-channel.json');
+  async function loadStickyChannel(): Promise<UpdateChannelId | null> {
+    try {
+      const v = JSON.parse(await readFile(updateChannelFile(), 'utf8')) as { channel?: unknown };
+      return normalizeChannel(v.channel);
+    } catch { return null; }
+  }
+  async function saveStickyChannel(id: UpdateChannelId): Promise<void> {
+    await writeFile(updateChannelFile(), JSON.stringify({ channel: id }, null, 2), 'utf8').catch(() => undefined);
+  }
+  type LatestRelease = { tag_name?: string; body?: string; assets?: Array<{ name: string; browser_download_url: string; size: number }> };
   async function checkForUpdates(): Promise<UpdateState> {
     if (updateState.checking || updateState.downloaded) return updateState;
     bumpUpdate({ checking: true, error: '' });
     logInfo('update', `checking… (current v${app.getVersion()})`);
+    const failures: Array<{ label: string; reason: string }> = [];
     try {
-      const r = await fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
-        headers: { 'user-agent': 'hmh-desktop-updater' },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!r.ok) throw new Error(`GitHub API ${r.status}`);
-      const rel = (await r.json()) as { tag_name?: string; body?: string; assets?: Array<{ name: string; browser_download_url: string; size: number }> };
-      const tag = String(rel.tag_name ?? '');
-      logInfo('update', `latest=${tag} assets=${(rel.assets ?? []).length}`);
-      bumpUpdate({ checking: false, latest: tag, notes: String(rel.body ?? '').slice(0, 600) });
-      // 有新版且未下载过 → 后台下载安装包
-      if (tag !== '' && cmpVersion(app.getVersion(), tag) < 0 && !updateState.downloaded) {
-        void downloadInstaller(rel.assets ?? []);
+      const sticky = await loadStickyChannel();
+      const channels = orderedCheckChannels(sticky ?? undefined);
+      for (const ch of channels) {
+        let rel: LatestRelease | null = null;
+        try {
+          const r = await fetch(ch.apiUrl(UPDATE_REPO), {
+            headers: { 'user-agent': 'hmh-desktop-updater' },
+            signal: AbortSignal.timeout(ch.timeoutMs),
+          });
+          if (!r.ok) { failures.push({ label: ch.label, reason: `HTTP ${r.status}` }); logInfo('update', `${ch.label} → HTTP ${r.status}`); continue; }
+          // 镜像可能回 200 但内容非 JSON(HTML 错误页):r.json() 抛错或 tag 缺失都按本通道失败回退
+          rel = (await r.json()) as LatestRelease;
+          if (typeof rel?.tag_name !== 'string' || rel.tag_name === '') { failures.push({ label: ch.label, reason: '响应无 tag_name' }); logInfo('update', `${ch.label} → 无 tag_name`); continue; }
+        } catch (err) {
+          const e = err as { cause?: { code?: unknown } };
+          const reason = err instanceof Error && err.name === 'TimeoutError'
+            ? `超时(${Math.round(ch.timeoutMs / 1000)}s)`
+            : String(e.cause?.code ?? err).slice(0, 60);
+          failures.push({ label: ch.label, reason });
+          logInfo('update', `${ch.label} → fail ${reason}`);
+          continue;
+        }
+        const tag = String(rel.tag_name);
+        logInfo('update', `latest=${tag} assets=${(rel.assets ?? []).length} via ${ch.label}${sticky === ch.id ? '(sticky)' : ''}`);
+        await saveStickyChannel(ch.id); // 粘性:下次先试本通道
+        bumpUpdate({ checking: false, latest: tag, notes: String(rel.body ?? '').slice(0, 600), channel: ch.id });
+        // 有新版且未下载过 → 后台下载安装包
+        if (cmpVersion(app.getVersion(), tag) < 0 && !updateState.downloaded) {
+          void downloadInstaller(rel.assets ?? []);
+        }
+        return updateState;
       }
+      const summary = summarizeCheckFailures(failures);
+      logInfo('update', `check failed: all channels (${summary})`);
+      bumpUpdate({ checking: false, error: `全部检查通道失败(${summary})`.slice(0, 200) });
     } catch (err) {
       logInfo('update', `check failed: ${String(err).slice(0, 140)}`);
       bumpUpdate({ checking: false, error: String(err).slice(0, 120) });
@@ -208,13 +247,8 @@ if (!app.requestSingleInstanceLock()) {
       const asset = assets.find((a) => /^HMH-Desktop-Setup-.*\.exe$/i.test(a.name)) ?? assets.find((a) => a.name.endsWith('.exe'));
       if (asset === undefined) { bumpUpdate({ error: 'release 无安装包资产' }); return; }
       const dest = join(app.getPath('temp'), asset.name);
-      // github.com 直连在部分网络超时 → 镜像回退链(实测 ghfast/gh-proxy 可用)
-      const mirrors = [
-        asset.browser_download_url,
-        `https://ghfast.top/${asset.browser_download_url}`,
-        `https://gh-proxy.com/${asset.browser_download_url}`,
-        `https://ghproxy.cn/${asset.browser_download_url}`,
-      ];
+      // 镜像回退链 + 同源优先:检查命中的通道排最前(规则见 updater-channels.ts)
+      const mirrors = orderedDownloadMirrors(asset.browser_download_url, updateState.channel);
       let buf: Buffer | null = null;
       let lastErr = '';
       for (const u of mirrors) {
@@ -328,7 +362,7 @@ if (!app.requestSingleInstanceLock()) {
             type: 'info',
             title: '关于 HMH Desktop',
             message: 'HMH Desktop',
-            detail: `本地优先的 HMH Agent 图形工作台 v${app.getVersion()}\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}${useBundledRuntime ? '(内置)' : ''}\n模式: ${bridge.mode === 'real' ? (useBundledRuntime ? '真实 hmharness(内置 runtime)' : '真实 hmharness(外部安装)') : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
+            detail: `app v${app.getVersion()} · 更新通道:${updateState.channel || '-'}\nruntime: hmharness ${bridge.hostVersion ?? '(未连接)'}${useBundledRuntime ? '(内置)' : ''}\n模式: ${bridge.mode === 'real' ? (useBundledRuntime ? '真实 hmharness(内置 runtime)' : '真实 hmharness(外部安装)') : '演示(假数据)'}\n\n与 CLI / TUI / 网页版共享同一 HMH_HOME。`,
           });
         },
       },

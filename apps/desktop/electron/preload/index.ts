@@ -95,7 +95,7 @@ const bridge = {
   applyUpdate(): Promise<unknown> {
     return ipcRenderer.invoke('bridge:apply-update');
   },
-  onUpdateState(cb: (st: { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string }) => void): () => void {
+  onUpdateState(cb: (st: { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string; channel: string }) => void): () => void {
     const listener = (_e: Electron.IpcRendererEvent, st: unknown): void => cb(st as Parameters<typeof cb>[0]);
     ipcRenderer.on('update:state', listener);
     return () => ipcRenderer.removeListener('update:state', listener);
