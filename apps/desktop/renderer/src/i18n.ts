@@ -333,6 +333,21 @@ const zh = {
       { k: 'Esc', d: '关闭弹层' },
     ],
   },
+  update: {
+    /** 后台静默更新横幅(任务 13-C:非模态,不打断任务区;主路径=重启更新,无浏览器跳转) */
+    bannerAria: '应用更新',
+    downloading: (v: string): string => `正在后台下载新版本 ${v}…`,
+    progress: (done: string, total: string, speed: string): string => `${done} / ${total} · ${speed}`,
+    ready: (v: string): string => `新版本 ${v} 已就绪`,
+    readyHint: '下载完成,重启后自动安装(当前任务不受影响)',
+    restart: '重启更新',
+    later: '稍后',
+    laterHint: '下次启动时会再次提醒',
+    checkFailed: '更新检查失败',
+    retry: '重试',
+    dismiss: '关闭',
+    via: (ch: string): string => `通道:${ch}`,
+  },
 };
 
 const en: typeof zh = {
@@ -658,6 +673,20 @@ const en: typeof zh = {
       { k: 'Ctrl + Enter', d: 'Send in newline mode' },
       { k: 'Esc', d: 'Close overlays' },
     ],
+  },
+  update: {
+    bannerAria: 'App update',
+    downloading: (v: string): string => `Downloading update ${v} in the background…`,
+    progress: (done: string, total: string, speed: string): string => `${done} / ${total} · ${speed}`,
+    ready: (v: string): string => `Update ${v} is ready`,
+    readyHint: 'Downloaded — installs automatically on restart (your work is untouched)',
+    restart: 'Restart & update',
+    later: 'Later',
+    laterHint: 'You will be reminded on next launch',
+    checkFailed: 'Update check failed',
+    retry: 'Retry',
+    dismiss: 'Dismiss',
+    via: (ch: string): string => `via ${ch}`,
   },
 };
 

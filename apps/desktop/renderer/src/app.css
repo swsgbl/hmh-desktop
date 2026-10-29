@@ -61,7 +61,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* 自定义标题栏(隐藏式 titleBarOverlay;drag 区域,☰ 唯一主菜单入口)
    HIG 阶段2(RFC §1):36→44px,对齐 04 号规格 44-52 区间;titleBarOverlay 高度需同步(main/index.ts) */
 .titlebar {
-  display: flex; align-items: center; gap: 8px; height: 44px;
+  display: flex; align-items: center; gap: 8px; height: 44px; flex: 0 0 44px;
   padding-left: 6px; padding-right: 150px; /* 右侧原生 min/max/close 由 overlay 提供 */
   background: var(--hmh-bg-layer-1); border-bottom: 1px solid var(--hmh-border-l1);
   -webkit-app-region: drag; user-select: none;
@@ -72,8 +72,27 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 
 /* minmax(0,1fr):行高锁死为容器高。2026-10-10 装机事故根因——grid 隐式行是
    auto(=max-content),左栏 100 条会话的自然高度 6119px 把整行撑到 6119,
-   composer 被推到视口外 6028px 处 = "没有输入框、看不到会话内容"。 */
-.app-shell { display: grid; grid-template-columns: 264px 1fr auto; grid-template-rows: minmax(0, 1fr); height: calc(100% - 44px); }
+   composer 被推到视口外 6028px 处 = "没有输入框、看不到会话内容"。
+   2026-10-29 任务 13-C:顶层改 flex column,标题栏与 app-shell 之间可插入
+   更新横幅(非模态,不遮任务区);无横幅时布局与原 calc(100% - 44px) 等价。 */
+.app-root { display: flex; flex-direction: column; height: 100%; }
+.app-shell { display: grid; grid-template-columns: 264px 1fr auto; grid-template-rows: minmax(0, 1fr); flex: 1 1 auto; min-height: 0; }
+
+/* 应用内更新横幅(任务 13-C:后台静默下载 → "重启更新"一键安装;非模态,
+   不打断任务区;主路径无任何"打开下载页"外链)。三态:下载进度 / 就绪 / 失败。 */
+.update-banner {
+  flex: 0 0 auto;
+  background: var(--hmh-bg-layer-1);
+  border-bottom: 1px solid var(--hmh-border-l1);
+  padding: 6px 14px;
+}
+.update-banner-main { display: flex; align-items: center; gap: 10px; min-height: 30px; flex-wrap: wrap; }
+.update-text { font-size: var(--hmh-font-size-sm); color: var(--hmh-label-primary); }
+.update-hint { margin-left: 8px; color: var(--hmh-label-tertiary); font-size: var(--hmh-font-size-xs); }
+.update-error-text { color: var(--hmh-state-error); word-break: break-all; }
+.update-progress-text { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.update-bar { flex: 1 1 120px; height: 4px; border-radius: 2px; background: var(--hmh-interactive-bg-hover); overflow: hidden; }
+.update-bar-fill { display: block; height: 100%; background: var(--hmh-button-primary-fill); transition: width 300ms linear; }
 
 /* 左栏
    HIG P2(RFC §2.4):侧栏表面与内容分离——侧栏=--hmh-surface-sidebar(base),
