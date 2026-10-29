@@ -45,6 +45,11 @@ const INSTALLER = 'G:\\hmharness\\scripts\\install-kaihongos.cjs'
 // a deploy that pushes only the installer leaves the device without the heal
 // layer (observed on the 0.23.43 upgrade; the warn is easy to miss)
 const HEAL_TREE = 'G:\\hmharness\\scripts\\heal-tree.cjs'
+// the installer (>=0.23.46) resolves its board-defaults.cjs via __dirname
+// sibling first — a deploy that pushes only the installer dies on-device with
+// "Cannot find module board-defaults.cjs" (observed on the 0.23.46 upgrade;
+// hdc does not propagate remote exit codes, so the error is easy to miss)
+const BOARD_DEFAULTS = 'G:\\hmharness\\packages\\cli\\board\\board-defaults.cjs'
 
 function sh(cmd, timeoutMs = 60000) {
   try {
@@ -91,13 +96,19 @@ if (!SKIP_INSTALL) {
     }
     send(armTar, '/data/local/tmp/node-arm.tar.gz')
   }
-  console.log('— push installer + heal-tree…')
+  console.log('— push installer + heal-tree + board-defaults…')
   console.log(send(INSTALLER, '/data/local/tmp/install-kaihongos.cjs'))
   console.log(send(HEAL_TREE, '/data/local/tmp/heal-tree.cjs'))
+  console.log(send(BOARD_DEFAULTS, '/data/local/tmp/board-defaults.cjs'))
   console.log('— run installer on device (数分钟)…')
   const out = sh(`${DEV_NODE} /data/local/tmp/install-kaihongos.cjs`, 300000)
   console.log(String(out).slice(-1200))
   if (!ok(out)) { console.error('FAIL: installer errored'); process.exit(1) }
+  // hdc swallows remote exit codes — sniff the output for runtime errors
+  if (/^Error:|Cannot find module|ReferenceError|SyntaxError/m.test(String(out))) {
+    console.error('FAIL: installer output contains a runtime error (see above)')
+    process.exit(1)
+  }
 } else {
   console.log('— skip install (已装过)')
 }
