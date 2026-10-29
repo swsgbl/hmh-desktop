@@ -1,0 +1,58 @@
+{
+  "generatedAt": "2026-10-29T05:46:32.277Z",
+  "window": {
+    "width": 1280,
+    "height": 800
+  },
+  "mutate": "",
+  "viewports": [
+    {
+      "name": "main",
+      "file": "main.png",
+      "width": 1280,
+      "height": 800,
+      "dpr": 1,
+      "masks": [
+        {
+          "x": 337,
+          "y": 52,
+          "w": 154,
+          "h": 44,
+          "for": "host 端口/版本(fake host 每次随机端口)"
+        }
+      ]
+    },
+    {
+      "name": "settings",
+      "file": "settings.png",
+      "width": 1280,
+      "height": 800,
+      "dpr": 1,
+      "masks": [
+        {
+          "x": 337,
+          "y": 52,
+          "w": 154,
+          "h": 44,
+          "for": "host 端口/版本(fake host 每次随机端口)"
+        }
+      ]
+    },
+    {
+      "name": "dock",
+      "file": "dock.png",
+      "width": 1280,
+      "height": 800,
+      "dpr": 1,
+      "masks": [
+        {
+          "x": 336,
+          "y": 52,
+          "w": 108,
+          "h": 66,
+          "for": "host 端口/版本(fake host 每次随机端口)"
+        }
+      ]
+    }
+  ]
+}

@@ -87,6 +87,9 @@ const zh = {
     modelSwitchFailed: (e: string): string => `切换模型失败:${e}`,
     collapseSidebar: '收起侧栏',
     expandSidebar: '展开侧栏',
+    // HIG 阶段2:≤820px 窄窗侧栏抽屉
+    openSidebarDrawer: '打开侧栏抽屉',
+    closeSidebarDrawer: '收起侧栏抽屉',
   },
   stream: {
     emptyNoSession: '新建一个会话,或从左侧选择',
@@ -292,6 +295,10 @@ const zh = {
     notGit: (cwd: string): string => `非 git 工作区(${cwd})`,
     gitChanges: (cwd: string, n: number): string => `${cwd}(git 变更 ${n} 项,只读)`,
     noChanges: '(无变更)',
+    // RFC §2.5:diff 状态短文字标签(颜色外的第二编码通道)
+    diffStateAdd: '新增',
+    diffStateMod: '修改',
+    diffStateDel: '删除',
     memoryLayers: '记忆层',
     memoryEntries: '记忆条目',
     trajectories: '轨迹数',
@@ -404,6 +411,9 @@ const en: typeof zh = {
     modelSwitchFailed: (e: string): string => `Failed to switch model: ${e}`,
     collapseSidebar: 'Collapse sidebar',
     expandSidebar: 'Expand sidebar',
+    // HIG stage 2: sidebar drawer under 820px
+    openSidebarDrawer: 'Open sidebar drawer',
+    closeSidebarDrawer: 'Close sidebar drawer',
   },
   stream: {
     emptyNoSession: 'Create a session, or pick one from the left',
@@ -609,6 +619,10 @@ const en: typeof zh = {
     notGit: (cwd: string): string => `Not a git workspace (${cwd})`,
     gitChanges: (cwd: string, n: number): string => `${cwd} (${n} git changes, read-only)`,
     noChanges: '(no changes)',
+    // RFC §2.5: short text labels for diff states (second encoding channel beyond color)
+    diffStateAdd: 'Added',
+    diffStateMod: 'Modified',
+    diffStateDel: 'Deleted',
     memoryLayers: 'Memory layers',
     memoryEntries: 'Memory entries',
     trajectories: 'Trajectories',

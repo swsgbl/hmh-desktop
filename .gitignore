@@ -31,3 +31,9 @@ hmh-doc-*/
 dom-probe.json
 ui-shot*.png
 ui-verify-shots-*/
+
+# 视觉回归:baseline 与具名证据入库;current/ 与每次运行的 diff 图是临时产物
+evidence/visual-regression/current/
+evidence/visual-regression/diff-main.png
+evidence/visual-regression/diff-settings.png
+evidence/visual-regression/diff-dock.png

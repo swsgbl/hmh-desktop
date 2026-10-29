@@ -507,6 +507,59 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       });
     }
 
+    /* ========== fake:HIG 阶段2 —— 窄窗抽屉 + 标题栏 44px/drag 区 ========== */
+    await step('窄窗抽屉:760px 侧栏可达可关(遮罩点击 + Esc)', async () => {
+      try { win.setMinimumSize(560, 600); win.setBounds({ width: 760, height: 700 }); } catch { /* best effort */ }
+      const isNarrow = await waitFor('matchMedia 820', `return {ok: window.matchMedia('(max-width: 820px)').matches, detail: 'iw=' + window.innerWidth};`, 5_000);
+      if (!isNarrow[0]) return isNarrow;
+      // 等 React 按窄窗重渲染出抽屉按钮(aria-label 换成"抽屉"文案)再点——CSS 断点即时,
+      // React state 有毫秒级延迟,盲点会落在旧的"收起侧栏"上
+      const btn = await waitFor('drawer button', `var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return (x.getAttribute('aria-label')||'').indexOf('抽屉')>=0;});
+        return {ok: !!b, detail: 'btn='+(b?b.getAttribute('aria-label'):'none')};`, 5_000);
+      if (!btn[0]) return btn;
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return (x.getAttribute('aria-label')||'').indexOf('抽屉')>=0;}); if(b) b.click(); })()`);
+      const opened = await waitFor('drawer open', `var sb=document.querySelector('.sidebar'), sc=document.querySelector('.sidebar-scrim');
+        var r=sb?sb.getBoundingClientRect():null;
+        return {ok: !!r && r.x >= 0 && r.x < 40 && !!sc, detail: 'x='+(r?Math.round(r.x):'none')+' scrim='+(sc?'yes':'no')};`, 5_000);
+      await shot('drawer-open');
+      // 遮罩点击关闭 → 侧栏滑出(x < 0)+ 遮罩消失
+      await js(`(function(){ var sc=document.querySelector('.sidebar-scrim'); if(sc) sc.click(); })()`);
+      const closed = await waitFor('drawer closed by scrim', `var sb=document.querySelector('.sidebar'), sc=document.querySelector('.sidebar-scrim');
+        var r=sb?sb.getBoundingClientRect():null;
+        return {ok: !!r && r.x < 0 && !sc, detail: 'x='+(r?Math.round(r.x):'none')+' scrim='+(sc?'yes':'no')};`, 5_000);
+      // Esc 也能开/关
+      await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.topbar button')).find(function(x){return (x.getAttribute('aria-label')||'').indexOf('抽屉')>=0;}); if(b) b.click(); })()`);
+      await waitFor('drawer reopen', `var sb=document.querySelector('.sidebar'); var r=sb?sb.getBoundingClientRect():null;
+        return {ok: !!r && r.x >= 0 && r.x < 40, detail: 'x='+(r?Math.round(r.x):'none')};`, 5_000);
+      await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}))`);
+      const escClosed = await waitFor('drawer closed by Esc', `var sb=document.querySelector('.sidebar'); var r=sb?sb.getBoundingClientRect():null;
+        return {ok: !!r && r.x < 0, detail: 'x='+(r?Math.round(r.x):'none')};`, 5_000);
+      // 恢复宽窗:侧栏回到 grid 列(display 非 none,正常列布局)
+      try { win.setBounds({ width: 1280, height: 800 }); } catch { /* best effort */ }
+      await sleep(400);
+      const wide = await waitFor('wide restored', `var sb=document.querySelector('.sidebar'); var r=sb?sb.getBoundingClientRect():null;
+        return {ok: !!r && r.width > 200 && getComputedStyle(sb).display !== 'none', detail: 'w='+(r?Math.round(r.width):'none')};`, 5_000);
+      return [opened[0] && closed[0] && escClosed[0] && wide[0], `open: ${opened[1]}; scrim-close: ${closed[1]}; esc-close: ${escClosed[1]}; wide: ${wide[1]}`];
+    });
+    await step('标题栏:44px + drag 区(菜单 no-drag;overlay 高度一致)', async () => {
+      const r = (await js(`(function(){
+        var tb=document.querySelector('.titlebar'), mb=document.querySelector('.titlebar-menu');
+        if(!tb || !mb) return JSON.stringify({ok:false, detail:'missing titlebar/menu'});
+        var cs=getComputedStyle(tb), ms=getComputedStyle(mb);
+        return JSON.stringify({ ok: cs.height === '44px' && cs.webkitAppRegion === 'drag' && ms.webkitAppRegion === 'no-drag' && mb.getBoundingClientRect().height >= 36,
+          detail: 'h='+cs.height+' region='+cs.webkitAppRegion+' menu-region='+ms.webkitAppRegion+' menu-h='+Math.round(mb.getBoundingClientRect().height) });
+      })()`)) as string;
+      const p = JSON.parse(r) as { ok: boolean; detail: string };
+      // 主进程侧:原生 titleBarOverlay 高度须同为 44(Windows 才有 overlay;旧类型缺此 API,可选调用)
+      let overlay = 'n/a';
+      try {
+        const probe = win as unknown as { getTitleBarOverlay?: () => { height?: number } | null };
+        const o = probe.getTitleBarOverlay?.() ?? null;
+        overlay = o !== null ? String(o.height) : 'n/a';
+      } catch { /* 平台无 overlay */ }
+      return [p.ok === true, `${p.detail} overlay-h=${overlay}`];
+    });
+
     await shot('final');
   } else if ((process.env.HMH_DESKTOP_UIVERIFY_WIZARD ?? '') !== '') {
     /* ========== real(向导构造,互斥于常规 real 步骤):

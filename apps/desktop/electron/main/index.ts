@@ -23,6 +23,7 @@ import { randomUUID } from 'node:crypto';
 import { DesktopRuntimeSupervisor, DesktopHostClient, envelopeFromFrame, type HostState } from '@hmh-desktop/host-adapter';
 import { isEventEnvelope, type EventEnvelope } from '@hmh-desktop/contracts';
 import { attachUiVerify } from './uiverify.ts';
+import { attachVisualRegression } from './visualregression.ts';
 import { installTarget, resolveInstalledEntry, startCliInstall, type InstallProgress } from './installer.ts';
 
 const here = import.meta.dirname ?? '.';
@@ -123,8 +124,8 @@ if (!app.requestSingleInstanceLock()) {
     ]));
   }
   function notifyEvent(env: EventEnvelope): void {
-    // 验收/截图/渲染探针模式静默(不往用户桌面弹测试通知)
-    if (process.env.HMH_DESKTOP_UIVERIFY === '1' || process.env.HMH_DESKTOP_SNAPSHOT !== undefined || process.env.HMH_DESKTOP_RENDER_TEST === '1') return;
+    // 验收/截图/渲染探针/视觉回归模式静默(不往用户桌面弹测试通知)
+    if (process.env.HMH_DESKTOP_UIVERIFY === '1' || process.env.HMH_DESKTOP_SNAPSHOT !== undefined || process.env.HMH_DESKTOP_RENDER_TEST === '1' || process.env.HMH_DESKTOP_VISREG === '1') return;
     if (!Notification.isSupported()) return;
     const win = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed());
     const focused = win?.isFocused() ?? false;
@@ -635,6 +636,7 @@ if (!app.requestSingleInstanceLock()) {
     return isDev
       || process.env.HMH_DESKTOP_UIVERIFY === '1'
       || process.env.HMH_DESKTOP_SNAPSHOT !== undefined
+      || process.env.HMH_DESKTOP_VISREG === '1'
       || process.env.HMH_DESKTOP_RENDER_TEST === '1'
       || process.env.HMH_DESKTOP_DOMPROBE === '1'
       || process.env.HMH_DESKTOP_SECURITY_TEST === '1'
@@ -1188,7 +1190,7 @@ if (!app.requestSingleInstanceLock()) {
       width: saved?.width ?? 1440,
       height: saved?.height ?? 900,
       ...(saved?.x !== undefined && saved?.y !== undefined ? { x: saved.x, y: saved.y } : {}),
-      minWidth: 960,
+      minWidth: 560, // HIG 阶段2:04 号规格窄窗 ≥560;原 960 使 ≤820px 抽屉断点实际不可达
       minHeight: 600,
       show: false,
       backgroundColor: '#f9fafb', // v4 DSH:浅色默认(bg-base),避免深色闪屏
@@ -1196,7 +1198,8 @@ if (!app.requestSingleInstanceLock()) {
       // 隐藏式标题栏:原生窗口控制(overlay 提供)+颜色随主题(renderer 经
       // chrome-theme 同步)——根治亮色模式顶部黑条;菜单栏 autoHide(Alt 呼出)。
       titleBarStyle: 'hidden',
-      titleBarOverlay: { ...chromeFor(nativeTheme.shouldUseDarkColors), height: 36 },
+      // HIG 阶段2:36→44,与 renderer .titlebar 高度一致(不一致会露出/遮住 8px)
+      titleBarOverlay: { ...chromeFor(nativeTheme.shouldUseDarkColors), height: 44 },
       autoHideMenuBar: true,
       webPreferences: {
         preload: preloadPath,
@@ -1241,8 +1244,8 @@ if (!app.requestSingleInstanceLock()) {
   }
 
   app.whenReady().then(() => {
-    // UIVERIFY:fake 模式验收须在 startHost 读 env 之前强制 fake
-    if (process.env.HMH_DESKTOP_UIVERIFY === '1' && process.env.HMH_DESKTOP_UIVERIFY_MODE !== 'real') {
+    // UIVERIFY:fake 模式验收须在 startHost 读 env 之前强制 fake;VISREG(视觉回归)同规则
+    if (process.env.HMH_DESKTOP_VISREG === '1' || (process.env.HMH_DESKTOP_UIVERIFY === '1' && process.env.HMH_DESKTOP_UIVERIFY_MODE !== 'real')) {
       process.env.HMH_DESKTOP_FAKE = '1';
     }
     // Windows 通知归属(否则显示为 electron.exe)
@@ -1276,6 +1279,8 @@ if (!app.requestSingleInstanceLock()) {
     void createWindow().then((win) => {
       if (win === null) return;
       if (process.env.HMH_DESKTOP_UIVERIFY === '1') attachUiVerify(win);
+      // 视觉回归截图钩子:HMH_DESKTOP_VISREG=1,确定性视口截图后退出(scripts/visual-regression.mjs 驱动)
+      if (process.env.HMH_DESKTOP_VISREG === '1') attachVisualRegression(win);
       if (process.env.HMH_DESKTOP_SECURITY_TEST === '1') {
         win.webContents.once('did-finish-load', () => {
           void securitySelfTest(win);
