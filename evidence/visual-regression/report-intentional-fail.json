@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-10-29T05:52:38.205Z",
+  "thresholds": {
+    "tolerance": 5,
+    "ratioFail": 0.005,
+    "toleranceNote": "per-channel |Δ| ≤ 5 (=2% of 255) treated as equal",
+    "ratioNote": "diffPixels / comparablePixels (masked excluded) > 0.5% → FAIL"
+  },
+  "mutate": "main",
+  "viewports": [
+    {
+      "name": "main",
+      "pass": false,
+      "width": 1280,
+      "height": 800,
+      "masks": 1,
+      "diffPixels": 10800,
+      "comparablePixels": 1017224,
+      "maskedPixels": 6776,
+      "diffRatio": 0.0106,
+      "diffImage": "diff-main.png"
+    },
+    {
+      "name": "settings",
+      "pass": true,
+      "width": 1280,
+      "height": 800,
+      "masks": 1,
+      "diffPixels": 0,
+      "comparablePixels": 1017224,
+      "maskedPixels": 6776,
+      "diffRatio": 0
+    },
+    {
+      "name": "dock",
+      "pass": true,
+      "width": 1280,
+      "height": 800,
+      "masks": 1,
+      "diffPixels": 0,
+      "comparablePixels": 1016872,
+      "maskedPixels": 7128,
+      "diffRatio": 0
+    }
+  ]
+}

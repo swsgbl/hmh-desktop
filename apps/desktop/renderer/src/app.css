@@ -58,20 +58,22 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.sm { min-height: 28px; padding: 0 10px; font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs); }
 
-/* 自定义标题栏(隐藏式 titleBarOverlay;drag 区域,☰ 唯一主菜单入口) */
+/* 自定义标题栏(隐藏式 titleBarOverlay;drag 区域,☰ 唯一主菜单入口)
+   HIG 阶段2(RFC §1):36→44px,对齐 04 号规格 44-52 区间;titleBarOverlay 高度需同步(main/index.ts) */
 .titlebar {
-  display: flex; align-items: center; gap: 8px; height: 36px;
+  display: flex; align-items: center; gap: 8px; height: 44px;
   padding-left: 6px; padding-right: 150px; /* 右侧原生 min/max/close 由 overlay 提供 */
   background: var(--hmh-bg-layer-1); border-bottom: 1px solid var(--hmh-border-l1);
   -webkit-app-region: drag; user-select: none;
 }
-.titlebar .titlebar-menu { -webkit-app-region: no-drag; padding: 2px 10px; border-radius: var(--hmh-radius-sm); }
+/* 命中区随标题栏抬升到 36×36(PR#4 纪律),drag/no-drag 边界不变 */
+.titlebar .titlebar-menu { -webkit-app-region: no-drag; padding: 0 10px; min-height: 36px; min-width: 36px; border-radius: var(--hmh-radius-sm); }
 .titlebar .titlebar-title { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); }
 
 /* minmax(0,1fr):行高锁死为容器高。2026-10-10 装机事故根因——grid 隐式行是
    auto(=max-content),左栏 100 条会话的自然高度 6119px 把整行撑到 6119,
    composer 被推到视口外 6028px 处 = "没有输入框、看不到会话内容"。 */
-.app-shell { display: grid; grid-template-columns: 264px 1fr auto; grid-template-rows: minmax(0, 1fr); height: calc(100% - 36px); }
+.app-shell { display: grid; grid-template-columns: 264px 1fr auto; grid-template-rows: minmax(0, 1fr); height: calc(100% - 44px); }
 
 /* 左栏
    HIG P2(RFC §2.4):侧栏表面与内容分离——侧栏=--hmh-surface-sidebar(base),
@@ -296,10 +298,15 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* Diff 面板 */
 .diff-pane { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 .diff-row { display: flex; gap: 8px; font: var(--hmh-font-size-xs)/18px var(--hmh-font-mono); padding: 2px 4px; }
-.diff-state { width: 20px; text-align: center; border-radius: 3px; font-weight: 600; }
+.diff-state { width: 20px; text-align: center; border-radius: 3px; font-weight: 600; flex-shrink: 0; }
 .diff-state.add { color: var(--hmh-state-success); }
 .diff-state.mod { color: var(--hmh-state-warn); }
 .diff-state.del { color: var(--hmh-state-error); }
+/* RFC §2.5 颜色纪律:状态不靠颜色单独编码——字母(A/M/D)+ 短文字标签双通道 */
+.diff-state-label { flex-shrink: 0; font-weight: 600; }
+.diff-state-label.add { color: var(--hmh-state-success); }
+.diff-state-label.mod { color: var(--hmh-state-warn); }
+.diff-state-label.del { color: var(--hmh-state-error); }
 .diff-path { color: var(--hmh-label-secondary); word-break: break-all; }
 
 /* Logs 面板 */
@@ -403,10 +410,11 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 /* Turn 汇总行 */
 .turn-sum { align-self: flex-end; max-width: 760px; font: var(--hmh-font-size-xs)/18px var(--hmh-font-mono); color: var(--hmh-label-tertiary); padding: 2px 8px; }
 
-/* 顶栏工作区/模型/引导:pill(高 24/全圆/bg-layer-2;DSH §3) */
+/* 顶栏工作区/模型/引导(高 24/bg-layer-2;DSH §3)
+   HIG 阶段2(RFC §2.3"胶囊仅限 chip/少数按钮"):topbar pill 收敛为 control 8px */
 .topbar-ws, .topbar-model {
   display: inline-flex; align-items: center; height: 24px; padding: 0 10px;
-  border: none; border-radius: var(--hmh-radius-pill);
+  border: none; border-radius: var(--hmh-radius-control);
   font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs);
   color: var(--hmh-label-secondary); background: var(--hmh-bg-layer-2);
 }
@@ -418,7 +426,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .model-menu { left: auto; right: 0; top: calc(100% + 6px); width: 260px; }
 .guide-pill {
   display: inline-flex; align-items: center; height: 24px; padding: 0 10px;
-  border: 1px solid var(--hmh-state-warn); border-radius: var(--hmh-radius-pill);
+  border: 1px solid var(--hmh-state-warn); border-radius: var(--hmh-radius-control);
   font-size: var(--hmh-font-size-xs); line-height: var(--hmh-line-height-xs); color: var(--hmh-state-warn);
 }
 .guide-pill:hover { background: color-mix(in srgb, var(--hmh-state-warn) 12%, transparent); }
@@ -455,9 +463,21 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
   .app-shell { grid-template-columns: 220px 1fr; grid-template-rows: 1fr auto; }
   .dock { grid-column: 1 / -1; grid-row: 2; width: auto; max-width: none; max-height: 40vh; border-left: 0; border-top: 1px solid var(--hmh-border-l1); }
 }
+/* HIG 阶段2(RFC §1):≤820px 侧栏不再 display:none 消失,转覆盖式抽屉(遮罩+可关)。
+   两条规则同时覆盖 .no-sidebar——其特异性 (0,2,0) 高于本块内的 .app-shell (0,1,0),
+   不并列会残留 0 1fr auto 列把 workspace 挤到 0 宽。 */
 @media (max-width: 820px) {
-  .app-shell { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
-  .sidebar { display: none; }
+  .app-shell, .app-shell.no-sidebar { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .sidebar {
+    position: fixed; top: 44px; left: 0; bottom: 0; z-index: 85;
+    width: 280px; max-width: 82vw; min-width: 0;
+    transform: translateX(-100%);
+    transition: transform var(--hmh-dur-panel) var(--hmh-ease);
+    box-shadow: var(--hmh-shadow-lv3);
+    background: var(--hmh-bg-layer-1);
+  }
+  .app-shell.drawer-open .sidebar { transform: translateX(0); }
+  .sidebar-scrim { position: fixed; inset: 44px 0 0 0; z-index: 84; background: var(--hmh-bg-mask); }
 }
 
 /* runtime 连接引导 */
@@ -540,7 +560,7 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
 .wizard-opt-note { grid-column: 2; font-size: var(--hmh-font-size-xs); color: var(--hmh-label-tertiary); line-height: 1.5; word-break: break-all; }
 .wizard-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
 .wizard-footer { display: flex; justify-content: space-between; gap: 8px; padding-top: 4px; border-top: 1px solid var(--hmh-border-l1); }
-.wizard-progress { height: 8px; border-radius: var(--hmh-radius-pill); background: var(--hmh-bg-layer-2); overflow: hidden; }
+.wizard-progress { height: 8px; border-radius: var(--hmh-radius-control); background: var(--hmh-bg-layer-2); overflow: hidden; }
 .wizard-progress-fill { height: 100%; background: var(--hmh-brand-primary); transition: width var(--hmh-dur-complete) var(--hmh-ease); }
 .wizard-progress.indeterminate .wizard-progress-fill { width: 34%; animation: wizard-slide 1.2s ease-in-out infinite; }
 @keyframes wizard-slide { 0% { margin-left: -34%; } 100% { margin-left: 100%; } }

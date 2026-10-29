@@ -150,6 +150,17 @@ export function App(): React.ReactElement {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try { return window.localStorage.getItem('hmh.sidebarCollapsed') === '1'; } catch { return false; }
   });
+  // HIG 阶段2(RFC §1):≤820px 窄窗侧栏=覆盖式抽屉(遮罩+可关),不再 display:none 消失
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [narrow, setNarrow] = useState<boolean>(() =>
+    typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 820px)').matches : false);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(max-width: 820px)');
+    const onChange = (e: MediaQueryListEvent): void => { setNarrow(e.matches); if (!e.matches) setDrawerOpen(false); };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [busySessions, setBusySessions] = useState<Set<string>>(new Set());
   // 工作区(03 §六)
@@ -480,6 +491,7 @@ export function App(): React.ReactElement {
     setItems([]);
     setStreaming('');
     setRunStatus(null);
+    setDrawerOpen(false); // 窄窗抽屉模式下选完会话即收起,把工作区让出来
     // 打开时自动展开其所属工作区组(收起状态里删掉该 cwd)
     const cwd = sessions.find((s) => s.id === id)?.cwd ?? '';
     if (cwd !== '') {
@@ -510,6 +522,7 @@ export function App(): React.ReactElement {
     setItems([]);
     setStreaming('');
     setRunStatus(null);
+    setDrawerOpen(false); // 窄窗抽屉模式下新建即收起
   }, [L, workspaces]);
 
   /* ---- 工作区管理(2026-10-11 对标 DSH:左栏工作区栏 + 新建会话选工作区) ----
@@ -571,13 +584,17 @@ export function App(): React.ReactElement {
       else if (action === 'theme-dark') setTheme('dark');
       else if (action === 'theme-light') setTheme('light');
       else if (action === 'toggle-locale') setLocale(locale === 'zh' ? 'en' : 'zh');
-      else if (action === 'toggle-sidebar') setSidebarCollapsed((v) => {
-        try { window.localStorage.setItem('hmh.sidebarCollapsed', v ? '0' : '1'); } catch { /* 私有模式 */ }
-        return !v;
-      });
+      else if (action === 'toggle-sidebar') {
+        // 窄窗=开合抽屉;宽窗=原收展语义(本地偏好)
+        if (narrow) setDrawerOpen((v) => !v);
+        else setSidebarCollapsed((v) => {
+          try { window.localStorage.setItem('hmh.sidebarCollapsed', v ? '0' : '1'); } catch { /* 私有模式 */ }
+          return !v;
+        });
+      }
     });
     return off;
-  }, [locale, newSession, setTheme, setLocale]);
+  }, [locale, newSession, setTheme, setLocale, narrow]);
 
   // Ctrl+K 命令面板 / Ctrl+N 新会话(03 §六;键盘优先)
   useEffect(() => {
@@ -598,6 +615,7 @@ export function App(): React.ReactElement {
         setCmdOpen(false);
         setSettingsOpen(false);
         setShortcutsOpen(false);
+        setDrawerOpen(false); // 窄窗抽屉可 Esc 关闭
       }
     };
     window.addEventListener('keydown', onKey);
@@ -871,7 +889,8 @@ export function App(): React.ReactElement {
         <span className="titlebar-title">HMH Desktop</span>
         <span className="titlebar-spacer" aria-hidden="true" />
       </header>
-      <div className={`app-shell${sidebarCollapsed ? ' no-sidebar' : ''}`}>
+      <div className={`app-shell${sidebarCollapsed && !narrow ? ' no-sidebar' : ''}${narrow && drawerOpen ? ' drawer-open' : ''}`}>
+      {narrow && drawerOpen && <div className="sidebar-scrim" aria-hidden="true" onClick={() => setDrawerOpen(false)} />}
       {shortcutsOpen && (
         <div className="cmdk-overlay" role="dialog" aria-label={L.shortcuts.title} onClick={() => setShortcutsOpen(false)}>
           <div className="cmdk" onClick={(e) => e.stopPropagation()}>
@@ -996,7 +1015,7 @@ export function App(): React.ReactElement {
           </div>
         </div>
       )}
-      <aside className="sidebar" aria-label={L.nav.sessions}>
+      <aside className="sidebar" aria-label={L.nav.sessions} aria-hidden={narrow && !drawerOpen ? true : undefined}>
         <div className="sidebar-head">
           <div className="new-session-group">
             <button className="btn primary grow" onClick={newSession} title={workspaces !== null ? L.sidebar.newInWs(workspaces.items.find((w) => w.id === workspaces.current)?.name ?? '') : ''}>{L.sidebar.newSession}</button>
@@ -1111,15 +1130,21 @@ export function App(): React.ReactElement {
         <header className="topbar">
           <button
             className="btn ghost icon-btn"
-            aria-label={sidebarCollapsed ? L.topbar.expandSidebar : L.topbar.collapseSidebar}
-            title={sidebarCollapsed ? L.topbar.expandSidebar : L.topbar.collapseSidebar}
+            aria-label={narrow
+              ? (drawerOpen ? L.topbar.closeSidebarDrawer : L.topbar.openSidebarDrawer)
+              : (sidebarCollapsed ? L.topbar.expandSidebar : L.topbar.collapseSidebar)}
+            title={narrow
+              ? (drawerOpen ? L.topbar.closeSidebarDrawer : L.topbar.openSidebarDrawer)
+              : (sidebarCollapsed ? L.topbar.expandSidebar : L.topbar.collapseSidebar)}
+            aria-expanded={narrow ? drawerOpen : undefined}
             onClick={() => {
+              if (narrow) { setDrawerOpen((v) => !v); return; }
               setSidebarCollapsed((v) => {
                 try { window.localStorage.setItem('hmh.sidebarCollapsed', v ? '0' : '1'); } catch { /* 私有模式 */ }
                 return !v;
               });
             }}
-          >{sidebarCollapsed ? <Icon name="panel-expand" /> : <Icon name="panel-collapse" />}</button>
+          >{narrow || !sidebarCollapsed ? <Icon name="panel-collapse" /> : <Icon name="panel-expand" />}</button>
           <span className={`host-dot ${hostBadge.connected ? 'on' : 'off'}`} aria-hidden="true" />
           <span className="host-label">{hostBadge.label}{hostBadge.detail !== '' ? ` · ${hostBadge.detail}` : ''}</span>
           {workspaces !== null && (
@@ -1463,12 +1488,20 @@ export function App(): React.ReactElement {
                   <>
                     <div className="fs-preview-head">{L.dock.gitChanges(diff.cwd, diff.changed.length)}</div>
                     <div className="fs-list">
-                      {diff.changed.map((c) => (
-                        <div key={c.path} className="diff-row">
-                          <span className={`diff-state ${c.state.includes('D') ? 'del' : c.state.includes('A') || c.state.includes('?') ? 'add' : 'mod'}`}>{c.state || 'M'}</span>
-                          <span className="diff-path">{c.path}</span>
-                        </div>
-                      ))}
+                      {diff.changed.map((c) => {
+                        // RFC §2.5:状态不靠颜色单独编码——字母(A/M/D)+ 文字标签双通道
+                        const del = c.state.includes('D');
+                        const add = !del && (c.state.includes('A') || c.state.includes('?'));
+                        const st = del ? 'del' : add ? 'add' : 'mod';
+                        const stateLabel = del ? L.dock.diffStateDel : add ? L.dock.diffStateAdd : L.dock.diffStateMod;
+                        return (
+                          <div key={c.path} className="diff-row">
+                            <span className={`diff-state ${st}`} title={`${stateLabel} (${c.state || 'M'})`}>{c.state || 'M'}</span>
+                            <span className={`diff-state-label ${st}`}>{stateLabel}</span>
+                            <span className="diff-path">{c.path}</span>
+                          </div>
+                        );
+                      })}
                       {diff.changed.length === 0 && <div className="empty-hint">{L.dock.noChanges}</div>}
                     </div>
                     {diff.stat !== '' && <pre className="tool-io out">{diff.stat}</pre>}
