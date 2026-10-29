@@ -69,6 +69,47 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
   await waitFor('host dot on', `var d=document.querySelector('.host-dot'); return {ok: !!d && d.classList.contains('on'), detail: d ? d.className : 'no dot'};`, mode === 'real' ? 60_000 : 20_000);
   await sleep(1_200); // 会话列表/顶栏数据落地
 
+  /** 统一收尾:SUMMARY + 按失败数退出。 */
+  const finish = (): void => {
+    const failed = results.filter((r) => !r[1]).length;
+    console.log(`UIVERIFY SUMMARY pass=${results.length - failed}/${results.length} mode=${mode} shots=${shots}`);
+    app.exit(failed === 0 ? 0 : 1);
+  };
+
+  /* ========== 专用:真实更新全流程验收(任务 13-C;驱动器 --update-real)
+     前置 env:HMH_DESKTOP_UPDATE_FORCE_TAG 非空(强制视为有更新,当前 0.2.9
+     == latest 0.2.9 仍走下载)。走真实检查链(direct → atomgit → …)→ 后台
+     流式下载真实 Setup(112MB,atomgit 资产)→ downloaded 横幅。只断言就绪,
+     绝不点击"重启更新"(避免把开发机的 electron dist 装坏)。 */
+  if (process.env.HMH_DESKTOP_UIVERIFY_UPDATE === 'real') {
+    await step('更新(真实):启动 30s 自动检查 → atomgit/镜像通道命中 → 后台下载进度横幅出现', async () => {
+      return waitFor('downloading or ready banner', `var b=document.querySelector('.update-banner');
+        if(!b) return {ok:false, detail:'no banner yet'};
+        var t=b.textContent.replace(/\\s+/g,' ');
+        return {ok: true, detail: t.slice(0,90)};`, 150_000);
+    });
+    await shot('update-real-downloading');
+    await step('更新(真实):112MB 流式下载完成 → "重启更新"横幅就绪(不点击,不安装)', async () => {
+      return waitFor('ready banner', `var b=document.querySelector('.update-banner');
+        var btn=b?b.querySelector('.update-restart'):null;
+        var links=b?b.querySelectorAll('a').length:-1;
+        return {ok: !!btn && btn.disabled===false && links===0, detail: b ? b.textContent.replace(/\\s+/g,' ').slice(0,90) : 'no banner'};`, 900_000);
+    });
+    await shot('update-real-ready');
+    await step('更新(真实):composer/侧栏不受横幅挤压(任务区可用)', async () => {
+      const r = (await js(`(function(){
+        var ta=document.querySelector('.composer textarea'), sb=document.querySelector('.sidebar');
+        var tr=ta?ta.getBoundingClientRect():null;
+        return JSON.stringify({ta: !!tr && tr.height>30 && tr.bottom<=window.innerHeight, sb: !!sb && getComputedStyle(sb).display!=='none'});
+      })()`)) as string;
+      const p = JSON.parse(r) as { ta: boolean; sb: boolean };
+      return [p.ta && p.sb, `composer 可用=${p.ta} 侧栏正常=${p.sb}`];
+    });
+    await shot('final');
+    finish();
+    return;
+  }
+
   /* ========== 通用:布局几何(用户报障的直接断言) ========== */
   await step('布局:标题栏+三栏+composer 在视口内(输入框可见)', async () => {
     const r = (await js(`(function(){
@@ -624,6 +665,61 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
       return [p.ok === true, `${p.detail} overlay-h=${overlay}`];
     });
 
+    /* ========== fake:更新横幅(mock update:state 三态;任务 13-C) ==========
+       主进程直发 mock 状态:检查中静默 → 下载中(进度/速度/进度条)→ 就绪
+       ("重启更新"可点、无外链、apply 不崩)→ 失败(重试流转 + 稍后关闭)。 */
+    await step('更新横幅:检查中静默无横幅 → 下载中进度可见(字节/速度/进度条)', async () => {
+      const stBase = { checking: false, currentVersion: '0.2.9', latest: null, notes: '', downloaded: false, error: '', channel: '', progress: null };
+      // checking 态:静默检查,不打扰任务区
+      win.webContents.send('update:state', { ...stBase, checking: true });
+      await sleep(400);
+      const silent = (await js(`!document.querySelector('.update-banner')`)) as boolean;
+      // 下载中:版本号 + 已下载/总字节 + 速度 + 进度条宽度
+      win.webContents.send('update:state', { ...stBase, latest: 'v0.3.0', channel: 'atomgit(国内)', progress: { received: 47_000_000, total: 112_147_199, speedBps: 2_100_000 } });
+      const dl = await waitFor('downloading banner', `var b=document.querySelector('.update-banner');
+        if(!b) return {ok:false, detail:'no banner'};
+        var t=b.textContent.replace(/\\s+/g,' ');
+        var bar=b.querySelector('.update-bar-fill');
+        var w=bar?parseFloat(bar.style.width):0;
+        return {ok: t.indexOf('v0.3.0')>=0 && t.indexOf('/')>=0 && t.indexOf('/s')>=0 && w>30 && w<=100, detail: 'text='+t.slice(0,70)+' barW='+w};`, 5_000);
+      await shot('update-downloading');
+      return [silent && dl[0], `checking 静默=${silent}; ${dl[1]}`];
+    });
+    await step('更新横幅:就绪态"重启更新"可点、无外链引导,apply 触发 preload 且进程存活', async () => {
+      win.webContents.send('update:state', { checking: false, currentVersion: '0.2.9', latest: 'v0.3.0', notes: '', downloaded: true, error: '', channel: 'atomgit(国内)', progress: null });
+      const ready = await waitFor('ready banner', `var b=document.querySelector('.update-banner');
+        var btn=b?b.querySelector('.update-restart'):null;
+        var links=b?b.querySelectorAll('a').length:-1;
+        var noExt=b?(b.textContent.indexOf('下载页')<0 && b.textContent.indexOf('http')<0):false;
+        return {ok: !!b && !!btn && btn.disabled===false && links===0 && noExt, detail: 'btn='+(btn?btn.textContent:'none')+' links='+links+' noExt='+noExt};`, 5_000);
+      await shot('update-ready');
+      if (!ready[0]) return ready;
+      // preload 桥在 + 点击后进程存活(mock 无安装包 → applyUpdate no-op 不退出;
+      // 主进程侧有 "apply requested" 日志行,由驱动器输出人审)。
+      const hasBridge = (await js(`typeof window.hmh.applyUpdate === 'function' && typeof window.hmh.checkUpdate === 'function'`)) as boolean;
+      await js(`(function(){ var b=document.querySelector('.update-banner .update-restart'); if(b) b.click(); })()`);
+      await sleep(800);
+      const alive = (await js(`!!document.querySelector('.update-banner') && !!document.querySelector('.composer textarea')`)) as boolean;
+      return [hasBridge && alive, `preload applyUpdate/checkUpdate=${hasBridge}; 点击后横幅与 composer 存活=${alive}`];
+    });
+    await step('更新横幅:失败态错误明细+重试流转,稍后可关闭', async () => {
+      win.webContents.send('update:state', { checking: false, currentVersion: '0.2.9', latest: null, notes: '', downloaded: false, error: '全部检查通道失败(直连:超时(8s); atomgit(国内):HTTP 502; gh-proxy:超时(10s))', channel: '', progress: null });
+      const err = await waitFor('error banner', `var b=document.querySelector('.update-banner');
+        var btn=b?b.querySelector('.update-retry'):null;
+        return {ok: !!b && b.textContent.indexOf('更新检查失败')>=0 && b.textContent.indexOf('atomgit')>=0 && !!btn && btn.disabled===false, detail: b ? b.textContent.replace(/\\s+/g,' ').slice(0,90) : 'no banner'};`, 5_000);
+      await shot('update-error');
+      if (!err[0]) return err;
+      // 点重试 → 进入 checking(横幅按状态机收起;真实 checkForUpdates 在后台跑,不影响本步)
+      await js(`(function(){ var b=document.querySelector('.update-banner .update-retry'); if(b) b.click(); })()`);
+      const toChecking = await waitFor('banner hidden on retry', `return {ok: !document.querySelector('.update-banner'), detail: document.querySelector('.update-banner') ? 'still' : 'hidden'};`, 5_000);
+      // 恢复就绪态验证"稍后":点击后横幅关闭(会话内静默,下次启动再提醒)
+      win.webContents.send('update:state', { checking: false, currentVersion: '0.2.9', latest: 'v0.3.0', notes: '', downloaded: true, error: '', channel: 'atomgit(国内)', progress: null });
+      await waitFor('ready again', `return {ok: !!document.querySelector('.update-banner .update-restart'), detail: 'ready'};`, 5_000);
+      await js(`(function(){ var bs=[].slice.call(document.querySelectorAll('.update-banner button')); var b=bs.find(function(x){return x.textContent.indexOf('稍后')>=0;}); if(b) b.click(); })()`);
+      const dismissed = await waitFor('banner dismissed', `return {ok: !document.querySelector('.update-banner'), detail: document.querySelector('.update-banner') ? 'still' : 'dismissed'};`, 5_000);
+      return [toChecking[0] && dismissed[0], `重试→checking 收起=${toChecking[0]}; 稍后关闭=${dismissed[0]}`];
+    });
+
     await shot('final');
   } else if ((process.env.HMH_DESKTOP_UIVERIFY_WIZARD ?? '') !== '') {
     /* ========== real(向导构造,互斥于常规 real 步骤):
@@ -792,9 +888,7 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
     await shot('final');
   }
 
-  const failed = results.filter((r) => !r[1]).length;
-  console.log(`UIVERIFY SUMMARY pass=${results.length - failed}/${results.length} mode=${mode} shots=${shots}`);
-  app.exit(failed === 0 ? 0 : 1);
+  finish();
 }
 
 export function attachUiVerify(win: BrowserWindow): void {

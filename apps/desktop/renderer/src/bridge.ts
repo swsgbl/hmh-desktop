@@ -117,6 +117,18 @@ export interface DiffDto {
   stat: string;
 }
 
+/** 应用内更新状态(main 经 update:state 推送;progress 下载中非空)。 */
+export interface UpdateStateDto {
+  checking: boolean;
+  currentVersion: string;
+  latest: string | null;
+  notes: string;
+  downloaded: boolean;
+  error: string;
+  channel: string;
+  progress: { received: number; total: number; speedBps: number } | null;
+}
+
 export interface HmhBridge {
   getState(): Promise<BridgeState>;
   runtimeInfo(): Promise<RuntimeInfoDto | { error: string; code: string }>;
@@ -158,6 +170,9 @@ export interface HmhBridge {
   diff(sessionId: string): Promise<DiffDto | { error: string; code: string }>;
   sessionPreview(id: string): Promise<SessionPreviewDto | { error: string; code: string }>;
   stopHost(): Promise<{ ok: boolean }>;
+  checkUpdate(): Promise<UpdateStateDto | { error: string; code: string }>;
+  applyUpdate(): Promise<{ ok: boolean } | { error: string; code: string }>;
+  onUpdateState(cb: (st: UpdateStateDto) => void): () => void;
   onEventBatches(cb: (batch: EventEnvelope[]) => void): () => void;
   onHostState(cb: (state: string, info: { restartCount: number; lastError?: string }) => void): () => void;
   onStreamChunks(cb: (chunk: { sessionId: string; kind: string; chunk: string }) => void): () => void;

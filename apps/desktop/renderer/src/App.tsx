@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { EventEnvelope, RunStatus } from '@hmh-desktop/contracts';
-import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type ProviderDetailDto, type SessionPreviewDto, type WorkspaceDto } from './bridge.ts';
+import { bridge, type BridgeState, type DiffDto, type FsListDto, type FsReadDto, type ProviderDetailDto, type SessionPreviewDto, type UpdateStateDto, type WorkspaceDto } from './bridge.ts';
 import { useLocale } from './i18n.ts';
 import { Icon } from './icons.tsx';
 import { useTheme, type Theme } from './theme.ts';
@@ -35,6 +35,14 @@ type Item =
   | { kind: 'error'; id: string; code: string; message: string; sessionId: string; runId: string };
 
 type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs' | 'remote';
+
+/** 更新横幅的字节/速度格式化(112147199 → "107.0 MB";速度 → "2.1 MB/s")。 */
+function fmtBytes(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)} MB`;
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)} KB`;
+  return `${n} B`;
+}
 
 /** HIG P3(RFC §3):turn 文本切分——fenced(```)代码块独立成段,
  *  代码段进内滚动容器(.turn-code)不再撑长卡片,正文段保持通排。纯渲染层,不碰数据流。 */
@@ -138,6 +146,10 @@ export function App(): React.ReactElement {
   const [approvalMode, setApprovalMode] = useState<'ask' | 'auto'>('ask');
   // Provider 设置(03 §七)
   const [providers, setProviders] = useState<ProviderDetailDto[]>([]);
+  // 应用内更新横幅(任务 13-C):状态订阅见下方 effect;updateDismissed=
+  // 用户点"稍后"→ 本次会话静默,下次启动再提醒
+  const [update, setUpdate] = useState<UpdateStateDto | null>(null);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
   const [currentModel, setCurrentModel] = useState<string>('');
   const [chatProvider, setChatProvider] = useState<string>('');
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
@@ -307,6 +319,13 @@ export function App(): React.ReactElement {
     });
     return () => { offState(); offEvents(); offChunks(); };
   }, [applyEnvelope]);
+
+  // 应用内更新(任务 13-C):后台静默下载 → 非模态横幅"重启更新";失败可重试;
+  // 不出现"打开下载页"类入口(主路径永远是应用内一键安装)。
+  useEffect(() => {
+    if (bridge === undefined) return;
+    return bridge.onUpdateState((st) => setUpdate(st));
+  }, []);
 
   useEffect(() => {
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight });
@@ -877,7 +896,7 @@ export function App(): React.ReactElement {
   }, [state, hostState, hostInfo, L]);
 
   return (
-    <>
+    <div className="app-root">
       {wizardOpen && <SetupWizard L={L} hostState={hostState} onClose={() => setWizardOpen(false)} />}
       <header className="titlebar">
         <button
@@ -889,6 +908,40 @@ export function App(): React.ReactElement {
         <span className="titlebar-title">HMH Desktop</span>
         <span className="titlebar-spacer" aria-hidden="true" />
       </header>
+      {update !== null && !updateDismissed && (update.progress !== null || update.downloaded || update.error !== '') && (
+        <div className="update-banner" role="status" aria-label={L.update.bannerAria} data-testid="update-banner">
+          <div className="update-banner-main">
+            {update.progress !== null && (
+              <>
+                <span className="update-text">{L.update.downloading(update.latest ?? '?')}</span>
+                <span className="update-progress-text">
+                  {L.update.progress(fmtBytes(update.progress.received), fmtBytes(update.progress.total), `${fmtBytes(update.progress.speedBps)}/s`)}
+                </span>
+                <span className="update-bar" aria-hidden="true">
+                  <span
+                    className="update-bar-fill"
+                    style={{ width: `${update.progress.total > 0 ? Math.min(100, (update.progress.received / update.progress.total) * 100) : 0}%` }}
+                  />
+                </span>
+              </>
+            )}
+            {update.downloaded && (
+              <>
+                <span className="update-text">{L.update.ready(update.latest ?? '?')}<span className="update-hint">{L.update.readyHint}</span></span>
+                <button className="btn primary sm update-restart" onClick={() => { if (bridge !== undefined) void bridge.applyUpdate(); }}>{L.update.restart}</button>
+                <button className="btn ghost sm" title={L.update.laterHint} onClick={() => setUpdateDismissed(true)}>{L.update.later}</button>
+              </>
+            )}
+            {update.error !== '' && !update.downloaded && update.progress === null && (
+              <>
+                <span className="update-text update-error-text">{L.update.checkFailed}:{update.error}</span>
+                <button className="btn ghost sm update-retry" onClick={() => { setUpdateDismissed(false); if (bridge !== undefined) void bridge.checkUpdate(); }}>{L.update.retry}</button>
+                <button className="btn ghost sm" aria-label={L.update.dismiss} onClick={() => setUpdateDismissed(true)}>×</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <div className={`app-shell${sidebarCollapsed && !narrow ? ' no-sidebar' : ''}${narrow && drawerOpen ? ' drawer-open' : ''}`}>
       {narrow && drawerOpen && <div className="sidebar-scrim" aria-hidden="true" onClick={() => setDrawerOpen(false)} />}
       {shortcutsOpen && (
@@ -1572,6 +1625,6 @@ export function App(): React.ReactElement {
         </aside>
       )}
       </div>
-    </>
+    </div>
   );
 }

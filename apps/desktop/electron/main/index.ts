@@ -15,7 +15,8 @@
 import { app, BrowserWindow, dialog, ipcMain, session, shell, Tray, Notification, Menu, nativeImage, nativeTheme } from 'electron';
 import { join, dirname, basename, isAbsolute, resolve } from 'node:path';
 import { existsSync, realpathSync, readFileSync } from 'node:fs';
-import { writeFile, readFile } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { writeFile, readFile, stat, rename } from 'node:fs/promises';
 import { homedir, networkInterfaces } from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
@@ -25,7 +26,7 @@ import { isEventEnvelope, type EventEnvelope } from '@hmh-desktop/contracts';
 import { attachUiVerify } from './uiverify.ts';
 import { attachVisualRegression } from './visualregression.ts';
 import { installTarget, resolveInstalledEntry, startCliInstall, type InstallProgress } from './installer.ts';
-import { orderedCheckChannels, orderedDownloadMirrors, normalizeChannel, summarizeCheckFailures, type UpdateChannelId } from './updater-channels.ts';
+import { orderedCheckChannels, downloadCandidates, normalizeChannel, normalizeRelease, pickInstallerAsset, sizeMatches, summarizeCheckFailures, cmpVersion, type LatestRelease, type ReleaseAsset, type UpdateChannelId, type UpdateRepos } from './updater-channels.ts';
 
 const here = import.meta.dirname ?? '.';
 const isDev = process.env.HMH_DESKTOP_DEV === '1';
@@ -161,27 +162,29 @@ if (!app.requestSingleInstanceLock()) {
   }
 
   /* ---- 应用内更新(2026-10-26:自研轻量更新器,零依赖;GitHub Releases 通道)
-     流程:☰"检查更新"→ fetch latest release tag → 比版本 → 后台下载 Setup
-     exe 到临时目录 → 菜单变"重启并安装更新"→ 退出应用后 NSIS /S /D=原目录
-     静默覆盖安装(下次启动即新版)。无签名证书阶段可用;正式签名后可加校验。
+     流程:启动 30s 后静默检查 → fetch latest release tag → 比版本 → 后台流式
+     下载 Setup exe 到临时目录(进度推送 renderer 横幅)→"重启更新"→ 退出应用
+     后 NSIS /S /D=原目录 静默覆盖安装(下次启动即新版)——全程不跳浏览器。
      2026-10-29 双通道根修(用户国内收不到推送):检查通道镜像回退链
-     (直连 8s → gh-proxy → ghfast,规则见 updater-channels.ts)+ 命中通道
-     粘性记忆 + 下载镜像与检查通道同源优先。 */
-  const UPDATE_REPO = 'swsgbl/hmh-desktop';
-  interface UpdateState { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string; channel: string }
-  let updateState: UpdateState = { checking: false, currentVersion: app.getVersion(), latest: null, notes: '', downloaded: false, error: '', channel: '' };
+     (直连 8s → gh-proxy → ghfast)+ 命中通道粘性记忆 + 下载同源优先。
+     同日任务 13-C:atomgit 国内首选通道(链第二位,国内直连匿名可读)+ 流式
+     下载进度 + 下载 size 校验 + "重启更新"非模态横幅(renderer)。
+     旋钮:UPDATE_REPO / UPDATE_REPO_ATOMGIT 覆盖双仓;HMH_DESKTOP_UPDATE_FORCE_TAG
+     非空 → 无视版本比较强制走更新流程(验收用,不重打包)。 */
+  const UPDATE_REPOS: UpdateRepos = {
+    github: process.env.UPDATE_REPO ?? 'swsgbl/hmh-desktop',
+    atomgit: process.env.UPDATE_REPO_ATOMGIT ?? 'hongfu/hmh-desktop',
+  };
+  const UPDATE_FORCE_TAG = process.env.HMH_DESKTOP_UPDATE_FORCE_TAG ?? '';
+  interface UpdateProgress { received: number; total: number; speedBps: number }
+  interface UpdateState { checking: boolean; currentVersion: string; latest: string | null; notes: string; downloaded: boolean; error: string; channel: string; progress: UpdateProgress | null }
+  let updateState: UpdateState = { checking: false, currentVersion: app.getVersion(), latest: null, notes: '', downloaded: false, error: '', channel: '', progress: null };
   let installerPath: string | null = null;
   const bumpUpdate = (patch: Partial<UpdateState>): void => {
     updateState = { ...updateState, ...patch };
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) w.webContents.send('update:state', updateState);
     }
-  };
-  const cmpVersion = (a: string, b: string): number => {
-    const pa = a.replace(/^v/, '').split('.').map(Number);
-    const pb = b.replace(/^v/, '').split('.').map(Number);
-    for (let i = 0; i < 3; i++) { if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0) ? -1 : 1; }
-    return 0;
   };
   /** 通道粘性:上次成功命中的检查通道(userData/update-channel.json,与 runtime.json 同模式)。 */
   const updateChannelFile = (): string => join(app.getPath('userData'), 'update-channel.json');
@@ -194,11 +197,10 @@ if (!app.requestSingleInstanceLock()) {
   async function saveStickyChannel(id: UpdateChannelId): Promise<void> {
     await writeFile(updateChannelFile(), JSON.stringify({ channel: id }, null, 2), 'utf8').catch(() => undefined);
   }
-  type LatestRelease = { tag_name?: string; body?: string; assets?: Array<{ name: string; browser_download_url: string; size: number }> };
   async function checkForUpdates(): Promise<UpdateState> {
     if (updateState.checking || updateState.downloaded) return updateState;
     bumpUpdate({ checking: true, error: '' });
-    logInfo('update', `checking… (current v${app.getVersion()})`);
+    logInfo('update', `checking… (current v${app.getVersion()})${UPDATE_FORCE_TAG !== '' ? ` force-tag=${UPDATE_FORCE_TAG}` : ''}`);
     const failures: Array<{ label: string; reason: string }> = [];
     try {
       const sticky = await loadStickyChannel();
@@ -206,14 +208,15 @@ if (!app.requestSingleInstanceLock()) {
       for (const ch of channels) {
         let rel: LatestRelease | null = null;
         try {
-          const r = await fetch(ch.apiUrl(UPDATE_REPO), {
+          const r = await fetch(ch.apiUrl(UPDATE_REPOS), {
             headers: { 'user-agent': 'hmh-desktop-updater' },
             signal: AbortSignal.timeout(ch.timeoutMs),
           });
           if (!r.ok) { failures.push({ label: ch.label, reason: `HTTP ${r.status}` }); logInfo('update', `${ch.label} → HTTP ${r.status}`); continue; }
-          // 镜像可能回 200 但内容非 JSON(HTML 错误页):r.json() 抛错或 tag 缺失都按本通道失败回退
-          rel = (await r.json()) as LatestRelease;
-          if (typeof rel?.tag_name !== 'string' || rel.tag_name === '') { failures.push({ label: ch.label, reason: '响应无 tag_name' }); logInfo('update', `${ch.label} → 无 tag_name`); continue; }
+          // 镜像可能回 200 但内容非 JSON(HTML 错误页);GitHub 回对象、atomgit
+          // 回数组——normalizeRelease 统一归一,形状不对按本通道失败回退
+          rel = normalizeRelease(await r.json());
+          if (rel === null) { failures.push({ label: ch.label, reason: '响应无 tag_name' }); logInfo('update', `${ch.label} → 无 tag_name`); continue; }
         } catch (err) {
           const e = err as { cause?: { code?: unknown } };
           const reason = err instanceof Error && err.name === 'TimeoutError'
@@ -223,13 +226,13 @@ if (!app.requestSingleInstanceLock()) {
           logInfo('update', `${ch.label} → fail ${reason}`);
           continue;
         }
-        const tag = String(rel.tag_name);
+        const tag = rel.tag_name;
         logInfo('update', `latest=${tag} assets=${(rel.assets ?? []).length} via ${ch.label}${sticky === ch.id ? '(sticky)' : ''}`);
         await saveStickyChannel(ch.id); // 粘性:下次先试本通道
         bumpUpdate({ checking: false, latest: tag, notes: String(rel.body ?? '').slice(0, 600), channel: ch.id });
-        // 有新版且未下载过 → 后台下载安装包
-        if (cmpVersion(app.getVersion(), tag) < 0 && !updateState.downloaded) {
-          void downloadInstaller(rel.assets ?? []);
+        // 有新版(或 FORCE_TAG 验收旋钮)且未下载过 → 后台下载安装包
+        if ((UPDATE_FORCE_TAG !== '' || cmpVersion(app.getVersion(), tag) < 0) && !updateState.downloaded) {
+          void downloadInstaller(rel.assets ?? [], tag);
         }
         return updateState;
       }
@@ -242,40 +245,76 @@ if (!app.requestSingleInstanceLock()) {
     }
     return updateState;
   }
-  async function downloadInstaller(assets: Array<{ name: string; browser_download_url: string; size: number }>): Promise<void> {
+  /** 后台流式下载安装包:分块写盘(112MB 不再整驻内存),进度(已下载/总字节/
+   *  速度)经 update:state 推 renderer 横幅;落盘后按资产元数据 size 校验。 */
+  async function downloadInstaller(assets: readonly ReleaseAsset[], tag: string): Promise<void> {
     try {
-      const asset = assets.find((a) => /^HMH-Desktop-Setup-.*\.exe$/i.test(a.name)) ?? assets.find((a) => a.name.endsWith('.exe'));
-      if (asset === undefined) { bumpUpdate({ error: 'release 无安装包资产' }); return; }
+      const asset = pickInstallerAsset(assets);
+      if (asset === null) { bumpUpdate({ error: 'release 无安装包资产' }); return; }
       const dest = join(app.getPath('temp'), asset.name);
-      // 镜像回退链 + 同源优先:检查命中的通道排最前(规则见 updater-channels.ts)
-      const mirrors = orderedDownloadMirrors(asset.browser_download_url, updateState.channel);
-      let buf: Buffer | null = null;
+      // 上次会话已把同版本安装包完整下到临时目录(size 对得上)→ 直接复用,
+      // 不再拉 112MB;这就是"用户忽略横幅继续用,下次启动仍一键可装"的落地。
+      try {
+        const st = await stat(dest);
+        if (sizeMatches(asset.size, st.size)) {
+          installerPath = dest;
+          bumpUpdate({ downloaded: true, progress: null });
+          logInfo('update', `复用已下载 ${asset.name}(${Math.round(st.size / 1e6)}MB) → ${dest}`);
+          return;
+        }
+      } catch { /* 不存在则正常下载 */ }
+      // 下载候选链:atomgit 命中 → atomgit 直链/API 端点优先,GitHub 主仓镜像兜底
+      const candidates = downloadCandidates({ channel: updateState.channel, tag, assetUrl: asset.browser_download_url, assetName: asset.name, repos: UPDATE_REPOS });
       let lastErr = '';
-      for (const u of mirrors) {
+      for (const u of candidates) {
         try {
           logInfo('update', `trying ${new URL(u).host}…`);
-          const r = await fetch(u, { signal: AbortSignal.timeout(600_000) });
+          const r = await fetch(u, { signal: AbortSignal.timeout(900_000) });
           if (!r.ok) { lastErr = `HTTP ${r.status}`; logInfo('update', `→ HTTP ${r.status}`); continue; }
-          buf = Buffer.from(await r.arrayBuffer());
-          if (buf.length > 1_000_000) { logInfo('update', `→ ok ${Math.round(buf.length / 1e6)}MB`); break; }
-          lastErr = '内容异常'; buf = null;
+          if (r.body === null) { lastErr = '无响应体'; continue; }
+          const total = Number(r.headers.get('content-length') ?? 0) > 0 ? Number(r.headers.get('content-length')) : asset.size;
+          const destTmp = `${dest}.part`;
+          const out = createWriteStream(destTmp);
+          let received = 0;
+          let lastBump = 0;
+          const t0 = Date.now();
+          const reader = r.body.getReader();
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done === true || value === undefined) break;
+            received += value.byteLength;
+            out.write(value);
+            // 进度节流:≤ 每 400ms 一帧,IPC 不洪泛;首块立即上报(总字节尽快可见)
+            const now = Date.now();
+            if (received === value.byteLength || now - lastBump > 400) {
+              lastBump = now;
+              bumpUpdate({ progress: { received, total, speedBps: Math.round(received / Math.max((now - t0) / 1000, 0.1)) } });
+            }
+          }
+          await new Promise<void>((res, rej) => { out.end((err?: Error | null) => { if (err !== null && err !== undefined) rej(err); else res(); }); });
+          if (received < 1_000_000) { lastErr = `内容异常(${received}B)`; logInfo('update', `→ ${lastErr}`); continue; }
+          if (!sizeMatches(asset.size, received)) { lastErr = `size 不符(元数据 ${asset.size}B / 实收 ${received}B)`; logInfo('update', `→ ${lastErr}`); continue; }
+          await rename(destTmp, dest);
+          installerPath = dest;
+          bumpUpdate({ downloaded: true, progress: null });
+          logInfo('update', `已下载 ${asset.name}(${Math.round(received / 1e6)}MB) → ${dest}`);
+          return;
         } catch (err) {
           const e = err as { cause?: { code?: unknown } };
-          lastErr = String(e.cause?.code ?? err).slice(0, 60);
+          lastErr = String(e.cause?.code ?? err).slice(0, 80);
           logInfo('update', `→ fail ${lastErr}`);
+          bumpUpdate({ progress: null });
         }
       }
-      if (buf === null) throw new Error(`全部下载通道失败(${lastErr})`);
-      const { writeFile: wf } = await import('node:fs/promises');
-      await wf(dest, buf);
-      installerPath = dest;
-      bumpUpdate({ downloaded: true });
-      logInfo('update', `已下载 ${asset.name}(${Math.round(buf.length / 1e6)}MB) → ${dest}`);
+      bumpUpdate({ error: `下载失败:全部下载通道失败(${lastErr})`.slice(0, 160), progress: null });
     } catch (err) {
-      bumpUpdate({ error: `下载失败: ${String(err).slice(0, 120)}` });
+      bumpUpdate({ error: `下载失败: ${String(err).slice(0, 120)}`, progress: null });
     }
   }
   function applyUpdate(): void {
+    // 验收可观测:每次 apply 请求都留日志(mock/无安装包时点击"重启更新"
+    // 不退出,UIVERIFY 断言"点击后进程存活"配合这行日志构成完整证据链)。
+    logInfo('update', `apply requested (installer=${installerPath === null ? 'none' : basename(installerPath)})`);
     if (installerPath === null) return;
     // 退出当前应用后由安装器静默覆盖安装(装回原目录)。NSIS assisted 规则:
     // /S 且 /D=path 必须最后一个参数、值不加引号(含空格也不加)——node spawn
@@ -342,8 +381,8 @@ if (!app.requestSingleInstanceLock()) {
         click: (): void => {
           if (updateState.downloaded) { applyUpdate(); return; }
           void checkForUpdates().then((st) => {
-            const newer = st.latest !== null && cmpVersion(st.currentVersion, st.latest) < 0;
-            const detail = newer ? `${st.notes}\n\n安装包正在后台下载,完成后 ☰ 菜单会出现"重启并安装更新"。` : '';
+            const newer = st.latest !== null && (cmpVersion(st.currentVersion, st.latest) < 0 || UPDATE_FORCE_TAG !== '');
+            const detail = newer ? `${st.notes}\n\n安装包正在后台下载,完成后顶部横幅会出现"重启更新"一键安装(无需打开下载页)。` : '';
             void dialog.showMessageBox(win, {
               type: 'info',
               title: '检查更新',
@@ -1308,8 +1347,9 @@ if (!app.requestSingleInstanceLock()) {
     app.setAppUserModelId('dev.hmh.desktop');
     setupTray();
     buildAppMenu();
-    // 启动 30s 后静默检查更新(有新版仅后台下载,不打扰;用户经 ☰ 菜单决定装)
-    if (app.isPackaged) setTimeout(() => { void checkForUpdates(); }, 30_000);
+    // 启动 30s 后静默检查更新(有新版仅后台下载,不打扰;失败静默,下次启动再试)。
+    // dev 也检查:行为与打包版一致,且 FORCE_TAG 旋钮下 dev 即可全流程验收。
+    setTimeout(() => { void checkForUpdates(); }, 30_000);
     // CSP(dev 与 prod 不同;prod 不允许任何远程源)
     const csp = isDev
       ? [
