@@ -1,6 +1,6 @@
 # HMH-OHOS(深开鸿/HarmonyOS 版)安装说明
 
-资产:`HMH-OHOS-0.2.4.hap`(API23,OpenHarmony 测试签名——侧载形态)
+资产:`HMH-OHOS-0.2.8.hap`(API23,versionCode 1000002,OpenHarmony 公共测试签名——侧载形态;sha256 `8448fb96736143d2178d7b9557ccf7c013dc4962b8b03aa4877902fef04be0f1`)。历史:0.2.4 → 0.2.5 → 0.2.6 → 0.2.7 同目录归档。
 
 ## 安装(两种)
 
@@ -11,7 +11,7 @@ node apps/ohos/scripts/deploy.mjs   # 需 hdc(DevEco toolchains)且 VM/设备可
 
 **B. 手动 hdc**(设备已 tconn):
 ```bash
-hdc install -r HMH-OHOS-0.2.4.hap
+hdc install -r HMH-OHOS-0.2.8.hap
 hdc shell aa start -a EntryAbility -b com.hmh.desktop.ohos
 ```
 
