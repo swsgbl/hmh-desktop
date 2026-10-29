@@ -96,20 +96,21 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         await shot('wizard-welcome');
         return w;
       });
-      await step('向导:开始配置→检测(伪造未装)→自动进选择页(三选一+全局配置提示)', async () => {
+      await step('向导:开始配置→检测(伪造未装)→未装即自动安装页(说明横幅+切换链接)', async () => {
         await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始配置';}); if(b) b.click(); })()`);
-        const w = await waitFor('select page', `var p=document.querySelector('.wizard-card.wizard-page-select');
-          if(!p) return {ok:false, detail:'not on select'};
+        const w = await waitFor('auto install page', `var p=document.querySelector('.wizard-card.wizard-page-install');
+          if(!p) return {ok:false, detail:'not on install'};
           var t=p.textContent;
-          var o1=t.indexOf('下载安装完整 hmh CLI')>=0, o2=t.indexOf('使用内置精简内核')>=0, o3=t.indexOf('跳过(演示模式)')>=0, note=t.indexOf('.hmharness')>=0;
-          return {ok: o1&&o2&&o3&&note, detail: 'opt1='+o1+' opt2='+o2+' opt3='+o3+' note='+note};`, 12_000);
-        await shot('wizard-select');
+          var note=t.indexOf('未检测到 hmh CLI,已自动开始安装')>=0;
+          var l1=t.indexOf('改用内置精简内核')>=0, l2=t.indexOf('演示模式')>=0;
+          var bar=!!p.querySelector('.wizard-progress');
+          var sel=document.querySelector('.wizard-card.wizard-page-select');
+          return {ok: note&&l1&&l2&&bar&&!sel, detail: 'note='+note+' 内置链接='+l1+' 演示链接='+l2+' bar='+bar+' selectLeak='+!!sel};`, 12_000);
+        await shot('wizard-auto-install');
         return w;
       });
-      await step('向导:选内置精简内核→配置跳过→完成页→开始使用→关闭且已连接', async () => {
-        await js(`(function(){ var o=[].slice.call(document.querySelectorAll('.wizard-opt')).find(function(x){return x.textContent.indexOf('使用内置精简内核')>=0;}); if(o) o.click(); })()`);
-        await sleep(300);
-        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='下一步'||x.textContent.trim()==='开始安装';}); if(b) b.click(); })()`);
+      await step('向导:横幅"改用内置精简内核"→配置跳过→完成页→开始使用→关闭且已连接', async () => {
+        await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-page-install .wizard-alt-link')).find(function(x){return x.textContent.indexOf('改用内置精简内核')>=0;}); if(b) b.click(); })()`);
         // 配置页:fake providers 已有密钥 → 自动跳过;兜底点"跳过"
         await waitFor('config or done', `var d=document.querySelector('.wizard-card.wizard-page-done');
           if(d) return {ok:true, detail:'done'};
@@ -504,6 +505,69 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         const p = JSON.parse(st) as { persisted?: { done?: boolean; choice?: string } };
         const persisted = p.persisted?.done === true && p.persisted?.choice === 'bundled';
         return [closed[0] && persisted, `closed=${closed[0]} persisted=${JSON.stringify(p.persisted ?? null)}`];
+      });
+
+      /* ========== fake(向导构造):窄屏 360×640 全元素可达 + 单击选项即前进 ==========
+         用户手机实测痛点:窄视口下选项/按钮被裁切点不到。伪造"检测到已装"
+         (主进程 env 即时读)让向导出现三选项路径,缩到 360×640 后逐个
+         elementFromPoint 断言(不是被裁切);再验证单击前进与取消。 */
+      await step('向导:窄屏 360×640——三选项(含 note 整栏)与按钮全部可命中+单击即前进', async () => {
+        process.env.HMH_DESKTOP_UIVERIFY_FAKE_DETECT_FOUND = '1';
+        const size0 = win.getSize();
+        const w0 = size0[0] ?? 1280;
+        const h0 = size0[1] ?? 800;
+        try {
+          await js(`window.dispatchEvent(new KeyboardEvent('keydown', {key:'p', ctrlKey:true, shiftKey:true, bubbles:true}))`);
+          const open = await waitFor('settings open', `var s=document.querySelector('.cmdk.settings'); return {ok: !!s, detail: s ? 'open' : 'closed'};`, 5_000);
+          if (!open[0]) return open;
+          await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.cmdk.settings button')).find(function(x){return x.textContent.indexOf('重新配置')>=0;}); if(b) b.click(); })()`);
+          const shown = await waitFor('wizard reopened', `return {ok: !!document.querySelector('.wizard-overlay'), detail: document.querySelector('.wizard-overlay') ? 'open' : 'closed'};`, 5_000);
+          if (!shown[0]) return shown;
+          await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='开始配置';}); if(b) b.click(); })()`);
+          const detectPage = await waitFor('detect found page(3 options)', `var p=document.querySelector('.wizard-card.wizard-page-detect');
+            var opts=p?p.querySelectorAll('.wizard-opt').length:0;
+            return {ok: !!p && opts===3, detail: 'opts='+opts};`, 12_000);
+          if (!detectPage[0]) return detectPage;
+          // 单击选项即前进:点"仍要下载新版"应直接落到选择页(无需再点"下一步")
+          await js(`(function(){ var o=[].slice.call(document.querySelectorAll('.wizard-opt')).find(function(x){return x.textContent.indexOf('仍要下载新版')>=0;}); if(o) o.click(); })()`);
+          const selectPage = await waitFor('select page via single click', `var p=document.querySelector('.wizard-card.wizard-page-select');
+            return {ok: !!p && p.querySelectorAll('.wizard-opt').length===3, detail: p ? 'select' : 'not select'};`, 6_000);
+          if (!selectPage[0]) return [false, `单击选项未前进到选择页: ${selectPage[1]}`];
+          // 缩到 360×640(minWidth 已在 UIVERIFY 下放宽),断言全部可命中
+          win.setSize(360, 640);
+          await sleep(500);
+          const r = (await js(`(function(){
+            function hit(el){ el.scrollIntoView({block:'nearest'}); var r=el.getBoundingClientRect();
+              var x=r.left+r.width/2, y=r.top+r.height/2;
+              var e=document.elementFromPoint(x,y);
+              return !!(e && (e===el || el.contains(e))); }
+            var card=document.querySelector('.wizard-card.wizard-page-select');
+            var opts=[].slice.call(card.querySelectorAll('.wizard-opt'));
+            var optHit=opts.map(hit);
+            var notes=[].slice.call(card.querySelectorAll('.wizard-opt-note'));
+            var noteHit=notes.map(function(n){ n.scrollIntoView({block:'nearest'}); var r=n.getBoundingClientRect();
+              var e=document.elementFromPoint(r.left+r.width/2, r.top+Math.min(r.height/2, 8));
+              return !!(e && opts.some(function(o){ return e===o || o.contains(e); })); });
+            var act=document.querySelector('.wizard-card.wizard-page-select .wizard-actions .btn.primary');
+            var footer=[].slice.call(document.querySelectorAll('.wizard-footer button'));
+            return JSON.stringify({vw: window.innerWidth, vh: window.innerHeight, opts: opts.length,
+              optHit: optHit, noteHit: noteHit, actHit: act ? hit(act) : false, ftHit: footer.map(hit)});
+          })()`)) as string;
+          const q = JSON.parse(r) as { vw: number; vh: number; opts: number; optHit: boolean[]; noteHit: boolean[]; actHit: boolean; ftHit: boolean[] };
+          await shot('wizard-narrow-360-select');
+          const narrowOk = q.opts === 3 && q.vw <= 380 && q.optHit.every(Boolean) && q.noteHit.every(Boolean) && q.actHit && q.ftHit.every(Boolean);
+          // 窄屏下单击选项① = 选中并前进到安装页(verify 模拟进度,不落盘)
+          await js(`(function(){ var o=[].slice.call(document.querySelectorAll('.wizard-opt')).find(function(x){return x.textContent.indexOf('下载安装完整 hmh CLI')>=0;}); if(o) o.click(); })()`);
+          const adv = await waitFor('install page via single click', `var p=document.querySelector('.wizard-card.wizard-page-install');
+            return {ok: !!p, detail: p ? 'installing' : 'not shown'};`, 6_000);
+          await js(`(function(){ var b=[].slice.call(document.querySelectorAll('.wizard-overlay button')).find(function(x){return x.textContent.trim()==='取消';}); if(b) b.click(); })()`);
+          const closedNarrow = await waitFor('wizard closed at 360px', `return {ok: !document.querySelector('.wizard-overlay'), detail: 'closed'};`, 5_000);
+          return [narrowOk && adv[0] && closedNarrow[0],
+            `vp=${q.vw}x${q.vh} opts=${q.opts} optHit=[${q.optHit.join(',')}] noteHit=[${q.noteHit.join(',')}] 主按钮=${q.actHit} footer=[${q.ftHit.join(',')}]; 单击前进: ${adv[1]}; 窄屏取消: ${closedNarrow[1]}`];
+        } finally {
+          win.setSize(w0, h0);
+          process.env.HMH_DESKTOP_UIVERIFY_FAKE_DETECT_FOUND = undefined;
+        }
       });
     }
 

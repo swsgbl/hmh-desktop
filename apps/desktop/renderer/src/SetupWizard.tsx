@@ -2,9 +2,11 @@
  * v5.1 首启安装向导(Setup Wizard)。
  *
  * 成熟安装器流程:欢迎 → 检测(自动,复用 main 发现链)→ 选择(检测到时
- * 默认共享 / 未检测到三选一)→ 安装进度(下载 %/解压/npm 步骤文案,
- * 失败重试+换源)→ Provider 配置(已有密钥自动跳过)→ 完成。
- * 选择持久化在 main(wizard.json + runtime.json);全程上一步/取消;
+ * 默认共享;未检测到则自动开始安装,页内可切换内置/演示)→ 安装进度
+ * (下载 %/解压/npm 步骤文案,失败重试+换源+改用内置)→ Provider 配置
+ * (已有密钥自动跳过)→ 完成。
+ * 交互:选项整行为按钮,单击即选中并前进(300ms 防连点);键盘 Enter/Space
+ * 同路径。选择持久化在 main(wizard.json + runtime.json);全程上一步/取消;
  * 设置面板「重新配置」可重入。全局配置语义(~/.hmharness 共享)在选择页与
  * 完成页明示(v1 不做用户级隔离切换,文案只诚实说明共享)。
  */
@@ -28,9 +30,18 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
   const [form, setForm] = useState({ name: '', baseUrl: '', model: '', apiKey: '' });
   const [formHint, setFormHint] = useState('');
   const [choice, setChoice] = useState<Choice>('bundled');
+  const [autoInstalled, setAutoInstalled] = useState(false);
   const choiceEntry = useRef('');
   const pageRef = useRef<WizardPage>('welcome');
   pageRef.current = page;
+  /** 单击前进防抖:300ms 内的重复触发只更新选中,不二次前进/安装。 */
+  const lastAdvanceRef = useRef(0);
+  const advanceGuard = (): boolean => {
+    const now = Date.now();
+    if (now - lastAdvanceRef.current < 300) return false;
+    lastAdvanceRef.current = now;
+    return true;
+  };
 
   const go = (p: WizardPage): void => { setPage(p); };
   /** 上一步(安装页运行中/完成后不回退,避免重复安装歧义)。 */
@@ -41,7 +52,9 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
   };
   const backDisabled = page === 'welcome' || page === 'done' || page === 'install';
 
-  /* ---- 检测页:进入即扫描;未检测到 → 自动进选择页 ---- */
+  /* ---- 检测页:进入即扫描;未检测到 → 智能化:直接自动开始安装
+     (不再落选择页等人选;安装页内可一键改用内置内核/演示模式,底部可取消;
+     检测到已有安装则保持默认共享,尊重用户环境) ---- */
   useEffect(() => {
     if (page !== 'detect' || bridge === undefined) return;
     let alive = true;
@@ -49,7 +62,14 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
       if (!alive || !('found' in r)) return;
       setDetect(r);
       if (!r.found) {
-        setTimeout(() => { if (alive && pageRef.current === 'detect') go('select'); }, 700);
+        setTimeout(() => {
+          if (!alive || pageRef.current !== 'detect') return;
+          setAutoInstalled(true);
+          setOpt('install');
+          setChoice('install');
+          go('install');
+          startInstall(mirrorFirst);
+        }, 700);
       }
     });
     return () => { alive = false; };
@@ -114,12 +134,13 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
     else setFormHint(L.settings.saveFailed('error' in r ? r.error : 'unknown'));
   };
 
-  const confirmDetect = (): void => {
-    if (detectChoice === 'use') {
+  const confirmDetect = (v: 'use' | 'new' | 'bundled'): void => {
+    setDetectChoice(v);
+    if (v === 'use') {
       setChoice('external');
       choiceEntry.current = detect?.entry ?? '';
       go('config');
-    } else if (detectChoice === 'new') {
+    } else if (v === 'new') {
       setOpt('install');
       go('select');
     } else {
@@ -127,17 +148,28 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
       go('config');
     }
   };
-  const confirmSelect = (): void => {
-    if (opt === 'install') {
+  const confirmSelect = (v: 'install' | 'bundled' | 'demo'): void => {
+    setOpt(v);
+    if (v === 'install') {
       setChoice('install');
+      setAutoInstalled(false);
       go('install');
       startInstall(mirrorFirst);
-    } else if (opt === 'bundled') {
+    } else if (v === 'bundled') {
       setChoice('bundled');
       go('config');
     } else {
       demoNow();
     }
+  };
+  /** 单击选项 = 选中并自动前进(整栏可点;连点 300ms 内只改选中不重复前进)。 */
+  const pickDetect = (v: 'use' | 'new' | 'bundled'): void => {
+    if (advanceGuard()) confirmDetect(v);
+    else setDetectChoice(v);
+  };
+  const pickSelect = (v: 'install' | 'bundled' | 'demo'): void => {
+    if (advanceGuard()) confirmSelect(v);
+    else setOpt(v);
   };
 
   const stepIdx = PAGE_ORDER.indexOf(page);
@@ -175,21 +207,21 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
                   <p className="wizard-opt-note">{L.wizard.detectFoundNote} · {detect.entry}</p>
                 </div>
                 <div className="wizard-opt-list" role="radiogroup" aria-label={L.wizard.stepDetect}>
-                  <button role="radio" aria-checked={detectChoice === 'use'} className={`wizard-opt${detectChoice === 'use' ? ' on' : ''}`} onClick={() => setDetectChoice('use')}>
+                  <button role="radio" aria-checked={detectChoice === 'use'} className={`wizard-opt${detectChoice === 'use' ? ' on' : ''}`} onClick={() => pickDetect('use')}>
                     <span className="wizard-radio" aria-hidden="true" />
                     <span className="wizard-opt-title">{L.wizard.useDetected}</span>
                   </button>
-                  <button role="radio" aria-checked={detectChoice === 'new'} className={`wizard-opt${detectChoice === 'new' ? ' on' : ''}`} onClick={() => setDetectChoice('new')}>
+                  <button role="radio" aria-checked={detectChoice === 'new'} className={`wizard-opt${detectChoice === 'new' ? ' on' : ''}`} onClick={() => pickDetect('new')}>
                     <span className="wizard-radio" aria-hidden="true" />
                     <span className="wizard-opt-title">{L.wizard.downloadNew}</span>
                   </button>
-                  <button role="radio" aria-checked={detectChoice === 'bundled'} className={`wizard-opt${detectChoice === 'bundled' ? ' on' : ''}`} onClick={() => setDetectChoice('bundled')}>
+                  <button role="radio" aria-checked={detectChoice === 'bundled'} className={`wizard-opt${detectChoice === 'bundled' ? ' on' : ''}`} onClick={() => pickDetect('bundled')}>
                     <span className="wizard-radio" aria-hidden="true" />
                     <span className="wizard-opt-title">{L.wizard.useBundled}</span>
                   </button>
                 </div>
                 <div className="wizard-actions">
-                  <button className="btn primary" onClick={confirmDetect}>{L.wizard.next}</button>
+                  <button className="btn primary" onClick={() => confirmDetect(detectChoice)}>{L.wizard.next}</button>
                 </div>
               </>
             )}
@@ -200,17 +232,17 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
           <section className="wizard-body">
             <h2 className="wizard-title">{L.wizard.selectTitle}</h2>
             <div className="wizard-opt-list" role="radiogroup" aria-label={L.wizard.selectTitle}>
-              <button role="radio" aria-checked={opt === 'install'} className={`wizard-opt${opt === 'install' ? ' on' : ''}`} onClick={() => setOpt('install')}>
+              <button role="radio" aria-checked={opt === 'install'} className={`wizard-opt${opt === 'install' ? ' on' : ''}`} onClick={() => pickSelect('install')}>
                 <span className="wizard-radio" aria-hidden="true" />
                 <span className="wizard-opt-title">① {L.wizard.optInstall}</span>
                 <span className="wizard-opt-note">{L.wizard.optInstallNote}</span>
               </button>
-              <button role="radio" aria-checked={opt === 'bundled'} className={`wizard-opt${opt === 'bundled' ? ' on' : ''}`} onClick={() => setOpt('bundled')}>
+              <button role="radio" aria-checked={opt === 'bundled'} className={`wizard-opt${opt === 'bundled' ? ' on' : ''}`} onClick={() => pickSelect('bundled')}>
                 <span className="wizard-radio" aria-hidden="true" />
                 <span className="wizard-opt-title">② {L.wizard.optBundled}</span>
                 <span className="wizard-opt-note">{L.wizard.optBundledNote(detect?.bundled.version !== '' ? `v${detect?.bundled.version}` : '')}</span>
               </button>
-              <button role="radio" aria-checked={opt === 'demo'} className={`wizard-opt${opt === 'demo' ? ' on' : ''}`} onClick={() => setOpt('demo')}>
+              <button role="radio" aria-checked={opt === 'demo'} className={`wizard-opt${opt === 'demo' ? ' on' : ''}`} onClick={() => pickSelect('demo')}>
                 <span className="wizard-radio" aria-hidden="true" />
                 <span className="wizard-opt-title">③ {L.wizard.optDemo}</span>
                 <span className="wizard-opt-note">{L.wizard.optDemoNote}</span>
@@ -218,7 +250,7 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
             </div>
             <p className="wizard-note">{L.wizard.globalHomeNote}</p>
             <div className="wizard-actions">
-              <button className="btn primary" onClick={confirmSelect}>{opt === 'install' ? L.wizard.startInstall : L.wizard.next}</button>
+              <button className="btn primary" onClick={() => confirmSelect(opt)}>{opt === 'install' ? L.wizard.startInstall : L.wizard.next}</button>
             </div>
           </section>
         )}
@@ -226,6 +258,15 @@ export function SetupWizard({ L, hostState, onClose }: { L: Strings; hostState: 
         {page === 'install' && (
           <section className="wizard-body">
             <h2 className="wizard-title">{p?.phase === 'error' ? L.wizard.installFailed : p?.phase === 'done' ? L.wizard.installDone : L.wizard.installing}</h2>
+            {autoInstalled && p?.phase !== 'error' && p?.phase !== 'done' && (
+              <div className="wizard-note wizard-auto" role="status">
+                <span className="wizard-auto-text">{L.wizard.autoInstallNote}</span>
+                <span className="wizard-alt">
+                  <button type="button" className="wizard-alt-link" onClick={() => { setChoice('bundled'); go('config'); }}>{L.wizard.fallbackBundled}</button>
+                  <button type="button" className="wizard-alt-link" onClick={demoNow}>{L.wizard.useDemo}</button>
+                </span>
+              </div>
+            )}
             {p?.phase !== 'error' && (
               <>
                 <div className={`wizard-progress${p?.pct === undefined ? ' indeterminate' : ''}`}>

@@ -1021,8 +1021,13 @@ if (!app.requestSingleInstanceLock()) {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
       const info = bundledRuntimeInfo();
       // UIVERIFY 向导步的"伪造未配置态":fake 模式下恒报未检测
-      // (真实检测路径由 real 变体验收,见 evidence/setup-wizard/)
+      // (真实检测路径由 real 变体验收,见 evidence/setup-wizard/)。
+      // UIVERIFY_FAKE_DETECT_FOUND=1(uiverify 窄屏场景运行中动态置位):
+      // 伪造"检测到已装",让向导出现检测页三选项 → 单击前进 → 选择页。
       if (process.env.HMH_DESKTOP_UIVERIFY_WIZARD === 'fake' && process.env.HMH_DESKTOP_FAKE === '1') {
+        if (process.env.HMH_DESKTOP_UIVERIFY_FAKE_DETECT_FOUND === '1') {
+          return { found: true, version: '0.0.0-verify', entry: 'verify://fake-entry', source: 'verify', bundled: info, npm: npmOnPath() };
+        }
         return { found: false, version: '', entry: '', source: '', bundled: info, npm: npmOnPath() };
       }
       const d = detectExternalRuntime();
@@ -1032,6 +1037,21 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('bridge:install-cli', (event, opts: unknown) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
       const o = (opts ?? {}) as { forceTgz?: unknown; mirrorFirst?: unknown };
+      // UIVERIFY fake 向导:自动安装路径走模拟进度(不碰磁盘/网络/不热切换),
+      // 且不发 done——验收要在安装页点"改用内置"切换链接。
+      if (process.env.HMH_DESKTOP_UIVERIFY_WIZARD === 'fake' && process.env.HMH_DESKTOP_FAKE === '1') {
+        const sendSim = (p: InstallProgress): void => {
+          for (const w of BrowserWindow.getAllWindows()) {
+            if (!w.isDestroyed()) w.webContents.send('install:progress', p);
+          }
+        };
+        void (async () => {
+          sendSim({ phase: 'check', text: '检查 npm…(verify 模拟)' });
+          await new Promise((r) => setTimeout(r, 400));
+          sendSim({ phase: 'npm', text: 'npm install @hmharness/cli → ~/.hmharness-global(verify 模拟,不落盘)' });
+        })();
+        return { ok: true, test: true };
+      }
       return startCliInstall(
         {
           sendProgress: (p: InstallProgress): void => {
@@ -1188,8 +1208,10 @@ if (!app.requestSingleInstanceLock()) {
       width: saved?.width ?? 1440,
       height: saved?.height ?? 900,
       ...(saved?.x !== undefined && saved?.y !== undefined ? { x: saved.x, y: saved.y } : {}),
-      minWidth: 960,
-      minHeight: 600,
+      // UIVERIFY 窄屏验收(wizard 360×640 全元素可达)需临时放宽下限;
+      // 正常使用仍锁 960×600。
+      minWidth: process.env.HMH_DESKTOP_UIVERIFY === '1' ? 320 : 960,
+      minHeight: process.env.HMH_DESKTOP_UIVERIFY === '1' ? 360 : 600,
       show: false,
       backgroundColor: '#f9fafb', // v4 DSH:浅色默认(bg-base),避免深色闪屏
       title: 'HMH Desktop',
