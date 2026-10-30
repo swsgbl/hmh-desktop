@@ -32,9 +32,12 @@ export struct Wizard {
   }
 
   private startPoll(): void {
+    // 顺序修正(2026-10-31 用户实测暴露):先清旧定时器再置状态——旧序
+    // polling=true 后紧跟 stopPoll() 把状态清回 false,按钮/转圈永远显示
+    // "未在等待"(轮询其实在跑),自动等待看似失效。
+    this.stopPoll()
     this.polling = true
     this.pollCount = 0
-    this.stopPoll()
     this.pollTimer = setInterval(() => {
       this.pollCount++
       const api = this.store.api()
