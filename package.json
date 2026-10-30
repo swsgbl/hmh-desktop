@@ -1,6 +1,6 @@
 {
   "name": "hmh-desktop",
-  "version": "0.2.10",
+  "version": "0.2.12",
   "private": true,
   "description": "HMH Desktop — 本地优先的 HMH Cognitive Workbench。Windows 优先桌面壳;hmharness 是唯一 Agent/Cognitive Runtime,本仓库不实现第二份 agent loop / 工具权限判定 / 认知模型。",
   "type": "module",
