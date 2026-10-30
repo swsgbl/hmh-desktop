@@ -62,6 +62,14 @@ export default class EntryAbility extends UIAbility {
         return
       }
       console.info('UI content loaded successfully')
+      // 2026-10-30 交互事故修复:自由浮动窗模式下窗口装饰(开/关)由窗口管理器
+      // 处理可用,但内容收不到真实鼠标事件(uitest 触摸注入正常=事件分发路径
+      // 不同)。最大化走桌面标准输入处理路径(API23 Window 无 focus())。
+      try {
+        windowStage.getMainWindowSync().maximize().catch((e: object) => console.warn('maximize skipped: ' + JSON.stringify(e)))
+      } catch (e) {
+        console.warn('window input fix skipped: ' + JSON.stringify(e))
+      }
     })
   }
 
