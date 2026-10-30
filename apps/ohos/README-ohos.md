@@ -2,6 +2,23 @@
 
 鸿蒙桌面客户端,与 Windows 桌面版同源同协议(hmh web 7788)。
 
+
+## 单机安装(深开鸿设备独立完成,无需其他电脑)
+
+> 重要:此系统**不要双击 .hap 文件**——系统安装器会先卸载现有应用且界面损坏,装不上。
+
+**第 1 步**:在本页(Releases)下载 `hmh-offline-bundle.tar.gz`(约 40MB,内含桌面应用+hmh 内核+node 运行时)。
+
+**第 2 步**:打开系统终端(Terminal),粘贴这一行并回车:
+
+```sh
+D=$(ls /storage/media/100/local/files/Docs/Download/hmh-offline-bundle.tar.gz 2>/dev/null || ls /storage/Users/currentUser/Download/hmh-offline-bundle.tar.gz 2>/dev/null || ls ~/Download/hmh-offline-bundle.tar.gz 2>/dev/null); [ -f "$D" ] || { echo 找不到安装包; exit 1; }; cd /data/local/tmp && rm -rf hmh-bundle && busybox tar xzf "$D" && sh hmh-bundle/install.sh
+```
+
+装完自动启动本机内核服务;打开桌面上的 HMH Desktop(蓝色 H 图标)即自动连接。
+
+⚠️ 窗口请保持浮动(勿点"最大化"按钮):此系统版本最大化后鼠标会失灵(系统缺陷)。
+
 ## 双模式
 
 应用支持两种运行模式,首启智能检测(免手工配置):
