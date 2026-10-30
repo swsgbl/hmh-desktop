@@ -129,6 +129,18 @@ export interface UpdateStateDto {
   progress: { received: number; total: number; speedBps: number } | null;
 }
 
+/* ---- 仓库面板(任务 14-B;gh/ag CLI 后端,main 侧 forge.ts 同形) ---- */
+export type ForgeHost = 'github' | 'atomgit';
+
+export interface ForgeHostStatusDto { installed: boolean; logged: boolean; user: string }
+export interface ForgeStatusDto { github: ForgeHostStatusDto; atomgit: ForgeHostStatusDto }
+export interface ForgeRepoDto { name: string; fullName: string; isPrivate: boolean; updatedAt: string; url: string; description: string }
+export interface ForgePrDto { number: string; title: string; state: string; isDraft: boolean; updatedAt: string; url: string }
+export interface ForgeIssueDto { number: string; title: string; state: string; updatedAt: string; url: string }
+export interface ForgeReleaseDto { tag: string; name: string; createdAt: string; isDraft: boolean; isPrerelease: boolean }
+/** forge 调用的统一错误形态(main 侧归一;renderer 判 ok 字段)。 */
+export type ForgeOk<T> = { ok: true; data: T } | { ok: false; code: string; error: string };
+
 export interface HmhBridge {
   getState(): Promise<BridgeState>;
   runtimeInfo(): Promise<RuntimeInfoDto | { error: string; code: string }>;
@@ -173,6 +185,16 @@ export interface HmhBridge {
   checkUpdate(): Promise<UpdateStateDto | { error: string; code: string }>;
   applyUpdate(): Promise<{ ok: boolean } | { error: string; code: string }>;
   onUpdateState(cb: (st: UpdateStateDto) => void): () => void;
+  forgeStatus(): Promise<ForgeStatusDto | { error: string; code: string }>;
+  forgeLogin(host: ForgeHost): Promise<ForgeOk<{ url: string }> | { error: string; code: string }>;
+  forgeRepos(host: ForgeHost, page?: number): Promise<ForgeOk<{ repos: ForgeRepoDto[]; hasMore: boolean }> | { error: string; code: string }>;
+  forgePrs(host: ForgeHost, repo: string, state?: string): Promise<ForgeOk<{ prs: ForgePrDto[] }> | { error: string; code: string }>;
+  forgeIssues(host: ForgeHost, repo: string, state?: string): Promise<ForgeOk<{ issues: ForgeIssueDto[] }> | { error: string; code: string }>;
+  forgeReleases(host: ForgeHost, repo: string): Promise<ForgeOk<{ releases: ForgeReleaseDto[] }> | { error: string; code: string }>;
+  forgeAction(kind: string, host: ForgeHost, args: Record<string, unknown>): Promise<ForgeOk<{ url: string }> | { error: string; code: string }>;
+  forgeOpen(url: string): Promise<{ ok: boolean } | { error: string; code: string }>;
+  forgeResolve(path: string): Promise<{ host: ForgeHost; repo: string } | null | { error: string; code: string }>;
+  onForgeLoginOutput(cb: (host: string, line: string) => void): () => void;
   onEventBatches(cb: (batch: EventEnvelope[]) => void): () => void;
   onHostState(cb: (state: string, info: { restartCount: number; lastError?: string }) => void): () => void;
   onStreamChunks(cb: (chunk: { sessionId: string; kind: string; chunk: string }) => void): () => void;

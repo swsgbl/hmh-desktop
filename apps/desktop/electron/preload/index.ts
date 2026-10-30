@@ -174,6 +174,43 @@ const bridge = {
     ipcRenderer.on('bridge:host-state', listener);
     return () => ipcRenderer.removeListener('bridge:host-state', listener);
   },
+  /** v0.3 仓库面板:双平台安装/登录态(gh/ag 后端;登录态只读,令牌不入应用)。 */
+  forgeStatus(): Promise<unknown> {
+    return ipcRenderer.invoke('forge:status');
+  },
+  /** 登录 = spawn 官方 CLI 的浏览器 OAuth;行输出经 onForgeLoginOutput 回流展示。 */
+  forgeLogin(host: 'github' | 'atomgit'): Promise<unknown> {
+    return ipcRenderer.invoke('forge:login', host);
+  },
+  forgeRepos(host: 'github' | 'atomgit', page?: number): Promise<unknown> {
+    return ipcRenderer.invoke('forge:repos', host, page ?? 1);
+  },
+  forgePrs(host: 'github' | 'atomgit', repo: string, state?: string): Promise<unknown> {
+    return ipcRenderer.invoke('forge:prs', host, repo, state ?? 'open');
+  },
+  forgeIssues(host: 'github' | 'atomgit', repo: string, state?: string): Promise<unknown> {
+    return ipcRenderer.invoke('forge:issues', host, repo, state ?? 'open');
+  },
+  forgeReleases(host: 'github' | 'atomgit', repo: string): Promise<unknown> {
+    return ipcRenderer.invoke('forge:releases', host, repo);
+  },
+  /** 写操作(pr/issue/release/克隆);面板确认卡之后才可到达此处。 */
+  forgeAction(kind: string, host: 'github' | 'atomgit', args: Record<string, unknown>): Promise<unknown> {
+    return ipcRenderer.invoke('forge:action', kind, host, args);
+  },
+  /** 逃生口:域名白名单内才外开系统浏览器(renderer 禁 window.open)。 */
+  forgeOpen(url: string): Promise<unknown> {
+    return ipcRenderer.invoke('forge:open', url);
+  },
+  /** 工作区路径 → 平台仓库(/repo 面板的上下文源)。 */
+  forgeResolve(path: string): Promise<unknown> {
+    return ipcRenderer.invoke('forge:resolve', path);
+  },
+  onForgeLoginOutput(cb: (host: string, line: string) => void): () => void {
+    const listener = (_e: Electron.IpcRendererEvent, host: string, line: string): void => cb(host, line);
+    ipcRenderer.on('forge:login-line', listener);
+    return () => ipcRenderer.removeListener('forge:login-line', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('hmh', bridge);

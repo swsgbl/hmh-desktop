@@ -110,6 +110,43 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
     return;
   }
 
+  /* ========== 专用:仓库面板真实冒烟(任务 14-B;驱动器 --forge-real)
+     env:HMH_DESKTOP_UIVERIFY_FORGE=real → forge 服务不走 fixture,直连本机
+     gh/ag(已登录 swsgbl / hongfu)。只读:登录卡/仓库列表/Release 列表;
+     写操作(合并/新建/发布)不触发——面板侧本就有确认卡门。host 仍走 fake,
+     仓库面板与 host 无耦合。 */
+  if (process.env.HMH_DESKTOP_UIVERIFY_FORGE === 'real') {
+    await step('仓库(真实):双平台登录卡 —— gh=swsgbl / ag=hongfu', async () => {
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='仓库'||x.textContent==='Repos';}); if(t) t.click(); })()`);
+      return waitFor('both logged in', `var gh=document.querySelector('[data-testid="forge-host-github"]');
+        var ag=document.querySelector('[data-testid="forge-host-atomgit"]');
+        var ghOk = !!gh && gh.textContent.indexOf('swsgbl')>=0;
+        var agOk = !!ag && ag.textContent.indexOf('hongfu')>=0;
+        return {ok: ghOk && agOk, detail: 'gh='+(gh?gh.textContent.replace(/\\s+/g,' ').slice(0,40):'none')+' | ag='+(ag?ag.textContent.replace(/\\s+/g,' ').slice(0,40):'none')};`, 30_000);
+    });
+    await shot('forge-real-hosts');
+    await step('仓库(真实):GitHub 我的仓库列表 ≥1 行', async () => {
+      return waitFor('github repos', `var rows=document.querySelectorAll('[data-testid="forge-repo-row"]').length;
+        return {ok: rows>=1, detail: 'rows='+rows};`, 45_000);
+    });
+    await step('仓库(真实):切 AtomGit → 列出 hongfu 仓库(含 hmh-desktop)', async () => {
+      await js(`(function(){ var c=[].slice.call(document.querySelectorAll('.forge-host-chips .forge-chip')).find(function(x){return x.textContent==='AtomGit';}); if(c) c.click(); })()`);
+      return waitFor('atomgit repos', `var rows=[].slice.call(document.querySelectorAll('[data-testid="forge-repo-row"]'));
+        var hit = rows.some(function(x){return x.textContent.indexOf('hmh-desktop')>=0;});
+        return {ok: rows.length>=1 && hit, detail: 'rows='+rows.length+(hit?' 含hmh-desktop':' 无hmh-desktop')};`, 45_000);
+    });
+    await shot('forge-real-atomgit-repos');
+    await step('仓库(真实):进入 hongfu/hmh-desktop → Release 列表含 v0.2.10', async () => {
+      await js(`(function(){ var r=[].slice.call(document.querySelectorAll('[data-testid="forge-repo-row"]')).find(function(x){return x.textContent.indexOf('hmh-desktop')>=0;}); var m=r?r.querySelector('.forge-main'):null; if(m) m.click(); })()`);
+      return waitFor('releases with v0.2.10', `var rows=[].slice.call(document.querySelectorAll('[data-testid="forge-release-row"]'));
+        var hit = rows.some(function(x){return x.textContent.indexOf('v0.2.10')>=0;});
+        return {ok: rows.length>=1 && hit, detail: 'releases='+rows.length+(hit?' 含v0.2.10':' 无v0.2.10;首行='+(rows[0]?rows[0].textContent.replace(/\\s+/g,' ').slice(0,50):'none'))};`, 45_000);
+    });
+    await shot('forge-real-releases');
+    finish();
+    return;
+  }
+
   /* ========== 通用:布局几何(用户报障的直接断言) ========== */
   await step('布局:标题栏+三栏+composer 在视口内(输入框可见)', async () => {
     const r = (await js(`(function(){
@@ -282,6 +319,67 @@ async function runUiVerify(win: BrowserWindow, mode: 'fake' | 'real'): Promise<v
         var okT = t.indexOf('手机远程控制')>=0 || t.indexOf('Phone remote')>=0;
         var okA = t.indexOf('开机自启')>=0 || t.indexOf('Autostart')>=0;
         return {ok: !!p && okT && okA, detail: t.replace(/\\s+/g,' ').slice(0,60)};`, 6_000);
+    });
+
+    /* ========== fake:Dock:仓库页签(任务 14-B:gh/ag 登录+仓库/PR/Release;
+       fixture = github 已登录(swsgbl) + atomgit 未装 → 一个 fixture 覆盖
+       「登录卡」与「无 CLI 指引态」两个验收场景;写操作只到确认卡,不真发) ========== */
+    await step('仓库:双平台状态卡(GitHub 已登录 swsgbl;AtomGit 未装 → 一行安装指引,无自动安装)', async () => {
+      await js(`(function(){ var t=[].slice.call(document.querySelectorAll('.dock-tab')).find(function(x){return x.textContent==='仓库'||x.textContent==='Repos';}); if(t) t.click(); })()`);
+      return waitFor('forge host cards', `var pane=document.querySelector('[data-testid="forge-pane"]');
+        if(!pane) return {ok:false, detail:'no pane'};
+        var gh=document.querySelector('[data-testid="forge-host-github"]');
+        var ag=document.querySelector('[data-testid="forge-host-atomgit"]');
+        var ghOk = !!gh && gh.textContent.indexOf('swsgbl')>=0 && (gh.textContent.indexOf('已登录')>=0 || gh.textContent.indexOf('Signed in')>=0);
+        // 未装 CLI:指引文案含 CLI 名 + 无登录按钮(不自动装,只指路)
+        var agHint = !!ag && (ag.textContent.indexOf('未检测到')>=0 || ag.textContent.indexOf('CLI not detected')>=0);
+        var agNoInstallBtn = !!ag && ag.querySelectorAll('button').length===0;
+        return {ok: ghOk && agHint && agNoInstallBtn, detail: 'gh='+(gh?gh.textContent.replace(/\\s+/g,' ').slice(0,44):'none')+' | ag='+(ag?ag.textContent.replace(/\\s+/g,' ').slice(0,44):'none')};`, 6_000);
+    });
+    await step('仓库:我的仓库列表 + 行内三动作(克隆/浏览器/让 hmh 处理),点击进仓库详情', async () => {
+      const w = await waitFor('repo rows', `var rows=document.querySelectorAll('[data-testid="forge-repo-row"]').length;
+        return {ok: rows>=1, detail: 'rows='+rows};`, 6_000);
+      if (!w[0]) return w;
+      const acts = (await js(`(function(){ var r=document.querySelector('[data-testid="forge-repo-row"]');
+        return JSON.stringify(r?[].slice.call(r.querySelectorAll('.forge-actions button')).map(function(b){return b.textContent;}):[]); })()`)) as string;
+      const hasClone = acts.indexOf('克隆')>=0 || acts.indexOf('Clone')>=0;
+      const hasAsk = acts.indexOf('hmh')>=0;
+      await js(`(function(){ var r=document.querySelector('[data-testid="forge-repo-row"] .forge-main'); if(r) r.click(); })()`);
+      const w2 = await waitFor('repo detail', `var pane=document.querySelector('[data-testid="forge-pane"]');
+        var t = pane ? pane.textContent : '';
+        return {ok: !!pane && t.indexOf('PR')>=0 && t.indexOf('Release')>=0, detail: t.replace(/\\s+/g,' ').slice(0,60)};`, 6_000);
+      return [w2[0] && hasClone && hasAsk, `${w2[1]}; 动作=${acts.slice(0, 60)}`];
+    });
+    await step('仓库:PR 列表点合并 → 确认卡出现(合并方式默认 squash)→ 取消不真发', async () => {
+      const w = await waitFor('pr rows', `var rows=document.querySelectorAll('[data-testid="forge-pr-row"]').length;
+        return {ok: rows>=1, detail: 'pr rows='+rows};`, 6_000);
+      if (!w[0]) return w;
+      await js(`(function(){ var r=document.querySelector('[data-testid="forge-pr-row"]');
+        var b=[].slice.call(r.querySelectorAll('button')).find(function(x){return x.textContent.indexOf('合并')>=0||x.textContent.indexOf('Merge')>=0;});
+        if(b) b.click(); })()`);
+      const w2 = await waitFor('merge confirm card', `var c=document.querySelector('[data-testid="forge-merge-confirm"]');
+        var radio = c ? c.querySelector('input[type=radio]:checked') : null;
+        return {ok: !!c && !!radio, detail: c ? '确认卡+方式单选('+radio.value+')' : 'no card'};`, 5_000);
+      if (!w2[0]) return w2;
+      await js(`(function(){ var c=document.querySelector('[data-testid="forge-merge-confirm"]');
+        var b=[].slice.call(c.querySelectorAll('button')).find(function(x){return x.textContent.indexOf('取消')>=0||x.textContent.indexOf('Cancel')>=0;});
+        if(b) b.click(); })()`);
+      return waitFor('confirm dismissed', `return {ok: !document.querySelector('[data-testid="forge-merge-confirm"]'), detail:'closed'};`, 5_000);
+    });
+    await step('仓库:Release 区展示版本列表(fixture 含 v0.2.10)+ 新建表单弹层(tag 必填门)', async () => {
+      const w = await waitFor('release rows', `var rows=[].slice.call(document.querySelectorAll('[data-testid="forge-release-row"]'));
+        var has = rows.some(function(x){return x.textContent.indexOf('v0.2.10')>=0;});
+        return {ok: rows.length>=1 && has, detail: 'rows='+rows.length+(has?' 含v0.2.10':' 无v0.2.10')};`, 6_000);
+      if (!w[0]) return w;
+      await js(`(function(){ var pane=document.querySelector('[data-testid="forge-pane"]');
+        var b=[].slice.call(pane.querySelectorAll('button')).find(function(x){return x.textContent.indexOf('发布新版本')>=0||x.textContent.indexOf('New release')>=0;});
+        if(b) b.click(); })()`);
+      const w2 = await waitFor('release form', `var f=document.querySelector('[data-testid="forge-form"]');
+        var submit = f ? [].slice.call(f.querySelectorAll('button')).pop() : null;
+        return {ok: !!f && !!submit && submit.disabled===true, detail: f ? '表单出现,空 tag 时提交禁用' : 'no form'};`, 5_000);
+      if (!w2[0]) return w2;
+      await js(`(function(){ var f=document.querySelector('[data-testid="forge-form"]'); var x=[].slice.call(f.querySelectorAll('button')).find(function(b){return b.textContent==='✕';}); if(x) x.click(); })()`);
+      return waitFor('form closed', `return {ok: !document.querySelector('[data-testid="forge-form"]'), detail:'closed'};`, 5_000);
     });
 
     /* ========== fake:搜索过滤 ========== */
