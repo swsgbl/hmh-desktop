@@ -28,7 +28,8 @@ const exe = exeOverride !== ''
 const args = useDev ? [join(root, 'apps', 'desktop', 'dist-electron', 'main', 'index.js')] : [];
 
 const updateReal = process.argv.includes('--update-real');
-console.log(`UIVERIFY-DRIVER layout=${useDev ? 'dev' : 'packaged'} mode=${mode}${wizardVariant !== '' ? ` wizard=${wizardVariant}` : ''}${updateReal ? ' update=real' : ''}`);
+const forgeReal = process.argv.includes('--forge-real');
+console.log(`UIVERIFY-DRIVER layout=${useDev ? 'dev' : 'packaged'} mode=${mode}${wizardVariant !== '' ? ` wizard=${wizardVariant}` : ''}${updateReal ? ' update=real' : ''}${forgeReal ? ' forge=real' : ''}`);
 const child = spawn(exe, args, {
   cwd: join(root, 'apps', 'desktop'),
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -42,6 +43,8 @@ const child = spawn(exe, args, {
     // 任务 13-C 真实更新验收:FORCE_TAG 非空 → 无视版本比较强制走更新流程
     // (dev 版本 0.2.9 == latest 0.2.9 仍下载),真实 Setup 走 atomgit 资产链。
     ...(updateReal ? { HMH_DESKTOP_UIVERIFY_UPDATE: 'real', HMH_DESKTOP_UPDATE_FORCE_TAG: 'v0.2.9' } : {}),
+    // 任务 14-B 真实仓库冒烟:forge 服务绕过 fixture 直连本机 gh/ag(只读)
+    ...(forgeReal ? { HMH_DESKTOP_UIVERIFY_FORGE: 'real' } : {}),
   },
 });
 let tail = '';
@@ -64,6 +67,7 @@ child.on('exit', (code) => {
 // 真实更新 20 分钟(112MB 慢速 CDN 兜底)
 const realTask = process.argv.includes('--real-task');
 const hardTimeout = updateReal ? 1_200_000
+  : forgeReal ? 420_000
   : wizardVariant === 'install' ? 720_000
   : mode === 'real' ? (realTask ? 480_000 : 300_000)
   : 240_000;

@@ -656,3 +656,76 @@ body { scrollbar-width: thin; scrollbar-color: var(--hmh-scrollbar-thumb) transp
     animation: none !important;
   }
 }
+
+/* ===== 仓库面板(任务 14-B:dock 'repos' 页签 + composer /repo 面板) =====
+   状态点全部「颜色 + 文字」双通道(点带 title,行内另有文字徽标);窄 dock 360px 下
+   行内动作按钮换行收纳,不做横向滚动。 */
+.forge-pane { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.forge-hosts { display: flex; flex-direction: column; gap: 6px; }
+.forge-host {
+  display: flex; flex-direction: column; gap: 6px; padding: 8px 10px;
+  border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm);
+  background: var(--hmh-bg-layer-1);
+}
+.forge-host-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.forge-host-name { font-weight: 600; font-size: var(--hmh-font-size-sm); }
+.forge-user { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.forge-host-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.forge-install-hint { margin: 0; }
+.forge-login-lines { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: var(--hmh-radius-sm); background: var(--hmh-bg-layer-2); }
+.forge-login-line { font-family: var(--hmh-font-mono, monospace); font-size: var(--hmh-font-size-xs); word-break: break-all; color: var(--hmh-label-secondary); }
+.forge-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.forge-dot.ok { background: var(--hmh-state-success); }
+.forge-dot.warn { background: var(--hmh-state-warn); }
+.forge-dot.off { background: var(--hmh-border-l3, #9aa0a6); }
+.forge-host-chips { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.forge-chip {
+  padding: 2px 10px; border-radius: 999px; font-size: var(--hmh-font-size-xs);
+  border: 1px solid var(--hmh-border-l2); color: var(--hmh-label-secondary);
+}
+.forge-chip.active { border-color: var(--hmh-brand-primary); color: var(--hmh-brand-primary); }
+.forge-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-weight: 600; font-size: var(--hmh-font-size-sm); margin-top: 2px; }
+.forge-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: var(--hmh-radius-sm); min-width: 0; }
+.forge-row:hover { background: var(--hmh-interactive-bg-hover); }
+.forge-row .forge-main { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; flex: 1 1 auto; text-align: left; }
+.forge-name { font-size: var(--hmh-font-size-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.forge-meta { font-size: var(--hmh-font-size-xs); color: var(--hmh-label-dimmed); display: inline-flex; gap: 4px; align-items: center; }
+.forge-badge {
+  font-size: var(--hmh-font-size-xs); padding: 0 6px; border-radius: 999px;
+  background: var(--hmh-bg-layer-2); color: var(--hmh-label-secondary); flex-shrink: 0;
+}
+.forge-badge.st-open { color: var(--hmh-state-success); }
+.forge-badge.st-closed { color: var(--hmh-label-dimmed); }
+.forge-num { font-family: var(--hmh-font-mono, monospace); font-size: var(--hmh-font-size-xs); color: var(--hmh-label-dimmed); flex-shrink: 0; }
+.forge-title { flex: 1 1 auto; min-width: 0; font-size: var(--hmh-font-size-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.forge-tag { font-family: var(--hmh-font-mono, monospace); font-size: var(--hmh-font-size-xs); color: var(--hmh-brand-primary); flex-shrink: 0; }
+.forge-actions { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+.forge-pager { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 2px 0; }
+.forge-err { font-size: var(--hmh-font-size-xs); color: var(--hmh-state-error); word-break: break-all; }
+.forge-toast {
+  position: sticky; bottom: 0; padding: 6px 10px; border-radius: var(--hmh-radius-sm);
+  background: var(--hmh-bg-layer-2); font-size: var(--hmh-font-size-xs); word-break: break-all;
+}
+.forge-back { align-self: flex-start; }
+/* 表单弹层/确认卡:覆在面板内容之上(dock 内局部层,不遮应用) */
+.forge-form, .forge-confirm {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px;
+  border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-sm);
+  background: var(--hmh-bg-layer-1); box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+.forge-form-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: var(--hmh-font-size-sm); font-weight: 600; min-width: 0; }
+.forge-form-head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.forge-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.forge-confirm-body { display: flex; flex-direction: column; gap: 4px; }
+.forge-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--hmh-font-size-sm); }
+.forge-ta { resize: vertical; min-height: 64px; padding: 6px 10px; border-radius: var(--hmh-radius-sm); border: 1px solid var(--hmh-border-l2); background: var(--hmh-bg-layer-1); }
+.forge-two { display: flex; gap: 6px; }
+.forge-two input { flex: 1 1 0; min-width: 0; }
+.forge-file-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+/* composer /repo 面板(挂在 composer 顶部,与 att-picker 同位) */
+.repo-slash {
+  display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; margin: 0 0 6px;
+  border: 1px solid var(--hmh-border-l2); border-radius: var(--hmh-radius-control);
+  background: var(--hmh-bg-layer-1); max-height: 220px; overflow-y: auto;
+}
+.repo-slash .forge-row { padding: 2px 4px; }

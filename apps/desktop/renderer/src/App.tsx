@@ -13,6 +13,7 @@ import { useLocale } from './i18n.ts';
 import { Icon } from './icons.tsx';
 import { useTheme, type Theme } from './theme.ts';
 import { SetupWizard } from './SetupWizard.tsx';
+import { ForgePanel, RepoSlashPanel } from './ForgePanel.tsx';
 
 interface SessionRow {
   id: string;
@@ -34,7 +35,7 @@ type Item =
   | { kind: 'turnsum'; id: string; turns: number; tools: number; tokens: number | null }
   | { kind: 'error'; id: string; code: string; message: string; sessionId: string; runId: string };
 
-type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs' | 'remote';
+type DockTab = 'overview' | 'files' | 'diff' | 'evidence' | 'logs' | 'remote' | 'repos';
 
 /** 更新横幅的字节/速度格式化(112147199 → "107.0 MB";速度 → "2.1 MB/s")。 */
 function fmtBytes(n: number): string {
@@ -980,6 +981,7 @@ export function App(): React.ReactElement {
               { cmd: 'tab:diff', label: L.cmdk.ctx(L.dock.tabDiff) },
               { cmd: 'tab:evidence', label: L.cmdk.ctx(L.dock.tabEvidence) },
               { cmd: 'tab:logs', label: L.cmdk.ctx(L.dock.tabLogs) },
+              { cmd: 'tab:repos', label: L.cmdk.ctx(L.dock.tabRepos) },
               { cmd: 'dock', label: L.cmdk.toggleDock },
               { cmd: 'stop', label: L.cmdk.stopTask },
             ].map((c) => (
@@ -1362,6 +1364,13 @@ export function App(): React.ReactElement {
           onDrop={(e) => { e.preventDefault(); setDragOver(false); addDroppedFiles([...e.dataTransfer.files]); }}
         >
           {dragOver && <div className="drop-hint" aria-live="polite">{L.composer.dropHint}</div>}
+          {activeSession !== '' && draft.trim().startsWith('/repo') && (
+            <RepoSlashPanel
+              L={L}
+              wsPath={workspaces !== null ? (workspaces.items.find((w) => w.id === workspaces.current)?.path ?? '') : ''}
+              onOpenPanel={() => { setDockOpen(true); setDockTab('repos'); }}
+            />
+          )}
           {attOpen && (
             <div className="att-picker" role="dialog" aria-label={L.composer.attachAriaDialog}>
               <input
@@ -1453,7 +1462,7 @@ export function App(): React.ReactElement {
       {dockOpen && (
         <aside className="dock" aria-label={L.nav.dock}>
           <div className="dock-tabs" role="tablist">
-            {(['overview', 'files', 'diff', 'evidence', 'logs', 'remote'] as DockTab[]).map((t) => (
+            {(['overview', 'files', 'diff', 'evidence', 'logs', 'remote', 'repos'] as DockTab[]).map((t) => (
               <button
                 key={t}
                 role="tab"
@@ -1461,7 +1470,7 @@ export function App(): React.ReactElement {
                 className={`dock-tab${dockTab === t ? ' active' : ''}`}
                 onClick={() => setDockTab(t)}
               >
-                {t === 'overview' ? L.dock.tabOverview : t === 'files' ? L.dock.tabFiles : t === 'diff' ? L.dock.tabDiff : t === 'evidence' ? L.dock.tabEvidence : t === 'logs' ? L.dock.tabLogs : L.dock.tabRemote}
+                {t === 'overview' ? L.dock.tabOverview : t === 'files' ? L.dock.tabFiles : t === 'diff' ? L.dock.tabDiff : t === 'evidence' ? L.dock.tabEvidence : t === 'logs' ? L.dock.tabLogs : t === 'remote' ? L.dock.tabRemote : L.dock.tabRepos}
               </button>
             ))}
           </div>
@@ -1620,6 +1629,9 @@ export function App(): React.ReactElement {
                 <div className="dock-note">{L.dock.remoteStopNote}</div>
                 <div className="dock-note">{L.dock.remoteSecurityNote}</div>
               </div>
+            )}
+            {dockTab === 'repos' && (
+              <ForgePanel L={L} onAskAgent={(t) => setDraft(t)} onCloned={() => void refreshWorkspaces()} />
             )}
           </div>
         </aside>

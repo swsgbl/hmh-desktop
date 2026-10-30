@@ -27,6 +27,7 @@ import { attachUiVerify } from './uiverify.ts';
 import { attachVisualRegression } from './visualregression.ts';
 import { installTarget, resolveInstalledEntry, startCliInstall, type InstallProgress } from './installer.ts';
 import { orderedCheckChannels, downloadCandidates, normalizeChannel, normalizeRelease, pickInstallerAsset, sizeMatches, summarizeCheckFailures, cmpVersion, type LatestRelease, type ReleaseAsset, type UpdateChannelId, type UpdateRepos } from './updater-channels.ts';
+import { createForge, forgeFixtures, checkHost, checkRepo, checkState, type ForgeActionKind, type ForgeHost, type ForgeService } from './forge.ts';
 
 const here = import.meta.dirname ?? '.';
 const isDev = process.env.HMH_DESKTOP_DEV === '1';
@@ -843,6 +844,43 @@ if (!app.requestSingleInstanceLock()) {
     });
   }
 
+  /* ---- 仓库面板服务(任务 14-B)----
+   * gh/ag CLI 的 main 侧封装;UIVERIFY fake 模式全量走 fixture(不碰磁盘/网络/凭据)。
+   * 登录行经 forge:login-line 推给全部窗口;URL 外开走 shell.openExternal。 */
+  let wsRootsCache: string[] = [];
+  let realForge: ForgeService | null = null;
+  // UIVERIFY_FORGE=real:UIVERIFY 框架内跑真实 gh/ag 冒烟(只读),forge 不走 fixture
+  const forgeFixtureOff = process.env.HMH_DESKTOP_UIVERIFY_FORGE === 'real';
+  const fixtureForge: ForgeService = (() => {
+    const f = forgeFixtures();
+    return {
+      status: async () => f.status,
+      repos: async (host) => ({ ok: true as const, data: f.repos(host) }),
+      prs: async () => ({ ok: true as const, data: f.prs }),
+      issues: async () => ({ ok: true as const, data: f.issues }),
+      releases: async () => ({ ok: true as const, data: f.releases }),
+      action: async () => f.action,
+      login: async () => f.login,
+      resolve: () => f.resolve,
+    };
+  })();
+  function forgeSvc(): ForgeService {
+    if (process.env.HMH_DESKTOP_UIVERIFY === '1' && !forgeFixtureOff) return fixtureForge;
+    if (realForge === null) {
+      realForge = createForge(undefined, {
+        allowedRoots: () => wsRootsCache,
+        onLoginLine: (host, line) => {
+          logInfo('forge', `${host} login: ${line.slice(0, 160)}`);
+          for (const w of BrowserWindow.getAllWindows()) {
+            if (!w.isDestroyed()) w.webContents.send('forge:login-line', host, line);
+          }
+        },
+        openExternal: (url) => { void shell.openExternal(url); },
+      });
+    }
+    return realForge;
+  }
+
   function registerIpc(): void {
     ipcMain.handle('bridge:get-state', (event) => {
       if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender' };
@@ -1213,8 +1251,13 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     // ---- 工作区(03 §六;切换语义与 web 相同:runtime 单选 cwd) ----
+    // 列表同时缓存为 forge 的上传/克隆路径门(允许的工作区根)
     ipcMain.handle('bridge:workspaces', (event) =>
-      hostCall(event, (c) => c.getJson<{ current: string; items: Array<{ id: string; name: string; path: string }> }>('/api/workspaces')));
+      hostCall(event, async (c) => {
+        const r = await c.getJson<{ current: string; items: Array<{ id: string; name: string; path: string }> }>('/api/workspaces');
+        wsRootsCache = r.items.map((w) => w.path);
+        return r;
+      }));
 
     ipcMain.handle('bridge:workspace-use', (event, id: unknown) => {
       const wid = typeof id === 'string' ? id.slice(0, 60) : '';
@@ -1262,6 +1305,80 @@ if (!app.requestSingleInstanceLock()) {
         app.quit();
       })();
       return { ok: true };
+    });
+
+    // ---- 仓库面板 IPC(任务 14-B:逐方法白名单 + 参数校验;renderer 永不 spawn) ----
+    const forgeErr = (event: Electron.IpcMainInvokeEvent, fn: () => Promise<unknown>): Promise<unknown> => {
+      if (!senderTrusted(event.senderFrame)) return Promise.resolve({ error: 'untrusted sender', code: 'FORBIDDEN' });
+      return fn().catch((err: unknown) => ({ ok: false, code: 'BRIDGE_ERROR', error: String(err).slice(0, 300) }));
+    };
+    ipcMain.handle('forge:status', (event) => forgeErr(event, () => forgeSvc().status()));
+    ipcMain.handle('forge:login', (event, h: unknown) => {
+      const host = checkHost(h);
+      if (host === null) return Promise.resolve({ ok: false, code: 'BAD_REQUEST', error: 'host must be github|atomgit' });
+      return forgeErr(event, () => forgeSvc().login(host));
+    });
+    ipcMain.handle('forge:repos', (event, h: unknown, page: unknown) => {
+      const host = checkHost(h);
+      const p = typeof page === 'number' && Number.isFinite(page) ? Math.floor(page) : 1;
+      if (host === null) return Promise.resolve({ ok: false, code: 'BAD_REQUEST', error: 'host must be github|atomgit' });
+      return forgeErr(event, () => forgeSvc().repos(host, p));
+    });
+    const repoArgs = (h: unknown, repo: unknown): { host: ForgeHost; repo: string } | { bad: string } => {
+      const host = checkHost(h);
+      const r = checkRepo(repo);
+      if (host === null || r === null) return { bad: 'host must be github|atomgit, repo must be owner/name' };
+      return { host, repo: r };
+    };
+    ipcMain.handle('forge:prs', (event, h: unknown, repo: unknown, state: unknown) => {
+      const a = repoArgs(h, repo);
+      if ('bad' in a) return Promise.resolve({ ok: false, code: 'BAD_REQUEST', error: a.bad });
+      return forgeErr(event, () => forgeSvc().prs(a.host, a.repo, checkState(state)));
+    });
+    ipcMain.handle('forge:issues', (event, h: unknown, repo: unknown, state: unknown) => {
+      const a = repoArgs(h, repo);
+      if ('bad' in a) return Promise.resolve({ ok: false, code: 'BAD_REQUEST', error: a.bad });
+      return forgeErr(event, () => forgeSvc().issues(a.host, a.repo, checkState(state)));
+    });
+    ipcMain.handle('forge:releases', (event, h: unknown, repo: unknown) => {
+      const a = repoArgs(h, repo);
+      if ('bad' in a) return Promise.resolve({ ok: false, code: 'BAD_REQUEST', error: a.bad });
+      return forgeErr(event, () => forgeSvc().releases(a.host, a.repo));
+    });
+    const ACTION_KINDS: readonly ForgeActionKind[] = ['pr_create', 'pr_merge', 'issue_create', 'release_create', 'release_upload', 'repo_clone'];
+    ipcMain.handle('forge:action', (event, k: unknown, h: unknown, args: unknown) => {
+      const kind = ACTION_KINDS.find((x) => x === k);
+      const a = repoArgs(h, (args as { repo?: unknown } | null | undefined)?.repo);
+      if (kind === undefined || 'bad' in a) return Promise.resolve({ ok: false, code: 'BAD_REQUEST', error: 'kind/host/repo 校验失败' });
+      const raw = (args ?? {}) as Record<string, unknown>;
+      // 逐字段过类型 + 长度门;深度语义校验在 forge.ts buildActionArgs(拼命令前最后防线)
+      const pas = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '');
+      const fa = {
+        repo: a.repo,
+        number: pas(raw.number, 20), title: pas(raw.title, 300), body: pas(raw.body, 20_000),
+        base: pas(raw.base, 200), head: pas(raw.head, 200), tag: pas(raw.tag, 120),
+        name: pas(raw.name, 300), notes: pas(raw.notes, 60_000), file: pas(raw.file, 1_000),
+        dir: pas(raw.dir, 1_000), method: pas(raw.method, 10),
+        prerelease: raw.prerelease === true,
+      };
+      return forgeErr(event, () => forgeSvc().action(kind, a.host, fa));
+    });
+    // 逃生口:仅双平台域名可外开(renderer 禁 window.open;UIVERIFY 只回 ok)
+    ipcMain.handle('forge:open', (event, url: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      const u = typeof url === 'string' ? url.slice(0, 2_000) : '';
+      if (!/^https:\/\/([a-z0-9-]+\.)*(github\.com|atomgit\.com)\//.test(u)) {
+        return { ok: false, code: 'BAD_REQUEST', error: '仅 github.com / atomgit.com 链接可打开' };
+      }
+      if (process.env.HMH_DESKTOP_UIVERIFY === '1' && !forgeFixtureOff) return { ok: true };
+      void shell.openExternal(u);
+      return { ok: true };
+    });
+    ipcMain.handle('forge:resolve', (event, p: unknown) => {
+      if (!senderTrusted(event.senderFrame)) return { error: 'untrusted sender', code: 'FORBIDDEN' };
+      if (process.env.HMH_DESKTOP_UIVERIFY === '1' && !forgeFixtureOff) return forgeFixtures().resolve;
+      const path = typeof p === 'string' ? p.slice(0, 1_000) : '';
+      return forgeSvc().resolve(path);
     });
   }
 
@@ -1499,7 +1616,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await check('window.hmh 只有白名单方法(无 ipcRenderer/额外面)', async () => {
       const r = (await js('Object.keys(window.hmh || {}).sort().join(",")')) as string;
-      const allow = ['applyUpdate', 'approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'checkUpdate', 'chromeTheme', 'cognitive', 'detectRuntime', 'diff', 'exportSession', 'fsList', 'fsRead', 'fsSearch', 'getState', 'getWizard', 'inject', 'installCli', 'interrupt', 'modelSet', 'onEventBatches', 'onHostState', 'onInstallProgress', 'onMenuAction', 'onStreamChunks', 'onUpdateState', 'pickDirectory', 'pickFiles', 'popupMainMenu', 'providerSave', 'providers', 'remoteWebAutostart', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'wizardComplete', 'workspaces', 'workspaceAdd', 'workspaceUse'];
+      const allow = ['applyUpdate', 'approve', 'approvalGet', 'approvalSet', 'browseRuntime', 'checkUpdate', 'chromeTheme', 'cognitive', 'detectRuntime', 'diff', 'exportSession', 'forgeAction', 'forgeIssues', 'forgeLogin', 'forgeOpen', 'forgePrs', 'forgeReleases', 'forgeRepos', 'forgeResolve', 'forgeStatus', 'fsList', 'fsRead', 'fsSearch', 'getState', 'getWizard', 'inject', 'installCli', 'interrupt', 'modelSet', 'onEventBatches', 'onForgeLoginOutput', 'onHostState', 'onInstallProgress', 'onMenuAction', 'onStreamChunks', 'onUpdateState', 'pickDirectory', 'pickFiles', 'popupMainMenu', 'providerSave', 'providers', 'remoteWebAutostart', 'remoteWebStart', 'remoteWebStatus', 'remoteWebStop', 'runtimeInfo', 'sendTask', 'sessionOp', 'sessionPreview', 'sessions', 'setRuntime', 'stopHost', 'wizardComplete', 'workspaces', 'workspaceAdd', 'workspaceUse'];
       const got = r === '' ? [] : r.split(',');
       const unexpected = got.filter((k) => !allow.includes(k));
       return [unexpected.length === 0, `keys=${r}`];
