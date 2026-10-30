@@ -62,14 +62,23 @@ export default class EntryAbility extends UIAbility {
         return
       }
       console.info('UI content loaded successfully')
-      // 2026-10-30 交互事故修复:自由浮动窗模式下窗口装饰(开/关)由窗口管理器
-      // 处理可用,但内容收不到真实鼠标事件(uitest 触摸注入正常=事件分发路径
-      // 不同)。最大化走桌面标准输入处理路径(API23 Window 无 focus())。
-      try {
-        windowStage.getMainWindowSync().maximize().catch((e: object) => console.warn('maximize skipped: ' + JSON.stringify(e)))
-      } catch (e) {
-        console.warn('window input fix skipped: ' + JSON.stringify(e))
+      // 2026-10-31 终修:锁浮动窗——本系统(KaihongOS 6.1.1.10 PC)最大化态下
+      // 鼠标命中测试整体错位到标题栏(ContainerModalTitleRow 吞掉一切点击;
+      // 浮动态鼠标完全正常,实测)=用户"整个 GUI 点不动"的真相。窗口模式会被
+      // 系统跨安装记忆,故立即 restore + 1.2s 后再 restore 压过记忆;并把默认
+      // 浮动窗拉大到三栏可用宽度(≥960 出紧凑侧栏)。勿点最大化按钮:此系统
+      // 版本上会复发鼠标失灵(待深开鸿修复)。
+      const forceFloat = (): void => {
+        try {
+          const win = windowStage.getMainWindowSync()
+          win.restore().catch((e: object) => console.warn('restore skipped: ' + JSON.stringify(e)))
+          win.resize(1150, 720).catch((e: object) => console.warn('resize skipped: ' + JSON.stringify(e)))
+        } catch (e) {
+          console.warn('forceFloat skipped: ' + JSON.stringify(e))
+        }
       }
+      forceFloat()
+      setTimeout(forceFloat, 1200)
     })
   }
 
