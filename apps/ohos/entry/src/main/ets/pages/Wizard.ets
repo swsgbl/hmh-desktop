@@ -128,7 +128,7 @@ export struct Wizard {
             .fontSize(12)
             .fontColor(Th.c.warn)
         } else {
-          Text('检测到本机没有运行中的 hmh。选择一种方式开始:')
+          Text('检测到本机未安装 hmh。选择安装方式(①会自动等待并连接,无需手动操作):')
             .fontSize(12)
             .fontColor(Th.c.text2)
         }
@@ -171,6 +171,7 @@ export struct Wizard {
 
   @Builder
   optionCard(key: string, title: string, desc: string, recommended: boolean) {
+    // 触屏适配(用户实测反馈 2026-10-31):整卡都是点击目标——不只"选择此项"几个字。
     Column({ space: 6 }) {
       Row({ space: 8 }) {
         Text(title)
@@ -192,14 +193,9 @@ export struct Wizard {
         .fontSize(11)
         .fontColor(Th.c.text2)
         .lineHeight(16)
-      Text(key === 'local-install' ? '选择此项 →' : '选择此项 →')
+      Text('选择此项 →')
         .fontSize(11)
         .fontColor(Th.c.brand)
-        .onClick(() => {
-          if (key === 'local-install') { this.step = 1 }
-          else if (key === 'remote') { this.step = 2 }
-          else { this.step = 3 }
-        })
     }
     .padding(14)
     .borderRadius(10)
@@ -207,13 +203,21 @@ export struct Wizard {
     .border({ width: 1, color: Th.c.border })
     .width('100%')
     .alignItems(HorizontalAlign.Start)
+    .onClick(() => {
+      if (key === 'local-install') {
+        // 自动安装语义(沙箱内应用不能代装,故:进入即自动等待,服务就绪即自动连)
+        this.step = 1
+        this.startPoll()
+      } else if (key === 'remote') { this.step = 2 }
+      else { this.step = 3 }
+    })
   }
 
   @Builder
   stepLocalInstall() {
     Scroll() {
       Column({ space: 12 }) {
-        Text('在电脑上运行这条命令(一键安装到本设备):')
+        Text('在电脑上(hmh-desktop 仓库根目录)运行,一键把 hmh 内核装进本设备:')
           .fontSize(12)
           .fontColor(Th.c.text)
         Row({ space: 8 }) {
@@ -257,7 +261,7 @@ export struct Wizard {
         if (this.polling) {
           Row({ space: 8 }) {
             MotionSpinner({ side: 16, color: Th.c.brand })
-            Text(`等待本机服务就绪… (${this.pollCount}/60)`)
+            Text(`已自动等待本机服务就绪… (${this.pollCount}/60,装好后自动连接)`)
               .fontSize(11)
               .fontColor(Th.c.text2)
           }
