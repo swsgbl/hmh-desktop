@@ -148,6 +148,32 @@ struct Index {
           this.winW = v
         }
       })
+
+      // ---- 弹层(条件渲染,替代 .overlay;三栏上方覆盖) ----
+      if (this.settingsOpen) {
+        Column() {
+          Row({ space: 8 }) {
+            Text('设置').fontSize(14).fontColor(Th.c.text).layoutWeight(1)
+            Text('×').fontSize(18).fontColor(Th.c.text3).padding(6)
+              .onClick(() => { AppStorage.setOrCreate('settingsOpen', false) })
+          }
+          .padding(14).width('100%')
+          SettingsPage()
+        }
+        .width(480)
+        .constraintSize({ maxHeight: '80%' })
+        .backgroundColor(Th.c.l2)
+        .border({ width: 1, color: Th.c.border2 })
+        .borderRadius(14)
+        .padding({ bottom: 12 })
+        .position({ x: '30%', y: '10%' })
+        .zIndex(100)
+      }
+      if (this.wizardOpen) {
+        Wizard()
+          .position({ x: 0, y: 0 })
+          .zIndex(100)
+      }
     }
     .width('100%')
     .height('100%')
