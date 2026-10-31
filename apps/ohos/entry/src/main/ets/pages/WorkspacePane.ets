@@ -135,14 +135,15 @@ export struct WorkspacePane {
           .padding({ left: 10, right: 10, top: 2, bottom: 2 })
       }
       Blank()
-      // 模型 pill(点击开菜单)
+      // 模型 pill(点击直接切模型——用户要求不用进设置)
       Column({ space: 0 }) {
-        Text(this.model !== '' ? this.model : this.L('top.model'))
-          .fontSize(12)
-          .fontColor(Th.c.text3)
-          .border({ width: 1, color: Th.c.border2 })
+        Text(`${this.model !== '' ? this.model : this.L('top.model')} ▾`)
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Th.c.brand)
+          .border({ width: 1.5, color: Th.c.brand })
           .borderRadius(999)
-          .padding({ left: 10, right: 10, top: 2, bottom: 2 })
+          .padding({ left: 12, right: 12, top: 4, bottom: 4 })
           .onClick(() => {
             this.modelMenuOpen = !this.modelMenuOpen
           })
@@ -180,15 +181,29 @@ export struct WorkspacePane {
       }
       .width(140)
 
-      Text(`审批:${this.approvalMode}`)
+      Text(`审批:${this.approvalMode} ▾`)
         .fontSize(12)
-        .fontColor(Th.c.waiting)
-      Text('⚙')
-        .fontSize(15)
-        .fontColor(Th.c.text3)
-        .padding({ left: 6, right: 6 })
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.approvalMode === 'auto' ? Th.c.completed : Th.c.waiting)
+        .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+        .backgroundColor(this.approvalMode === 'auto' ? Th.c.brandBg : Th.c.l1)
+        .borderRadius(999)
+        .border({ width: 1, color: this.approvalMode === 'auto' ? Th.c.brand : Th.c.border2 })
         .onClick(() => {
-          this.settingsOpen = true
+          this.approvalMode = this.approvalMode === 'auto' ? 'ask' : 'auto'
+          // approval mode is in-memory toggle; persistence via settings
+        })
+      // ⚙ 高对比度设置按钮(用户反馈:原 text3 色太模糊)
+      Text(this.locale === 'en' ? 'Settings' : '设置')
+        .fontSize(12)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(Th.c.brand)
+        .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+        .backgroundColor(Th.c.brandBg)
+        .borderRadius(6)
+        .border({ width: 1, color: Th.c.brand })
+        .onClick(() => {
+          AppStorage.setOrCreate('settingsOpen', true)
         })
       Text(this.locale === 'zh' ? '中' : 'EN')
         .fontSize(12)
@@ -507,6 +522,8 @@ export struct WorkspacePane {
           .onChange((v: string) => {
             this.input = v
           })
+          .enterKeyType(EnterKeyType.Send)
+          .onSubmit(() => this.doSend())
           .layoutWeight(1)
         Button(this.chat.running ? this.L('comp.inject') : this.L('comp.send'))
           .fontSize(14)
@@ -596,6 +613,9 @@ export struct WorkspacePane {
       const o = resp as Record<string, Object>
       if (o['ok'] === true) {
         this.input = ''
+        // 用户消息本地立即上屏(SSE 只回 AI 侧,不回用户侧)
+        const um: ChatMessage = { role: 'user', text: text, tools: [] as string[] }
+        this.chat.messages.push(um)
         this.attachments = []
         this.atOpen = false
       }

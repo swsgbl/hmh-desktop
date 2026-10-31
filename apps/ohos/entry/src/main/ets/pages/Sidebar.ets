@@ -13,6 +13,8 @@ import { t } from '../model/I18n'
 import { Th, Metrics } from '../theme/Theme'
 import { ApiError, toApiError } from '../net/ApiClient'
 
+class RenameBody { title: string = '' }
+
 @Component
 export struct Sidebar {
   @Link activeId: string
@@ -27,6 +29,10 @@ export struct Sidebar {
   @State search: string = ''
   @State wsData: WorkspacesResp = { current: '', items: [] } as WorkspacesResp
   @State wsMenuOpen: boolean = false
+  @State menuForId: string = ''
+  @State renameForId: string = ''
+  @State renameText: string = ''
+  @State confirmDeleteId: string = ''
   @StorageProp('localeRev') localeRev: number = 0
   private store: AppStore = AppStore.get()
   private scroller: Scroller = new Scroller()
@@ -229,7 +235,7 @@ export struct Sidebar {
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
-        Text(s.pinned ? '★' : '')
+        Text(this.pinned.has(s.id) ? '★' : '')
           .fontSize(12)
           .fontColor(Th.c.warn)
       }
@@ -244,10 +250,28 @@ export struct Sidebar {
         } else if (s.outcome === 'ok') {
           Text('✓').fontSize(10).fontColor(Th.c.completed)
         }
-        Text('⋯')
-          .fontSize(14)
-          .fontColor(Th.c.text3)
-          .onClick(() => this.itemMenu(s.id))
+        Row({ space: 0 }) {
+          Text(this.pinned.has(s.id) ? '★' : '☆')
+            .fontSize(11)
+            .fontColor(this.pinned.has(s.id) ? Th.c.warn : Th.c.text3)
+            .padding(2)
+            .onClick(() => this.doStar(s.id))
+          Text('档')
+            .fontSize(10)
+            .fontColor(Th.c.text3)
+            .padding(2)
+            .onClick(() => this.doArchive(s.id))
+          Text('删')
+            .fontSize(10)
+            .fontColor(Th.c.text3)
+            .padding(2)
+            .onClick(() => { this.confirmDeleteId = s.id })
+          Text('改')
+            .fontSize(10)
+            .fontColor(Th.c.text3)
+            .padding(2)
+            .onClick(() => { this.renameForId = s.id; this.renameText = s.title })
+        }
       }
       .width('100%')
     }
@@ -257,16 +281,86 @@ export struct Sidebar {
     .backgroundColor(s.id === this.activeId ? Th.c.l1 : Th.c.l2)
     .width('100%')
     .onClick(() => this.openSession(s.id))
+
+    // ---- 内联重命名 ----
+    if (this.renameForId === s.id) {
+      Row({ space: 6 }) {
+        TextInput({ text: this.renameText, placeholder: this.locale === 'en' ? 'New name' : '新名称' })
+          .fontSize(12)
+          .backgroundColor(Th.c.l1)
+          .border({ width: 1, color: Th.c.brand })
+          .borderRadius(4)
+          .height(30)
+          .layoutWeight(1)
+          .onChange((v: string) => { this.renameText = v })
+          .enterKeyType(EnterKeyType.Done)
+          .onSubmit(() => this.doRename(s.id))
+        Text('OK')
+          .fontSize(11)
+          .fontColor(Th.c.completed)
+          .padding(4)
+          .onClick(() => this.doRename(s.id))
+        Text('X')
+          .fontSize(11)
+          .fontColor(Th.c.danger)
+          .padding(4)
+          .onClick(() => { this.renameForId = '' })
+      }
+      .width('100%')
+      .padding(4)
+    }
+
+    // ---- 删除确认 ----
+    if (this.confirmDeleteId === s.id) {
+      Row({ space: 8 }) {
+        Text(this.locale === 'en' ? 'Delete?' : '确定删除?')
+          .fontSize(11)
+          .fontColor(Th.c.danger)
+          .layoutWeight(1)
+        Button(this.locale === 'en' ? 'Yes' : '是')
+          .fontSize(11)
+          .height(24)
+          .backgroundColor(Th.c.danger)
+          .onClick(() => this.doDelete(s.id))
+        Button(this.locale === 'en' ? 'No' : '否')
+          .fontSize(11)
+          .height(24)
+          .backgroundColor(Th.c.l1)
+          .fontColor(Th.c.text)
+          .onClick(() => { this.confirmDeleteId = '' })
+      }
+      .width('100%')
+      .padding(4)
+    }
   }
 
   // ---------- 动作 ----------
-  private itemMenu(id: string): void {
-    // 蓝本:每行 ⋯ 菜单(导出/归档/删除)——v3 弹层从简:先直接归档+删除双按钮由长按/此处触发
-    // 此处先做成:点击 ⋯ → 归档(可恢复);删除/导出走 dock 会话页(蓝本同款三键在 hover 展示)
-    this.store.api().postJson<Object>(`/api/sessions/${encodeURIComponent(id)}/archive`, null).then((_r: Object) => {
-      this.refresh()
-    }).catch((_e: object) => {
-    })
+  private doStar(id: string): void {
+    if (this.pinned.has(id)) { this.pinned.delete(id) } else { this.pinned.add(id) }
+    this.store.savePinned(this.pinned)
+  }
+
+  private doArchive(id: string): void {
+    this.store.api().postJson<Object>('/api/sessions/' + encodeURIComponent(id) + '/archive', null)
+      .then((_r: Object) => { this.refresh() })
+      .catch((_e: object) => { })
+  }
+
+  private doDelete(id: string): void {
+    this.store.api().postJson<Object>('/api/sessions/' + encodeURIComponent(id) + '/delete', null)
+      .then((_r: Object) => { this.refresh() })
+      .catch((_e: object) => { })
+    this.confirmDeleteId = ''
+  }
+
+  private doRename(id: string): void {
+    if (this.renameText.trim() === '') { this.renameForId = ''; return }
+    const rb = new RenameBody()
+    rb.title = this.renameText.trim()
+    this.store.api().postJson<Object>('/api/sessions/' + encodeURIComponent(id) + '/rename', rb)
+      .then((_r: Object) => { this.refresh() })
+      .catch((_e: object) => { })
+    this.renameForId = ''
   }
 
   private filterLabel(f: string): string {

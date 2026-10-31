@@ -12,6 +12,7 @@ import { guardState } from '../model/Guards'
 @Component
 export struct DockPane {
   @State tab: number = 0
+  @State dockCollapsed: boolean = false
   @State locale: string = 'zh'
   @State st: StateObj | null = null
   @State logs: string[] = []
@@ -96,27 +97,42 @@ export struct DockPane {
 
   build() {
     Column({ space: 0 }) {
-      // dock-tabs
-      Scroll() {
-        Row({ space: 4 }) {
-          ForEach(this.tabNames(), (name: string, idx: number) => {
-            Text(name)
-              .fontSize(13)
-              .fontColor(this.tab === idx ? Th.c.text : Th.c.text3)
-              .backgroundColor(this.tab === idx ? Th.c.l1 : Th.c.l2)
-              .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-              .borderRadius(6)
-              .onClick(() => {
-                this.tab = idx
-              })
-          }, (name: string, idx: number) => name)
+      // dock-tabs + 折叠按钮(用户要求)
+      Row({ space: 0 }) {
+        Scroll() {
+          Row({ space: 4 }) {
+            ForEach(this.tabNames(), (name: string, idx: number) => {
+              Text(name)
+                .fontSize(13)
+                .fontColor(this.tab === idx ? Th.c.text : Th.c.text3)
+                .backgroundColor(this.tab === idx ? Th.c.l1 : Th.c.l2)
+                .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+                .borderRadius(6)
+                .onClick(() => {
+                  this.tab = idx
+                })
+            }, (name: string, idx: number) => name)
+          }
+          .padding({ left: 8, top: 8, bottom: 8, right: 4 })
         }
-        .padding(8)
+        .scrollable(ScrollDirection.Horizontal)
+        .layoutWeight(1)
+
+        // 折叠/展开按钮
+        Text(this.dockCollapsed ? '▸' : '▾')
+          .fontSize(14)
+          .fontColor(Th.c.text3)
+          .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+          .onClick(() => {
+            this.dockCollapsed = !this.dockCollapsed
+          })
       }
-      .scrollable(ScrollDirection.Horizontal)
       .width('100%')
       .backgroundColor(Th.c.l2)
       .border({ width: 1, color: Th.c.border2 })
+
+      // dock-body(折叠时隐藏)
+      if (!this.dockCollapsed) {
 
       // dock-body
       Scroll() {
@@ -158,6 +174,7 @@ export struct DockPane {
       }
       .layoutWeight(1)
       .width('100%')
+      } // end !dockCollapsed
     }
     .width(360)
     .height('100%')

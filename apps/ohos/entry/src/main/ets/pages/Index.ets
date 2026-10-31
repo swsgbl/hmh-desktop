@@ -154,9 +154,7 @@ struct Index {
     .backgroundColor(Th.c.bg)
 
     // ---- 设置弹层(居中 480px) ----
-    .overlay(this.settingsLayer(), { align: Alignment.Center })
     // v6.1: 安装向导(全屏遮罩,探测后弹出)
-    .overlay(this.wizardLayer(), { align: Alignment.Center })
   }
 
   @Builder
