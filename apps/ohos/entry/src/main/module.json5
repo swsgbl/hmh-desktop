@@ -17,7 +17,8 @@
         "label": "$string:EntryAbility_label",
         "startWindowIcon": "$media:app_icon",
         "startWindowBackground": "$color:start_window_background",
-        "exported": true
+        "exported": true,
+        "visible": true
       }
     ],
     "requestPermissions": [

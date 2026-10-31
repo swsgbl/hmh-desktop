@@ -20,7 +20,10 @@ export struct Wizard {
   @StorageProp('firstRunOutcome') outcome: string = 'wizard'
   private store: AppStore = AppStore.get()
   private pollTimer: number = -1
-  private readonly PC_CMD = 'node apps/ohos/scripts/deploy-local-kernel.mjs'
+  // 2026-10-31 单机闭环:应用与内核全部在本机完成(浏览器下载整合包+终端一行),
+  // 不再要求另一台电脑。命令自动探测下载目录的真实路径(文件管理器视图与
+  // 终端路径不同:/storage/media/... 为终端可见形态)。
+  private readonly PC_CMD = 'D=$(ls /storage/media/100/local/files/Docs/Download/hmh-offline-bundle.tar.gz 2>/dev/null || ls ~/Download/hmh-offline-bundle.tar.gz 2>/dev/null); cd /data/local/tmp && busybox tar xzf "$D" && sh hmh-bundle/install.sh'
 
   aboutToDisappear(): void {
     this.stopPoll()
@@ -220,15 +223,15 @@ export struct Wizard {
   stepLocalInstall() {
     Scroll() {
       Column({ space: 12 }) {
-        Text('在电脑上(hmh-desktop 仓库根目录)运行,一键把 hmh 内核装进本设备:')
+        Text('单机安装(本机浏览器先下载 hmh-offline-bundle.tar.gz,再在终端粘贴这一行):')
           .fontSize(12)
           .fontColor(Th.c.text)
         Row({ space: 8 }) {
           Text(this.PC_CMD)
-            .fontSize(11)
+            .fontSize(10)
             .fontColor(Th.c.brand)
             .layoutWeight(1)
-            .maxLines(2)
+            .maxLines(4)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
           Button(this.copied ? '已复制 ✓' : '复制')
             .fontSize(11)
